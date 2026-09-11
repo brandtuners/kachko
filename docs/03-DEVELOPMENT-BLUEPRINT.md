@@ -3101,6 +3101,8 @@ Each ticket includes its step, owner, dependency ticket IDs, contract link, acce
 
 # 85. Definition of Done
 
+PRs are checked by the [automatic documentation review agent](04-PR-REVIEW-AGENT.md). Rohan configures its API secret and required GitHub status check; Rohan and Girish address cited findings before merging. The agent supplements the feature checks below.
+
 A feature is not done merely because the UI works.
 
 A feature is done when:
