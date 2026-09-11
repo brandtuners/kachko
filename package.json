@@ -1,0 +1,34 @@
+{
+  "name": "kachko",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo test",
+    "test:e2e": "turbo test:e2e",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.4.1",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.4.1",
+  "type": "module",
+  "devDependencies": {
+    "turbo": "^2.10.12"
+  }
+}
