@@ -1,0 +1,96 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "head_sha": {
+      "type": "string"
+    },
+    "base_sha": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "verification": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "fail",
+        "incomplete"
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "doc_path": {
+            "type": "string"
+          },
+          "doc_section": {
+            "type": "string"
+          },
+          "impact": {
+            "type": "string"
+          },
+          "correction": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "P0",
+              "P1",
+              "P2",
+              "P3"
+            ]
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "doc_line": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "title",
+          "path",
+          "doc_path",
+          "doc_section",
+          "impact",
+          "correction",
+          "priority",
+          "line",
+          "doc_line"
+        ]
+      }
+    }
+  },
+  "required": [
+    "head_sha",
+    "base_sha",
+    "summary",
+    "verification",
+    "status",
+    "limitations",
+    "findings"
+  ]
+}
