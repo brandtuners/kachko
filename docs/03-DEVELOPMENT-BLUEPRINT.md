@@ -481,7 +481,7 @@ Do not create all modules fully on day one. Create folders/modules as the featur
 
 # 9. Phase 4 — Local Infrastructure
 
-Create `docker-compose.yml`.
+The root `docker-compose.yml` now defines local PostgreSQL 16 and Redis 7, loopback-only ports, health checks, and named volumes. Follow the [local setup guide](../README.md#local-postgresql-and-redis). Environment examples are in root `.env.example` and `apps/api/.env.example`. API connections, dependency readiness, and Prisma remain separate next steps.
 
 Services:
 
