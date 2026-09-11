@@ -1,4 +1,4 @@
-# Kachko API
+# kachko API
 
 NestJS modular monolith following `docs/01-HLD.md` and `docs/02-LLD.md`.
 
@@ -13,6 +13,8 @@ pnpm --filter api typecheck
 pnpm --filter api lint
 pnpm --filter api test
 ```
+
+For local PostgreSQL/Redis startup and connection examples, follow the [root setup guide](../../README.md#local-postgresql-and-redis).
 
 Local defaults work without an env file. Copy `apps/api/.env.example` to `apps/api/.env` to override them. Workspace scripts run with the API directory as their working directory.
 
