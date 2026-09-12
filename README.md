@@ -77,7 +77,7 @@ pnpm --filter kachko-fe dev
 
 Frontend: `http://localhost:3000`. API health: `http://localhost:4000/api/v1/health`.
 
-**Current scope:** local infrastructure, Prisma tooling, and the User/Session schema and migration are implemented. The API currently reports process health only. Its generated Prisma client is ready for backend use, but NestJS database lifecycle wiring, Redis connections, dependency readiness, and authentication remain separate tasks. See the [API README](apps/api/README.md) for its existing commands.
+**Current scope:** local infrastructure, Prisma identity models/migration, NestJS PostgreSQL/Redis providers, and dependency readiness are implemented. Set the required `DATABASE_URL` and `REDIS_URL` in `apps/api/.env`. `/api/v1/health/ready` returns `200` when both services respond and `503` on failure; `/api/v1/health/live` remains independent of dependency availability. Authentication remains a separate task. See the [API README](apps/api/README.md) for response examples, timeouts, lifecycle behavior, and `pnpm --filter api test:infra`.
 
 ## Prisma and identity database
 
