@@ -7,7 +7,8 @@
       ],
       "outputs": [
         ".next/**",
-        "dist/**"
+        "dist/**",
+        "src/generated/prisma/**"
       ]
     },
     "dev": {
@@ -34,5 +35,9 @@
         "^build"
       ]
     }
-  }
+  },
+  "globalDependencies": [
+    "prisma/schema.prisma",
+    "prisma.config.ts"
+  ]
 }

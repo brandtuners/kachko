@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "nest start --watch",
-    "build": "nest build",
+    "dev": "pnpm db:generate && nest start --watch",
+    "build": "pnpm db:generate && nest build",
     "start": "node dist/main.js",
     "lint": "eslint \"{src,test}/**/*.ts\"",
-    "typecheck": "tsc --noEmit",
-    "test": "pnpm build && node --test test/*.test.cjs"
+    "typecheck": "pnpm db:generate && tsc --noEmit",
+    "test": "pnpm build && node --test test/*.test.cjs",
+    "db:generate": "pnpm -w db:generate",
+    "test:db": "pnpm build && node --test test/database/*.test.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
@@ -20,7 +22,9 @@
     "class-validator": "^0.14.2",
     "helmet": "^8.0.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "@prisma/client": "7.10.0",
+    "@prisma/adapter-pg": "7.10.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",

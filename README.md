@@ -55,7 +55,7 @@ Named volumes retain PostgreSQL data and Redis append-only data when containers 
 
 ## Environment files and port conflicts
 
-- Root `.env`: Compose service credentials and published ports, plus connection examples for future root database tooling.
+- Root `.env`: Compose service credentials and published ports, plus connection values for root Prisma migration commands.
 - `apps/api/.env`: NestJS runtime configuration when launched with the workspace commands below. The API does not automatically read the root `.env`.
 - If ports are occupied, set `POSTGRES_PORT=5433` and/or `REDIS_PORT=6380` in the root `.env`. Update `DATABASE_URL`/`REDIS_URL` in both environment files to match, then rerun `docker compose up -d --wait postgres redis`.
 - Keep database/user/password values synchronized with the URLs. Percent-encode special characters in URL credentials. Use `127.0.0.1` for host applications; `postgres`/`redis` are service names for containers on the Compose network.
@@ -77,6 +77,58 @@ pnpm --filter kachko-fe dev
 
 Frontend: `http://localhost:3000`. API health: `http://localhost:4000/api/v1/health`.
 
-**Current scope:** local infrastructure and environment examples are provided. The API currently reports process health only; it does not yet connect to PostgreSQL or Redis. NestJS clients, dependency readiness, Prisma models/migrations, and authentication are the next backend tasks. See the [API README](apps/api/README.md) for its existing commands.
+**Current scope:** local infrastructure, Prisma tooling, and the User/Session schema and migration are implemented. The API currently reports process health only. Its generated Prisma client is ready for backend use, but NestJS database lifecycle wiring, Redis connections, dependency readiness, and authentication remain separate tasks. See the [API README](apps/api/README.md) for its existing commands.
+
+## Prisma and identity database
+
+Prisma database access belongs only to the API. The root holds the schema, migration history, and development CLI as specified in the project docs:
+
+| Location | Responsibility |
+|---|---|
+| `prisma/schema.prisma` | User, Session and UserRole definitions |
+| `prisma/migrations/` | Versioned PostgreSQL SQL migrations |
+| `prisma.config.ts` | CLI configuration, loading root `.env` |
+| Root `package.json` | Prisma CLI development dependency and `db:*` commands |
+| `apps/api/package.json` | Prisma Client and PostgreSQL adapter runtime dependencies |
+| `apps/api/src/generated/prisma/` | Generated API-only TypeScript client; ignored by Git |
+
+The frontend has no Prisma dependency and must use API contracts rather than importing database models or the generated client. API build, dev, and typecheck scripts regenerate the client automatically. Prisma packages are pinned together at `7.10.0`; the generator uses CommonJS to match the NestJS compiler.
+
+After setting up the root `.env` and starting PostgreSQL, run from the repository root:
+
+```sh
+pnpm install
+pnpm db:validate
+pnpm db:generate
+pnpm db:deploy
+pnpm db:status
+```
+
+`db:deploy` applies the checked-in initial migration to the database identified by the root `DATABASE_URL`; it does not reset existing data. Confirm that URL points to your intended database. No user or administrator accounts are seeded.
+
+For subsequent schema changes during development:
+
+```sh
+pnpm db:migrate --name describe_your_change
+pnpm db:generate
+```
+
+Review and commit the generated SQL. `migrate dev` needs a shadow database and may request a reset if the database has drifted; never point it at production or accept a reset of data you need. Deployment uses `pnpm db:deploy`. `pnpm db:studio` opens the database browser. A seed command will be introduced when seed data is needed; the previously unconfigured placeholder was removed.
+
+The models include unique email/username/token hashes, account role/status fields, session expiry/revocation timestamps, and a cascading User → Session relation. Unique email/username constraints already create indexes, so the duplicate non-unique indexes shown in the LLD example are unnecessary. Future auth code must normalize email/usernames, enforce reserved-name/password rules, hash passwords/tokens, and check session expiry/revocation: the schema does not implement those behaviors.
+
+### Database integration test
+
+Use a **separate local database whose name ends in `_test`**. For example, with the Compose defaults, create it once:
+
+```sh
+docker compose exec -T postgres createdb -U kachko kachko_identity_test
+DATABASE_URL=postgresql://kachko:kachko@127.0.0.1:5432/kachko_identity_test pnpm db:deploy
+TEST_DATABASE_URL=postgresql://kachko:kachko@127.0.0.1:5432/kachko_identity_test pnpm db:test
+```
+
+Adjust credentials/ports if customized. The test checks defaults, unique constraints, foreign keys, persisted session timestamps, and cascade deletion through the generated Prisma client. It removes only its own fixtures. It refuses non-local databases, names without `_test`, and URLs with query overrides; it never falls back to the development `DATABASE_URL`. Existing API tests remain independent of database availability.
+
+Prisma references: [client generation](https://www.prisma.io/docs/orm/prisma-schema/overview/generators) and [CLI configuration](https://www.prisma.io/docs/orm/reference/prisma-config-reference).
 
 Configuration references: [Docker Compose services](https://docs.docker.com/reference/compose-file/services/), [official PostgreSQL image](https://hub.docker.com/_/postgres), and [official Redis image](https://hub.docker.com/_/redis).
