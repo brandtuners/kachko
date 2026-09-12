@@ -57,7 +57,7 @@ Quick links: [detailed execution rules](#71-exact-development-order), [task boar
 
 ### Repository baseline
 
-The repository and pnpm/Turborepo workspace already exist. Continue frontend development in the existing `apps/kachko-fe` application. The API originally contained Express dependencies and a generic TypeScript configuration, with no application source. It now has a NestJS scaffold, versioned health routes, environment validation, request validation, CORS, security headers, error handling, and development OpenAPI docs. Database connections and business features remain to be implemented. Existing files are not proof that every foundation check passes.
+The repository and pnpm/Turborepo workspace already exist. Continue frontend development in the existing `apps/kachko-fe` application. The API originally contained Express dependencies and a generic TypeScript configuration, with no application source. It now has a NestJS scaffold, versioned health routes, environment validation, request validation, CORS, security headers, error handling, and development OpenAPI docs. The root Prisma schema/config and initial User/Session migration are implemented, with an API-only generated client. NestJS runtime database connections and business features remain to be implemented. Existing files are not proof that every foundation check passes.
 
 ### Working agreement and handoff
 
@@ -481,7 +481,7 @@ Do not create all modules fully on day one. Create folders/modules as the featur
 
 # 9. Phase 4 — Local Infrastructure
 
-The root `docker-compose.yml` now defines local PostgreSQL 16 and Redis 7, loopback-only ports, health checks, and named volumes. Follow the [local setup guide](../README.md#local-postgresql-and-redis). Environment examples are in root `.env.example` and `apps/api/.env.example`. API connections, dependency readiness, and Prisma remain separate next steps.
+The root `docker-compose.yml` now defines local PostgreSQL 16 and Redis 7, loopback-only ports, health checks, and named volumes. Follow the [local setup guide](../README.md#local-postgresql-and-redis). Environment examples are in root `.env.example` and `apps/api/.env.example`. Prisma identity schema/migrations are implemented; API connections and dependency readiness remain separate next steps.
 
 Services:
 
@@ -578,6 +578,8 @@ R2 secret keys
 ---
 
 # 11. Phase 6 — Database First
+
+**Current implementation:** `prisma/schema.prisma` contains User, Session, and UserRole. The initial migration is in `prisma/migrations/20260912000000_init_identity`. Root Prisma CLI/config manage schema changes; the generated client and PostgreSQL adapter belong only to `apps/api`. Follow the [Prisma setup guide](../README.md#prisma-and-identity-database). Add Page/Block/Theme models with their feature slices; the current identity schema does not yet complete those later milestones.
 
 Create Prisma:
 
@@ -834,6 +836,8 @@ Backend/database validation is for correctness.
 ---
 
 # 16. Phase 7 — Database Migration
+
+For the existing User/Session migration, run `pnpm db:deploy` and `pnpm db:status` after setting the root `DATABASE_URL`. Generate the client with `pnpm db:generate`. No seed command/data is configured yet; the theme seed example below applies when themes are implemented. The following `migrate dev` example describes creating future migrations, not recreating the checked-in identity migration.
 
 Once the initial schema is ready:
 
