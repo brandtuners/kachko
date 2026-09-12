@@ -57,7 +57,7 @@ Quick links: [detailed execution rules](#71-exact-development-order), [task boar
 
 ### Repository baseline
 
-The repository and pnpm/Turborepo workspace already exist. Continue frontend development in the existing `apps/kachko-fe` application. The API originally contained Express dependencies and a generic TypeScript configuration, with no application source. It now has a NestJS scaffold, versioned health routes, environment validation, request validation, CORS, security headers, error handling, and development OpenAPI docs. The root Prisma schema/config and initial User/Session migration are implemented, with an API-only generated client. NestJS runtime database connections and business features remain to be implemented. Existing files are not proof that every foundation check passes.
+The repository and pnpm/Turborepo workspace already exist. Continue frontend development in the existing `apps/kachko-fe` application. The API originally contained Express dependencies and a generic TypeScript configuration, with no application source. It now has a NestJS scaffold, versioned health routes, environment validation, request validation, CORS, security headers, error handling, and development OpenAPI docs. The root Prisma schema/config and initial User/Session migration are implemented, with an API-only generated client. NestJS Prisma/Redis providers and dependency readiness are implemented; business features remain to be implemented. Existing files are not proof that every foundation check passes.
 
 ### Working agreement and handoff
 
@@ -481,7 +481,7 @@ Do not create all modules fully on day one. Create folders/modules as the featur
 
 # 9. Phase 4 — Local Infrastructure
 
-The root `docker-compose.yml` now defines local PostgreSQL 16 and Redis 7, loopback-only ports, health checks, and named volumes. Follow the [local setup guide](../README.md#local-postgresql-and-redis). Environment examples are in root `.env.example` and `apps/api/.env.example`. Prisma identity schema/migrations are implemented; API connections and dependency readiness remain separate next steps.
+The root `docker-compose.yml` now defines local PostgreSQL 16 and Redis 7, loopback-only ports, health checks, and named volumes. Follow the [local setup guide](../README.md#local-postgresql-and-redis). Environment examples are in root `.env.example` and `apps/api/.env.example`. Prisma identity schema/migrations, API connections, and `/api/v1/health/ready` are implemented. See the [API setup and verification guide](../apps/api/README.md).
 
 Services:
 
@@ -871,7 +871,7 @@ All production schema changes go through migrations.
 
 # 17. Phase 8 — API Foundation
 
-The NestJS scaffold implements part of this foundation. Complete request IDs, structured logging, and dependency readiness when local services are connected; verify the full checklist before business integration:
+The NestJS scaffold implements part of this foundation. Dependency readiness now probes PostgreSQL and Redis, returning 200/503 with bounded checks while liveness stays independent. Complete request IDs and structured logging; verify the full checklist before business integration:
 
 ```text
 Global validation
