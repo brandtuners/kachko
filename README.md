@@ -138,3 +138,5 @@ Configuration references: [Docker Compose services](https://docs.docker.com/refe
 Auth/session/profile endpoints and shared identity contracts are implemented. See [local endpoint testing and the FE contract](docs/05-IDENTITY-API.md). All identity mutations require `X-Kachko-CSRF: 1`; authenticated requests also send the session cookie.
 
 Google signup/login is now included. See [Google credentials, migration and local browser testing](docs/06-GOOGLE-LOGIN.md).
+
+Page/LINK CRUD, publishing and public lookup are implemented and listed in Swagger. Apply all migrations with `pnpm db:deploy` and restart the API before testing. See [the page contract and FE fixture](docs/07-PAGE-LINK-CONTRACT.md). Run `pnpm --filter api test:pages` for isolated database verification.

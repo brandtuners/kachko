@@ -45,7 +45,7 @@ export class IdentityRateGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
     response.setHeader('Cache-Control', 'no-store');
-    const policy = this.reflector.get<{ name: string; limit: number; seconds: number }>('identityRate', context.getHandler())
+    const policy = this.reflector.getAllAndOverride<{ name: string; limit: number; seconds: number }>('identityRate', [context.getHandler(), context.getClass()])
       ?? { name: 'identity', limit: 60, seconds: 60 };
     let result: number[];
     try {

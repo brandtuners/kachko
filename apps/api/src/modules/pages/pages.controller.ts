@@ -1,0 +1,99 @@
+import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiBody, ApiCookieAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { z, createPageSchema, updatePageSchema, createLinkBlockSchema, updateLinkBlockSchema, pageIdSchema, blockIdSchema, usernameSchema,
+  type CreatePageInput, type UpdatePageInput, type CreateLinkBlockInput, type UpdateLinkBlockInput } from '@kachko/validation';
+import { IdentityValidationPipe } from '../identity/identity.controller';
+import { IdentityRateGuard, SessionGuard, RatePolicy, type IdentityRequest } from '../identity/identity.guards';
+import { PagesService } from './pages.service';
+import * as schema from './pages.swagger';
+const pageId = new IdentityValidationPipe(pageIdSchema);
+const blockId = new IdentityValidationPipe(blockIdSchema);
+const emptyBody = new IdentityValidationPipe(z.strictObject({}).default({}));
+
+@ApiTags('Pages and links')
+@ApiCookieAuth()
+@ApiHeader({ name: 'X-Kachko-CSRF', required: false, description: 'Required value 1 for POST, PATCH and DELETE' })
+@ApiResponse({ status: 400, description: 'VALIDATION_ERROR: invalid IDs, fields or URL' })
+@ApiResponse({ status: 401, description: 'UNAUTHENTICATED' })
+@ApiResponse({ status: 403, description: 'CSRF_REJECTED' })
+@ApiResponse({ status: 404, description: 'PAGE_NOT_FOUND or BLOCK_NOT_FOUND (also returned for foreign resources)' })
+@ApiResponse({ status: 429, description: 'RATE_LIMITED; see Retry-After' })
+@Controller('pages')
+@RatePolicy('pages', 120, 60)
+@UseGuards(IdentityRateGuard, SessionGuard)
+export class PagesController {
+  constructor(private readonly pages: PagesService) {}
+  @Get()
+  @ApiResponse({ status: 200, schema: schema.pagesResponse })
+  list(@Req() request: IdentityRequest) { return this.pages.list(request.identity.id); }
+
+  @Post()
+  @ApiOperation({ summary: 'Create your single draft page; slug derives from your username' })
+  @ApiBody({ schema: schema.pageCreateBody, examples: { basic: { value: { title: 'My links', description: 'Welcome to my page' } } } })
+  @ApiResponse({ status: 201, schema: schema.pageResponse })
+  @ApiResponse({ status: 409, description: 'PAGE_ALREADY_EXISTS' })
+  create(@Req() request: IdentityRequest, @Body(new IdentityValidationPipe(createPageSchema)) input: CreatePageInput) {
+    return this.pages.create(request.identity.id, input);
+  }
+  @Get(':id')
+  @ApiResponse({ status: 200, schema: schema.pageResponse })
+  get(@Req() request: IdentityRequest, @Param('id', pageId) id: string) { return this.pages.get(request.identity.id, id); }
+
+  @Patch(':id')
+  @ApiBody({ schema: schema.pageUpdateBody })
+  @ApiResponse({ status: 200, schema: schema.pageResponse })
+  update(@Req() request: IdentityRequest, @Param('id', pageId) id: string,
+    @Body(new IdentityValidationPipe(updatePageSchema)) input: UpdatePageInput) { return this.pages.update(request.identity.id, id, input); }
+
+  @Delete(':id')
+  @ApiResponse({ status: 200, schema: schema.deletedResponse })
+  delete(@Req() request: IdentityRequest, @Param('id', pageId) id: string) { return this.pages.delete(request.identity.id, id); }
+
+  @Post(':id/publish')
+  @HttpCode(200)
+  @ApiResponse({ status: 200, schema: schema.pageResponse })
+  publish(@Req() request: IdentityRequest, @Param('id', pageId) id: string, @Body(emptyBody) _body: unknown) {
+    void _body;
+    return this.pages.publish(request.identity.id, id, true);
+  }
+  @Post(':id/unpublish')
+  @HttpCode(200)
+  @ApiResponse({ status: 200, schema: schema.pageResponse })
+  unpublish(@Req() request: IdentityRequest, @Param('id', pageId) id: string, @Body(emptyBody) _body: unknown) {
+    void _body;
+    return this.pages.publish(request.identity.id, id, false);
+  }
+  @Post(':pageId/blocks')
+  @ApiBody({ schema: schema.linkCreateBody, examples: { website: { value: {
+    type: 'LINK', content: { title: 'My website', url: 'https://example.com/', openInNewTab: true }, isVisible: true,
+  } } } })
+  @ApiResponse({ status: 201, schema: schema.envelope(schema.linkBlock) })
+  addBlock(@Req() request: IdentityRequest, @Param('pageId', pageId) id: string,
+    @Body(new IdentityValidationPipe(createLinkBlockSchema)) input: CreateLinkBlockInput) { return this.pages.addBlock(request.identity.id, id, input); }
+
+  @Patch(':pageId/blocks/:blockId')
+  @ApiBody({ schema: schema.linkUpdateBody })
+  @ApiResponse({ status: 200, schema: schema.envelope(schema.linkBlock) })
+  updateBlock(@Req() request: IdentityRequest, @Param('pageId', pageId) id: string, @Param('blockId', blockId) block: string,
+    @Body(new IdentityValidationPipe(updateLinkBlockSchema)) input: UpdateLinkBlockInput) {
+    return this.pages.updateBlock(request.identity.id, id, block, input);
+  }
+  @Delete(':pageId/blocks/:blockId')
+  @ApiResponse({ status: 200, schema: schema.deletedResponse })
+  deleteBlock(@Req() request: IdentityRequest, @Param('pageId', pageId) id: string, @Param('blockId', blockId) block: string) {
+    return this.pages.deleteBlock(request.identity.id, id, block);
+  }
+}
+
+@ApiTags('Public pages')
+@Controller('public')
+export class PublicPagesController {
+  constructor(private readonly pages: PagesService) {}
+  @Get(':username')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: 'Published profile and visible links; no authentication required' })
+  @ApiResponse({ status: 200, schema: schema.publicResponse })
+  @ApiResponse({ status: 404, description: 'PAGE_NOT_FOUND: missing, unpublished or inactive/deleted owner' })
+  @ApiResponse({ status: 400, description: 'VALIDATION_ERROR: malformed username' })
+  get(@Param('username', new IdentityValidationPipe(usernameSchema)) username: string) { return this.pages.publicPage(username); }
+}

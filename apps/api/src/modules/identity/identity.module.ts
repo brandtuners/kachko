@@ -13,6 +13,7 @@ import { CsrfGuard, IdentityRateGuard, SessionGuard } from './identity.guards';
 @Module({
   imports: [DatabaseModule, RedisModule],
   controllers: [AuthController, UsersController, GoogleController],
+  exports: [SessionGuard, IdentityRateGuard, IdentityService],
   providers: [GoogleService, GoogleProvider, IdentityService, IdentityRepository, IdentityRateGuard, SessionGuard,
     { provide: APP_GUARD, useClass: CsrfGuard }],
 })

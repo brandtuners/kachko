@@ -35,7 +35,13 @@ export class IdentityRepository {
     return this.prisma.session.updateMany({ where: { tokenHash, revokedAt: null }, data: { revokedAt: new Date() } });
   }
   updateProfile(id: string, data: { username?: string; displayName?: string | null; bio?: string | null }) {
-    // Page slug synchronization/cache invalidation will join this transaction when Page exists.
-    return this.prisma.user.update({ where: { id }, data });
+    return this.prisma.$transaction(async tx => {
+      const user = await tx.user.update({ where: { id }, data });
+      // Every public profile edit invalidates the prior revision atomically.
+      await tx.page.updateMany({ where: { userId: id }, data: {
+        ...(data.username !== undefined ? { slug: user.username } : {}), revision: { increment: 1 },
+      } });
+      return user;
+    });
   }
 }

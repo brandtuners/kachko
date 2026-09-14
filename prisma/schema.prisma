@@ -23,6 +23,7 @@ model User {
 
   sessions Session[]
   googleAccount GoogleAccount?
+  page Page?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -61,4 +62,41 @@ model GoogleAccount {
   userId String @unique
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+}
+
+// V1: at most one page per owner; slug follows the owner's username.
+model Page {
+  id String @id @default(uuid())
+  userId String @unique
+  slug String @unique
+  title String?
+  description String?
+  isPublished Boolean @default(false)
+  publishedAt DateTime?
+  themeKey String @default("minimal")
+  revision Int @default(0)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blocks PageBlock[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PageBlock {
+  id String @id @default(uuid())
+  pageId String
+  type BlockType
+  position Int
+  isVisible Boolean @default(true)
+  content Json
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pageId, position])
+  @@index([pageId, isVisible, position])
+}
+
+// Add additional block types only with their validated feature implementations.
+enum BlockType {
+  LINK
 }
