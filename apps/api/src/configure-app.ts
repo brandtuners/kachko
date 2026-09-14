@@ -8,12 +8,12 @@ export function configureApp(app: INestApplication) {
   const config = app.get(ConfigService);
   app.setGlobalPrefix('api/v1');
   app.use(helmet());
-  app.enableCors({ origin: config.getOrThrow<string[]>('CORS_ORIGINS'), credentials: true });
+  app.enableCors({ origin: config.getOrThrow<string[]>('CORS_ORIGINS'), credentials: true, allowedHeaders: ['Content-Type', 'X-Kachko-CSRF'], exposedHeaders: ['Retry-After'] });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
   if (config.get<string>('NODE_ENV') !== 'production') {
     const document = SwaggerModule.createDocument(app, new DocumentBuilder()
-      .setTitle('Kachko API').setVersion('1').build());
+      .setTitle('kachko API').setVersion('1').addCookieAuth(config.getOrThrow<string>('SESSION_COOKIE_NAME')).build());
     SwaggerModule.setup('api/docs', app, document);
   }
 }

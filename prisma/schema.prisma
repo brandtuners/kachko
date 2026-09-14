@@ -22,6 +22,7 @@ model User {
   deletedAt    DateTime?
 
   sessions Session[]
+  googleAccount GoogleAccount?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -52,4 +53,12 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+// Google subject is stable; email alone must never link an existing account.
+model GoogleAccount {
+  subject String @id
+  userId String @unique
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 }

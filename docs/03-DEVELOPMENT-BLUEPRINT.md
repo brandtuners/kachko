@@ -14,7 +14,7 @@
 
 ### Step-by-step execution flow
 
-**Start now:** Rohan verifies the NestJS API and sets up PostgreSQL/Redis + Prisma. At the same time, Girish verifies the existing Next.js app and builds UI primitives plus auth/dashboard shells.
+**Current handoff:** Rohan has implemented local services, Prisma, readiness and the identity APIs/shared contracts. Girish can now connect auth/profile UI using [the identity contract and local test guide](05-IDENTITY-API.md). Both still need to verify the integrated identity completion gate before beginning the first publishable page.
 
 Complete the following steps in order. The Rohan and Girish columns show the tasks each person takes; the dependency column shows what must be ready first. Girish can build contract-backed UI with fixtures while Rohan implements the matching API. A step is complete only after both verify it using the real API.
 
@@ -22,7 +22,7 @@ Complete the following steps in order. The Rohan and Girish columns show the tas
 |---|---|---|---|---|
 | 1. Verify foundation | Existing repository | Verify Nest scaffold; complete workspace scripts/CI, local PostgreSQL + Redis, env examples | Verify existing Next app; add FE typecheck/testing scripts, UI primitives, responsive dashboard/auth shells | Both apps run locally; relevant lint, typecheck, build and initial checks pass |
 | 2. Identity contract + data | Step 1 | Shared DTOs/errors, User/Session schema and migration; settle username and cookie/CSRF flow, seed reserved names | Typed API client, contract fixtures, registration/login/username forms | Contract reviewed; migration works on an empty DB; FE can render all form states |
-| 3. Identity integration | Step 2 | Register/login/logout/current user, username checks, profile update, session expiry/revocation, auth rate limits | Connect auth/profile UI, protected dashboard, session expiry handling | Register with username, log in, reload session, edit profile and log out against API; ownership/session tests pass |
+| 3. Identity integration | Step 2 | Register/login/logout/current user, Google login + username onboarding, username checks, profile update, session expiry/revocation, auth rate limits | Connect auth/profile UI, Google button/callback/onboarding, protected dashboard, session expiry handling | Register with username, log in, reload session, edit profile and log out against API; ownership/session tests pass |
 | 4. First publishable page | Step 3; page/block/public DTOs agreed | Page CRUD, LINK CRUD, safe URLs, ownership, default theme, publish/unpublish, public lookup and cache invalidation | Basic dashboard, profile fields, add/edit/delete link, publish controls, SSR public renderer | Register → page → link → publish → public URL works; unpublished pages return 404 and private data stays private |
 | 5. Editor | Step 4 | TEXT block validation; visibility/reorder transaction; reliable updates and failure responses | Text editor, drag/drop plus manual reorder, live preview, autosave/retry/rollback, mobile editor | Edits and order survive reload; failed saves are visible and preserve edits; hidden blocks stay hidden |
 | 6. Appearance + social | Step 5 | Theme catalog/config validation and persistence, templates, social CRUD/reorder | Theme/template picker, appearance controls, social editor/icons, matching preview/public rendering | Theme/social changes persist and appear correctly on public page |
@@ -57,7 +57,7 @@ Quick links: [detailed execution rules](#71-exact-development-order), [task boar
 
 ### Repository baseline
 
-The repository and pnpm/Turborepo workspace already exist. Continue frontend development in the existing `apps/kachko-fe` application. The API originally contained Express dependencies and a generic TypeScript configuration, with no application source. It now has a NestJS scaffold, versioned health routes, environment validation, request validation, CORS, security headers, error handling, and development OpenAPI docs. The root Prisma schema/config and initial User/Session migration are implemented, with an API-only generated client. NestJS Prisma/Redis providers and dependency readiness are implemented; business features remain to be implemented. Existing files are not proof that every foundation check passes.
+The repository and pnpm/Turborepo workspace already exist. Continue frontend development in the existing `apps/kachko-fe` application. The API originally contained Express dependencies and a generic TypeScript configuration, with no application source. It now has a NestJS scaffold, versioned health routes, environment validation, request validation, CORS, security headers, error handling, and development OpenAPI docs. The root Prisma schema/config and initial User/Session migration are implemented, with an API-only generated client. NestJS Prisma/Redis providers and dependency readiness are implemented; registration, login/logout, Google login/onboarding, sessions, username checks and own-profile APIs are implemented with shared contracts. FE identity integration and page/publishing features remain to be implemented. Existing files are not proof that every foundation check passes.
 
 ### Working agreement and handoff
 
@@ -76,8 +76,9 @@ For this project, use the following blueprint conventions when examples in the L
 - Use section 18 envelopes consistently, including wrapping the current-user response in `data`. `GET /auth/me` checks the session/current identity; `GET /users/me` reads the editable profile (both under `/api/v1`).
 - Choose username before submitting registration, so the LLD's required unique `User.username` can be stored immediately. The UI may collect it as a separate step before submitting the combined registration request. For V1, the single page slug follows the username; username changes update it transactionally and invalidate old/new public URLs.
 - `LINK` URLs allow HTTP(S). Add `mailto:`/`tel:` only with their dedicated validated block types later.
+- Identity contract: [05-IDENTITY-API.md](05-IDENTITY-API.md) defines implemented envelopes, validation, custom-header CSRF, cookie settings and limits. `PATCH /users/me` includes username updates; the separate LLD username PATCH example is consolidated here. Avatar updates wait for verified media ownership.
 - Shared block packages contain data/types/validation. React editors and renderers stay in the frontend registry.
-- Social profiles, account deletion, and basic abuse reporting/moderation are launch requirements, consistent with the LLD acceptance/security requirements. OAuth, imports, advanced embeds/analytics, and a richer admin dashboard follow the core release.
+- Social profiles, account deletion, and basic abuse reporting/moderation are launch requirements, consistent with the LLD acceptance/security requirements. Google OAuth is included in the current identity milestone; see [06-GOOGLE-LOGIN.md](06-GOOGLE-LOGIN.md). Other OAuth providers, account linking, imports, advanced embeds/analytics, and a richer admin dashboard follow the core release.
 
 ---
 
@@ -821,7 +822,7 @@ terms
 about
 ```
 
-Keep a reserved username list.
+Keep a reserved username list. The implemented version-controlled seed list is `RESERVED_USERNAMES` in `packages/validation/src/index.ts`; do not create dummy User rows for reserved names.
 
 Username validation must happen:
 
@@ -837,7 +838,7 @@ Backend/database validation is for correctness.
 
 # 16. Phase 7 — Database Migration
 
-For the existing User/Session migration, run `pnpm db:deploy` and `pnpm db:status` after setting the root `DATABASE_URL`. Generate the client with `pnpm db:generate`. No seed command/data is configured yet; the theme seed example below applies when themes are implemented. The following `migrate dev` example describes creating future migrations, not recreating the checked-in identity migration.
+For the existing User/Session migration, run `pnpm db:deploy` and `pnpm db:status` after setting the root `DATABASE_URL`. Generate the client with `pnpm db:generate`. Reserved username seed data now lives in `packages/validation/src/index.ts` and is enforced by shared/API validation; no database seed command is configured yet; the theme seed example below applies when themes are implemented. The following `migrate dev` example describes creating future migrations, not recreating the checked-in identity migration.
 
 Once the initial schema is ready:
 
@@ -3247,7 +3248,7 @@ Password reset
 ## P1 — Should Have
 
 ```text
-OAuth
+Other OAuth providers and explicit account linking
 Video embeds
 Import
 Advanced moderation dashboard

@@ -77,7 +77,7 @@ pnpm --filter kachko-fe dev
 
 Frontend: `http://localhost:3000`. API health: `http://localhost:4000/api/v1/health`.
 
-**Current scope:** local infrastructure, Prisma identity models/migration, NestJS PostgreSQL/Redis providers, and dependency readiness are implemented. Set the required `DATABASE_URL` and `REDIS_URL` in `apps/api/.env`. `/api/v1/health/ready` returns `200` when both services respond and `503` on failure; `/api/v1/health/live` remains independent of dependency availability. Authentication remains a separate task. See the [API README](apps/api/README.md) for response examples, timeouts, lifecycle behavior, and `pnpm --filter api test:infra`.
+**Current scope:** local infrastructure, Prisma identity models/migration, NestJS PostgreSQL/Redis providers, and dependency readiness are implemented. Set the required `DATABASE_URL` and `REDIS_URL` in `apps/api/.env`. `/api/v1/health/ready` returns `200` when both services respond and `503` on failure; `/api/v1/health/live` remains independent of dependency availability. Identity authentication/profile APIs and shared contracts are now implemented; frontend integration remains pending. See the [API README](apps/api/README.md) for response examples, timeouts, lifecycle behavior, and `pnpm --filter api test:infra`.
 
 ## Prisma and identity database
 
@@ -132,3 +132,9 @@ Adjust credentials/ports if customized. The test checks defaults, unique constra
 Prisma references: [client generation](https://www.prisma.io/docs/orm/prisma-schema/overview/generators) and [CLI configuration](https://www.prisma.io/docs/orm/reference/prisma-config-reference).
 
 Configuration references: [Docker Compose services](https://docs.docker.com/reference/compose-file/services/), [official PostgreSQL image](https://hub.docker.com/_/postgres), and [official Redis image](https://hub.docker.com/_/redis).
+
+### Identity API
+
+Auth/session/profile endpoints and shared identity contracts are implemented. See [local endpoint testing and the FE contract](docs/05-IDENTITY-API.md). All identity mutations require `X-Kachko-CSRF: 1`; authenticated requests also send the session cookie.
+
+Google signup/login is now included. See [Google credentials, migration and local browser testing](docs/06-GOOGLE-LOGIN.md).

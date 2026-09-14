@@ -2800,3 +2800,8 @@ Theme
 Everything else should be built around this model.
 
 This gives the product a simple V1 while keeping the architecture capable of growing into a broader creator/personal-page platform.
+
+
+## Implemented Google identity contract
+
+Google login has moved into the current identity milestone. [06-GOOGLE-LOGIN.md](06-GOOGLE-LOGIN.md) defines the concrete `/api/v1/auth/google`, `/callback`, `/pending` and `/complete` endpoints; these supersede generic provider route examples for Google. The additive `GoogleAccount` model links a unique Google subject to a unique User ID with cascade deletion. A verified Google identity is held temporarily in Redis until the required username is submitted; then User, GoogleAccount and Session are created atomically. Email/password identity remains available. Google email matches never automatically link existing accounts. Other providers and explicit linking remain later work.
