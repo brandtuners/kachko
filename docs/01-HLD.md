@@ -212,7 +212,7 @@ The central abstraction is **Page → Blocks**.
 - Logout
 - Session management
 - Password reset
-- Google/GitHub OAuth
+- Google OAuth in the current identity milestone; GitHub and explicit account linking later (see docs/06-GOOGLE-LOGIN.md)
 - Username availability
 
 ### Profile

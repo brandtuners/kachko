@@ -41,8 +41,31 @@ export function validateEnvironment(env: Record<string, unknown>) {
   if (!Number.isInteger(timeout) || timeout < 100 || timeout > 10000) {
     throw new Error('DEPENDENCY_TIMEOUT_MS must be an integer between 100 and 10000');
   }
+  const sessionTtl = Number(env.SESSION_TTL_SECONDS ?? 604800);
+  if (!Number.isInteger(sessionTtl) || sessionTtl < 60 || sessionTtl > 2592000) {
+    throw new Error('SESSION_TTL_SECONDS must be an integer between 60 and 2592000');
+  }
+  const cookieName = String(env.SESSION_COOKIE_NAME ?? 'kachko_session');
+  if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(cookieName)) throw new Error('SESSION_COOKIE_NAME must be a simple cookie name');
+  const googleId = String(env.GOOGLE_CLIENT_ID ?? '').trim();
+  const googleSecret = String(env.GOOGLE_CLIENT_SECRET ?? '').trim();
+  if (Boolean(googleId) !== Boolean(googleSecret)) throw new Error('Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET');
+  const googleCallback = String(env.GOOGLE_REDIRECT_URI ?? `http://localhost:${port}/api/v1/auth/google/callback`);
+  const googleRedirect = String(env.GOOGLE_LOGIN_REDIRECT_URL ?? '');
+  if (googleId) {
+    for (const value of [googleCallback, ...(googleRedirect ? [googleRedirect] : [])]) {
+      const url = new URL(value);
+      if (url.username || url.password || url.hash || url.search ||
+          (url.protocol !== 'https:' && !(nodeEnv !== 'production' && url.protocol === 'http:' && url.hostname === 'localhost'))) {
+        throw new Error('Google redirect URLs must be HTTPS (localhost HTTP allowed outside production), without credentials, query or fragment');
+      }
+    }
+    if (new URL(googleCallback).pathname !== '/api/v1/auth/google/callback') throw new Error('GOOGLE_REDIRECT_URI must use /api/v1/auth/google/callback');
+    if (googleRedirect && !allowedOrigins.includes(new URL(googleRedirect).origin)) throw new Error('Google frontend redirect origin must be in CORS_ORIGINS');
+  }
   return {
-    ...env, NODE_ENV: nodeEnv, PORT: port, CORS_ORIGINS: allowedOrigins,
+    ...env, SESSION_TTL_SECONDS: sessionTtl, SESSION_COOKIE_NAME: cookieName, NODE_ENV: nodeEnv, PORT: port, CORS_ORIGINS: allowedOrigins,
+    GOOGLE_CLIENT_ID: googleId, GOOGLE_CLIENT_SECRET: googleSecret, GOOGLE_REDIRECT_URI: googleCallback, GOOGLE_LOGIN_REDIRECT_URL: googleRedirect,
     DATABASE_URL: connectionUrl(env, 'DATABASE_URL'),
     REDIS_URL: connectionUrl(env, 'REDIS_URL'),
     DEPENDENCY_TIMEOUT_MS: timeout,
