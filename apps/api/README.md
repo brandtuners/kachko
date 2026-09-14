@@ -46,7 +46,7 @@ Unavailable response (HTTP 503):
 
 `DEPENDENCY_TIMEOUT_MS` defaults to `2000` (allowed range `100–10000`). It bounds each readiness probe, PostgreSQL pool connection/query/server statement timeouts, and Redis connection/PING attempts. The PostgreSQL pool is limited to 10 connections. Redis rejects commands while offline and limits its command queue to 100. Future background jobs that require longer SQL execution must deliberately configure their own limits rather than silently inheriting a short request timeout. Readiness proves connectivity only, not that migrations or business features are complete.
 
-Identity authentication/profile routes and Redis identity rate limits are implemented. Request IDs, structured request logging, page/publishing modules and other business features remain planned work.
+Identity authentication/profile routes and Redis identity rate limits are implemented. Page/LINK CRUD and public publishing are also implemented. Request IDs, structured request logging and later editor/media features remain planned work.
 
 ### Verification
 
@@ -70,3 +70,5 @@ Registration, login/logout, cookie sessions, username availability and own-profi
 Run `pnpm --filter api test:auth` from the root for the isolated real PostgreSQL/Redis identity journey (Docker required). FE integration is still pending.
 
 Google signup/login is now included. See [Google credentials, migration and local browser testing](../../docs/06-GOOGLE-LOGIN.md).
+
+Page/LINK CRUD, publishing and public lookup are implemented and listed in Swagger. Apply all migrations with `pnpm db:deploy` and restart the API before testing. See [the page contract and FE fixture](../../docs/07-PAGE-LINK-CONTRACT.md). Run `pnpm --filter api test:pages` for isolated database verification.

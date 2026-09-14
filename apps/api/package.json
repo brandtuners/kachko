@@ -13,7 +13,8 @@
     "test:db": "pnpm build && node --test test/database/*.test.cjs",
     "test:infra": "pnpm build && node --test test/infrastructure/*.test.cjs",
     "contracts:build": "pnpm --filter @kachko/types --filter @kachko/validation build",
-    "test:auth": "pnpm build && node --test test/infrastructure/auth.test.cjs"
+    "test:auth": "pnpm build && node --test test/infrastructure/auth.test.cjs",
+    "test:pages": "pnpm build && node --test test/infrastructure/pages.test.cjs"
   },
   "dependencies": {
     "@kachko/types": "workspace:*",

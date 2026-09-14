@@ -2805,3 +2805,8 @@ This gives the product a simple V1 while keeping the architecture capable of gro
 ## Implemented Google identity contract
 
 Google login has moved into the current identity milestone. [06-GOOGLE-LOGIN.md](06-GOOGLE-LOGIN.md) defines the concrete `/api/v1/auth/google`, `/callback`, `/pending` and `/complete` endpoints; these supersede generic provider route examples for Google. The additive `GoogleAccount` model links a unique Google subject to a unique User ID with cascade deletion. A verified Google identity is held temporarily in Redis until the required username is submitted; then User, GoogleAccount and Session are created atomically. Email/password identity remains available. Google email matches never automatically link existing accounts. Other providers and explicit linking remain later work.
+
+
+## Implemented Page/LINK foundation
+
+See [07-PAGE-LINK-CONTRACT.md](07-PAGE-LINK-CONTRACT.md) for the current shared contracts and migration. V1 enforces at most one Page per User, starts with LINK-only blocks and a minimal theme key, and updates page slugs transactionally with usernames. The broader block enum, theme catalog/relation, socials and domains above are later extensions. Page/LINK HTTP routes, publishing and public lookup are implemented. Page.revision increments transactionally on page/block/profile edits and selects versioned public cache entries; PostgreSQL publication/owner checks precede cache reads. See the linked API contract for the implemented cache behavior.

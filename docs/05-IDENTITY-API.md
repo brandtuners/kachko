@@ -44,7 +44,7 @@ Rules: email is trimmed/lowercased and limited to 254 characters; usernames are 
 
 New passwords are 12–128 characters and are never trimmed. Login accepts 1–128 characters and returns a generic failure for invalid credentials. Display name is 1–80 trimmed characters (null clears it on update). Bio is at most 500 trimmed characters (null clears it). Avatar changes require the future media ownership/upload-completion flow. No arbitrary avatar URLs are accepted.
 
-Username updates currently change User only: Page does not exist yet. When Page is added, slug synchronization and old/new public cache invalidation must be added transactionally before page publishing ships. The separate LLD `PATCH /users/me/username` example is consolidated into the blueprint's `PATCH /users/me` endpoint.
+Username updates now synchronize User.username and an existing Page.slug in one transaction. Every public profile edit also increments the page revision, invalidating cached profile/page responses. Public lookup rejects the old username after a rename. The separate LLD `PATCH /users/me/username` example is consolidated into the blueprint's `PATCH /users/me` endpoint.
 
 ## Cookies, CSRF and rate limits
 
