@@ -7,3 +7,5 @@ allowBuilds:
   "@scarf/scarf": false
   "@prisma/engines": true
   prisma: true
+  '@sentry/cli': false
+  sharp: false

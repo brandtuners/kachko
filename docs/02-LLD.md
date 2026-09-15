@@ -533,6 +533,8 @@ export interface TextBlockContent {
 
 ## IMAGE
 
+Current external-image contract: see [11-BLOCK-LIBRARY.md](11-BLOCK-LIBRARY.md) and the blueprint extension. The mediaId example below remains the future managed-upload contract.
+
 ```typescript
 export interface ImageBlockContent {
   mediaId: string;
@@ -2809,4 +2811,14 @@ Google login has moved into the current identity milestone. [06-GOOGLE-LOGIN.md]
 
 ## Implemented Page/LINK foundation
 
-See [07-PAGE-LINK-CONTRACT.md](07-PAGE-LINK-CONTRACT.md) for the current shared contracts and migration. V1 enforces at most one Page per User, starts with LINK-only blocks and a minimal theme key, and updates page slugs transactionally with usernames. The broader block enum, theme catalog/relation, socials and domains above are later extensions. Page/LINK HTTP routes, publishing and public lookup are implemented. Page.revision increments transactionally on page/block/profile edits and selects versioned public cache entries; PostgreSQL publication/owner checks precede cache reads. See the linked API contract for the implemented cache behavior.
+See [07-PAGE-LINK-CONTRACT.md](07-PAGE-LINK-CONTRACT.md) for the current shared contracts and migration. V1 enforces at most one Page per User, supports LINK/TEXT blocks and a minimal theme key, and updates page slugs transactionally with usernames. The broader block enum and domains above are later extensions; the theme catalog/relation, templates and socials are now implemented. Page/LINK HTTP routes, publishing and public lookup are implemented. Page.revision increments transactionally on page/block/profile edits and selects versioned public cache entries; PostgreSQL publication/owner checks precede cache reads. See the linked API contract for the implemented cache behavior.
+
+
+## Implemented TEXT and reorder contract
+
+[08-TEXT-AND-REORDER.md](08-TEXT-AND-REORDER.md) defines TEXT content (plain text up to 5000 characters, left/center/right alignment), immutable block types, and complete-list atomic reordering including hidden blocks. Positions must cover 0..N-1; stale block sets return 409 without mutation. Public responses and revision-based caching support both LINK and TEXT. Frontend editor integration remains pending.
+
+
+## Implemented appearance/social contract
+
+[09-APPEARANCE-AND-SOCIALS.md](09-APPEARANCE-AND-SOCIALS.md) supersedes generic theme/social examples: Page.themeKey references Theme.slug, Page.appearanceOverrides stores validated JSON, and catalog seeds are migration-owned. Theme config uses structured colors/gradient stops and bounded options rather than raw CSS gradient strings. Templates create independent page blocks; replacing existing blocks requires explicit confirmation. Social updates/deletes use nested `/pages/:pageId/socials/:socialId` paths and POST `/pages/:pageId/socials/reorder`. Public output contains resolved appearance and visible social profiles.

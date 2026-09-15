@@ -74,6 +74,9 @@ model Page {
   isPublished Boolean @default(false)
   publishedAt DateTime?
   themeKey String @default("minimal")
+  theme Theme @relation(fields: [themeKey], references: [slug], onDelete: Restrict)
+  appearanceOverrides Json @default("{}")
+  socials SocialProfile[]
   revision Int @default(0)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   blocks PageBlock[]
@@ -99,4 +102,64 @@ model PageBlock {
 // Add additional block types only with their validated feature implementations.
 enum BlockType {
   LINK
+  TEXT
+  IMAGE
+  SOCIAL
+  DIVIDER
+  YOUTUBE
+  SPOTIFY
+  EMAIL
+  PHONE
+  LOCATION
+}
+
+model Theme {
+  id String @id @default(uuid())
+  name String
+  slug String @unique
+  isSystem Boolean @default(true)
+  background Json
+  typography Json
+  buttons Json
+  cards Json
+  pages Page[]
+  templates PageTemplate[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PageTemplate {
+  key String @id
+  name String
+  description String
+  themeKey String
+  theme Theme @relation(fields: [themeKey], references: [slug], onDelete: Restrict)
+  blocks Json
+}
+
+model SocialProfile {
+  id String @id @default(uuid())
+  pageId String
+  platform SocialPlatform
+  username String?
+  url String
+  position Int
+  isVisible Boolean @default(true)
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([pageId, position])
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  YOUTUBE
+  X
+  LINKEDIN
+  FACEBOOK
+  TIKTOK
+  GITHUB
+  DISCORD
+  TWITCH
+  SPOTIFY
 }

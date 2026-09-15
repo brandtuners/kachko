@@ -61,6 +61,10 @@ The repository and pnpm/Turborepo workspace already exist. Continue frontend dev
 
 **Page/LINK API:** shared contracts, migrations, CRUD, publish/unpublish, public lookup and revision-based cache invalidation are implemented. See [07-PAGE-LINK-CONTRACT.md](07-PAGE-LINK-CONTRACT.md) for Swagger/local testing and FE integration. Step 4 remains open until both verify the real frontend journey.
 
+**Editor backend:** TEXT CRUD, visibility and full-list transactional reordering are implemented, including public serialization and cache invalidation. See [08-TEXT-AND-REORDER.md](08-TEXT-AND-REORDER.md). Girish still owns text rendering/editor, drag-and-drop/manual order controls and save/retry UX; Step 5 requires their integrated verification.
+
+**Appearance/social backend:** six seeded system themes, three templates, validated appearance overrides, social CRUD/reorder and public cache integration are implemented. See [09-APPEARANCE-AND-SOCIALS.md](09-APPEARANCE-AND-SOCIALS.md). Step 6 remains open for Girish's theme/template/social UI and joint public-renderer verification.
+
 ### Working agreement and handoff
 
 1. Rohan publishes a feature contract: method/path, request/response examples, validation rules, error codes, auth requirements, and acceptance cases. Girish reviews it before building API-dependent UI.
@@ -79,7 +83,7 @@ For this project, use the following blueprint conventions when examples in the L
 - Choose username before submitting registration, so the LLD's required unique `User.username` can be stored immediately. The UI may collect it as a separate step before submitting the combined registration request. For V1, the single page slug follows the username; username changes update it transactionally and invalidate old/new public URLs.
 - `LINK` URLs allow HTTP(S). Add `mailto:`/`tel:` only with their dedicated validated block types later.
 - Identity contract: [05-IDENTITY-API.md](05-IDENTITY-API.md) defines implemented envelopes, validation, custom-header CSRF, cookie settings and limits. `PATCH /users/me` includes username updates; the separate LLD username PATCH example is consolidated here. Avatar updates wait for verified media ownership.
-- Page/LINK foundation conventions are defined in [07-PAGE-LINK-CONTRACT.md](07-PAGE-LINK-CONTRACT.md): one page per user, LINK-only content and the fixed minimal theme key until appearance work.
+- Page/LINK foundation conventions are defined in [07-PAGE-LINK-CONTRACT.md](07-PAGE-LINK-CONTRACT.md): one page per user, LINK/TEXT content and a themeKey reference to the system Theme catalog. Appearance/templates/social contracts are defined in [09-APPEARANCE-AND-SOCIALS.md](09-APPEARANCE-AND-SOCIALS.md), including nested social paths and POST reorder.
 - Shared block packages contain data/types/validation. React editors and renderers stay in the frontend registry.
 - Social profiles, account deletion, and basic abuse reporting/moderation are launch requirements, consistent with the LLD acceptance/security requirements. Google OAuth is included in the current identity milestone; see [06-GOOGLE-LOGIN.md](06-GOOGLE-LOGIN.md). Other OAuth providers, account linking, imports, advanced embeds/analytics, and a richer admin dashboard follow the core release.
 
@@ -583,7 +587,7 @@ R2 secret keys
 
 # 11. Phase 6 — Database First
 
-**Current implementation:** `prisma/schema.prisma` contains User, Session, and UserRole. The initial migration is in `prisma/migrations/20260912000000_init_identity`. Root Prisma CLI/config manage schema changes; the generated client and PostgreSQL adapter belong only to `apps/api`. Follow the [Prisma setup guide](../README.md#prisma-and-identity-database). Add Page/Block/Theme models with their feature slices; the current identity schema does not yet complete those later milestones.
+**Current implementation:** `prisma/schema.prisma` contains identity/Google accounts, Page/PageBlock, Theme/PageTemplate and SocialProfile with their enums. The initial migration is in `prisma/migrations/20260912000000_init_identity`. Root Prisma CLI/config manage schema changes; the generated client and PostgreSQL adapter belong only to `apps/api`. Follow the [Prisma setup guide](../README.md#prisma-and-identity-database). These backend feature models are now implemented; frontend integration gates still require verification.
 
 Create Prisma:
 
@@ -841,7 +845,7 @@ Backend/database validation is for correctness.
 
 # 16. Phase 7 — Database Migration
 
-For the existing User/Session migration, run `pnpm db:deploy` and `pnpm db:status` after setting the root `DATABASE_URL`. Generate the client with `pnpm db:generate`. Reserved username seed data now lives in `packages/validation/src/index.ts` and is enforced by shared/API validation; no database seed command is configured yet; the theme seed example below applies when themes are implemented. The following `migrate dev` example describes creating future migrations, not recreating the checked-in identity migration.
+For the existing User/Session migration, run `pnpm db:deploy` and `pnpm db:status` after setting the root `DATABASE_URL`. Generate the client with `pnpm db:generate`. Reserved username seed data now lives in `packages/validation/src/index.ts` and is enforced by shared/API validation; system themes/templates are seeded by the appearance migration; no separate database seed command is configured. The theme seed example below is a reference for future catalog expansion. The following `migrate dev` example describes creating future migrations, not recreating the checked-in identity migration.
 
 Once the initial schema is ready:
 
@@ -3334,3 +3338,7 @@ Register with username → Create page → Add link → Publish → Open public 
 Complete this with real API/database data before moving to advanced features.
 
 ---
+
+## Extended block contract (September 2026)
+
+All ten library types are supported by block CRUD/public rendering: LINK, TEXT, IMAGE, SOCIAL, DIVIDER, YOUTUBE, SPOTIFY, EMAIL, PHONE, LOCATION. IMAGE currently accepts an external HTTPS `url`, required `alt`, and optional HTTP(S) `href`. This is an explicit interim extension to the LLD mediaId-only example, not completion of the managed-media gate. The API does not fetch, verify file bytes, or claim ownership of external images. Uploads and owned mediaId references remain pending. Other content shapes and local testing are in [11-BLOCK-LIBRARY.md](11-BLOCK-LIBRARY.md).

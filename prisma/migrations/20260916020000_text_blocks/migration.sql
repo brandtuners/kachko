@@ -1,0 +1,1 @@
+ALTER TYPE "BlockType" ADD VALUE 'TEXT';

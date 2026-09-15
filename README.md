@@ -140,3 +140,7 @@ Auth/session/profile endpoints and shared identity contracts are implemented. Se
 Google signup/login is now included. See [Google credentials, migration and local browser testing](docs/06-GOOGLE-LOGIN.md).
 
 Page/LINK CRUD, publishing and public lookup are implemented and listed in Swagger. Apply all migrations with `pnpm db:deploy` and restart the API before testing. See [the page contract and FE fixture](docs/07-PAGE-LINK-CONTRACT.md). Run `pnpm --filter api test:pages` for isolated database verification.
+
+TEXT blocks and transactional reordering are implemented. See [editor API examples and validation rules](docs/08-TEXT-AND-REORDER.md); apply the TEXT migration with `pnpm db:deploy` and restart the API.
+
+Appearance, system themes/templates and social-profile APIs are implemented. See [the appearance/social setup and endpoint guide](docs/09-APPEARANCE-AND-SOCIALS.md); apply migrations and restart the API before testing.

@@ -124,6 +124,23 @@ test('page migration enforces single-page ownership and cascades; username chang
   assert.equal((await request('/pages/not-a-uuid', { cookie: alice.cookie })).status, 400);
   assert.equal((await request(root, { method: 'PATCH', cookie: alice.cookie, body: { isPublished: true } })).status, 400);
   assert.equal((await request(`${root}/blocks`, { method: 'POST', cookie: alice.cookie, body: { type: 'LINK', content: { title: 'bad', url: 'javascript:alert(1)' } } })).status, 400);
+  for (const [type, content] of Object.entries({
+    IMAGE: { url: 'https://example.com/photo.png', alt: 'Photo' },
+    SOCIAL: { platform: 'GITHUB', username: 'rohan' }, DIVIDER: {},
+    YOUTUBE: { videoId: 'dQw4w9WgXcQ' },
+    SPOTIFY: { url: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC' },
+    EMAIL: { email: 'hello@example.com' }, PHONE: { number: '+91 9876543210' }, LOCATION: { query: 'Mumbai' },
+  })) {
+    const created = await request(`${root}/blocks`, { method: 'POST', cookie: alice.cookie, body: { type, content } });
+    assert.equal(created.status, 201, type);
+    const id = created.body.data.id;
+    assert.equal(created.body.data.type, type);
+    const patched = await request(`${root}/blocks/${id}`, { method: 'PATCH', cookie: alice.cookie, body: { content } });
+    assert.equal(patched.status, 200, type);
+    const invalid = await request(`${root}/blocks/${id}`, { method: 'PATCH', cookie: alice.cookie, body: { content: { text: 'wrong type' } } });
+    assert.equal(invalid.status, 400, type);
+    assert.equal((await request(`${root}/blocks/${id}`, { method: 'DELETE', cookie: alice.cookie })).status, 200);
+  }
   const links = await Promise.all([1, 2, 3].map(i => request(`${root}/blocks`, { method: 'POST', cookie: alice.cookie,
     body: { type: 'LINK', content: { title: `Link ${i}`, url: 'HTTPS://Example.COM' }, isVisible: i !== 3 } })));
   assert.ok(links.every(r => r.status === 201));
@@ -196,6 +213,186 @@ test('page migration enforces single-page ownership and cascades; username chang
   assert.equal(lastPage.slug, 'page_race');
   await request(`/pages/${lastPage.id}/publish`, { method: 'POST', cookie: alice.cookie });
   assert.equal((await request('/public/page_race')).status, 200);
+  // TEXT and reorder extension: current page is published and empty.
+  await redisClient.flushDb(); // Isolated test Redis only; reset the preceding journey's limits.
+  const editorRoot = `/pages/${lastPage.id}`;
+  const add = body => request(`${editorRoot}/blocks`, { method: 'POST', cookie: alice.cookie, body });
+  const textCreated = await add({ type: 'TEXT', content: { text: 'Hello\nworld' } });
+  assert.equal(textCreated.status, 201);
+  assert.equal(textCreated.body.data.content.alignment, 'left');
+  const textId = textCreated.body.data.id;
+  const linkCreated = await add({ type: 'LINK', content: { title: 'Website', url: 'https://example.com' } });
+  assert.equal(linkCreated.status, 201);
+  const linkId = linkCreated.body.data.id;
+  const hiddenCreated = await add({ type: 'TEXT', content: { text: 'Hidden' }, isVisible: false });
+  const hiddenId = hiddenCreated.body.data.id;
+  const patch = (id, body) => request(`${editorRoot}/blocks/${id}`, { method: 'PATCH', cookie: alice.cookie, body });
+  assert.equal((await patch(textId, { content: { title: 'wrong type', url: 'https://example.com' } })).status, 400);
+  assert.equal((await patch(linkId, { content: { text: 'wrong type' } })).status, 400);
+  assert.equal((await patch(textId, { type: 'LINK' })).status, 400);
+  assert.equal((await add({ type: 'TEXT', content: { text: ' ' } })).status, 400);
+  assert.equal((await add({ type: 'TEXT', content: { text: 'x'.repeat(5001) } })).status, 400);
+  let mixed = await request('/public/page_race');
+  assert.deepEqual(mixed.body.data.blocks.map(b => b.type), ['TEXT', 'LINK']);
+  const edited = await patch(textId, { content: { text: '<b>Still plain text</b>', alignment: 'center' } });
+  assert.equal(edited.status, 200);
+  mixed = await request('/public/page_race');
+  assert.equal(mixed.body.data.blocks[0].content.text, '<b>Still plain text</b>');
+  assert.equal(mixed.body.data.blocks[0].content.alignment, 'center');
+  const reorder = (items, cookie = alice.cookie, csrf = true) => request(`${editorRoot}/blocks/reorder`, { method: 'POST', cookie, csrf, body: { items } });
+  const order = ids => ids.map((id, position) => ({ id, position }));
+  const target = order([linkId, hiddenId, textId]);
+  assert.equal((await reorder(target, alice.cookie, false)).status, 403);
+  assert.equal((await reorder(target, bob.cookie)).status, 404);
+  const beforeInvalid = await db.page.findUnique({ where: { id: lastPage.id }, include: { blocks: { orderBy: { position: 'asc' } } } });
+  for (const [items, status] of [[[{ id: textId, position: 0 }, { id: textId, position: 1 }, { id: hiddenId, position: 2 }], 400],
+    [order([textId, linkId]), 409], [order([textId, linkId, randomUUID()]), 409],
+    [[{ id: textId, position: 0 }, { id: linkId, position: 2 }, { id: hiddenId, position: 3 }], 400], [[], 409]]) {
+    assert.equal((await reorder(items)).status, status);
+  }
+  const afterInvalid = await db.page.findUnique({ where: { id: lastPage.id }, include: { blocks: { orderBy: { position: 'asc' } } } });
+  assert.equal(afterInvalid.revision, beforeInvalid.revision);
+  assert.deepEqual(afterInvalid.blocks.map(b => [b.id, b.position]), beforeInvalid.blocks.map(b => [b.id, b.position]));
+  const reordered = await reorder(target);
+  assert.equal(reordered.status, 200);
+  assert.deepEqual(reordered.body.data.blocks.map(b => b.id), [linkId, hiddenId, textId]);
+  assert.deepEqual((await request('/public/page_race')).body.data.blocks.map(b => b.id), [linkId, textId]);
+  assert.equal((await patch(hiddenId, { isVisible: true })).status, 200);
+  assert.deepEqual((await request('/public/page_race')).body.data.blocks.map(b => b.id), [linkId, hiddenId, textId]);
+  // Concurrent content editing must not be overwritten by a reorder.
+  const concurrentEdits = await Promise.all([reorder(order([textId, linkId, hiddenId])), patch(textId, { content: { text: 'Concurrent edit', alignment: 'right' } })]);
+  assert.ok(concurrentEdits.every(r => r.status === 200));
+  const afterConcurrent = (await request(editorRoot, { cookie: alice.cookie })).body.data.blocks;
+  assert.deepEqual(afterConcurrent.map(b => b.id), [textId, linkId, hiddenId]);
+  assert.equal(afterConcurrent[0].content.text, 'Concurrent edit');
+  // A block-set change either follows a valid reorder, or makes that reorder stale.
+  const raceAdd = await Promise.all([reorder(order([hiddenId, linkId, textId])), add({ type: 'TEXT', content: { text: 'Added concurrently' } })]);
+  assert.ok([200, 409].includes(raceAdd[0].status));
+  assert.equal(raceAdd[1].status, 201);
+  const addedId = raceAdd[1].body.data.id;
+  let editorBlocks = (await request(editorRoot, { cookie: alice.cookie })).body.data.blocks;
+  assert.deepEqual(editorBlocks.map(b => b.position), [0, 1, 2, 3]);
+  const raceDelete = await Promise.all([reorder(order(editorBlocks.map(b => b.id).reverse())),
+    request(`${editorRoot}/blocks/${addedId}`, { method: 'DELETE', cookie: alice.cookie })]);
+  assert.ok([200, 409].includes(raceDelete[0].status));
+  assert.equal(raceDelete[1].status, 200);
+  editorBlocks = (await request(editorRoot, { cookie: alice.cookie })).body.data.blocks;
+  assert.deepEqual(editorBlocks.map(b => b.position), [0, 1, 2]);
+  assert.equal(editorBlocks.some(b => b.id === addedId), false);
+  assert.equal((await request(`${editorRoot}/blocks/${textId}`, { method: 'DELETE', cookie: alice.cookie })).status, 200);
+  assert.equal((await request('/public/page_race')).body.data.blocks.some(b => b.id === textId), false);
+  const updatedSwagger = await (await fetch(`${base}/api/docs-json`)).json();
+  assert.ok(updatedSwagger.paths['/api/v1/pages/{pageId}/blocks/reorder'].post);
+  const createSchema = updatedSwagger.paths['/api/v1/pages/{pageId}/blocks'].post.requestBody.content['application/json'].schema;
+  assert.ok(JSON.stringify(createSchema).includes('TEXT'));
+  // Empty page reorder is a valid no-op and remains owner-protected.
+  assert.equal((await request(`/pages/${bobPage.id}/blocks/reorder`, { method: 'POST', cookie: bob.cookie, body: { items: [] } })).status, 200);
+  // Appearance/social feature with fresh test limits and a warm public cache.
+  await redisClient.flushDb();
+  const themeCatalog = await request('/themes');
+  assert.equal(themeCatalog.status, 200);
+  assert.equal(themeCatalog.body.data.length, 11);
+  for (const theme of themeCatalog.body.data) {
+    const { themeConfigSchema } = require('@kachko/validation');
+    assert.equal(themeConfigSchema.safeParse(theme.config).success, true);
+    assert.equal((await request(`/themes/${theme.key}`)).status, 200);
+  }
+  assert.equal((await request('/themes/missing')).status, 404);
+  const templateCatalog = await request('/templates');
+  assert.equal(templateCatalog.body.data.length, 3);
+  assert.equal((await request('/templates/creator')).status, 200);
+  assert.equal((await request('/templates/missing')).status, 404);
+  const ap = body => request(`${editorRoot}/appearance`, { method: 'PATCH', cookie: alice.cookie, body });
+  assert.equal((await request(`${editorRoot}/appearance`, { cookie: bob.cookie })).status, 404);
+  assert.equal((await request(`${editorRoot}/appearance`, { method: 'PATCH', cookie: bob.cookie, body: { themeKey: 'dark' } })).status, 404);
+  assert.equal((await request(`${editorRoot}/appearance`, { method: 'PATCH', cookie: alice.cookie, csrf: false, body: { themeKey: 'dark' } })).status, 403);
+  assert.equal((await ap({ themeKey: 'dark' })).status, 200);
+  let appearance = (await request(`${editorRoot}/appearance`, { cookie: alice.cookie })).body.data;
+  assert.equal(appearance.themeKey, 'dark');
+  assert.equal(appearance.appearance.background.color, '#111827');
+  assert.equal((await request('/public/page_race')).body.data.page.appearance.background.color, '#111827');
+  assert.equal((await ap({ overrides: { buttons: { radius: 25 }, typography: { titleSize: 40 } } })).status, 200);
+  assert.equal((await request('/public/page_race')).body.data.page.appearance.buttons.radius, 25);
+  assert.equal((await request(editorRoot, { cookie: alice.cookie })).body.data.appearance.typography.titleSize, 40);
+  for (const body of [{ themeKey: 'unknown' }, { overrides: { css: 'body{display:none}' } },
+    { overrides: { background: { type: 'solid', color: 'url(https://evil.example)' } } },
+    { overrides: { typography: { fontFamily: 'arbitrary-font' } } }, { overrides: { cards: { blur: 999 } } }]) {
+    assert.equal((await ap(body)).status, 400);
+  }
+  assert.equal((await ap({ themeKey: 'nature' })).status, 200);
+  appearance = (await request(`${editorRoot}/appearance`, { cookie: alice.cookie })).body.data;
+  assert.deepEqual(appearance.overrides, {});
+  assert.equal(appearance.appearance.buttons.radius, 16);
+  const addSocial = body => request(`${editorRoot}/socials`, { method: 'POST', cookie: alice.cookie, body });
+  const socialCreated = await Promise.all([
+    addSocial({ platform: 'GITHUB', url: 'HTTPS://GITHUB.COM/rohan', username: ' rohan ' }),
+    addSocial({ platform: 'YOUTUBE', url: 'https://www.youtube.com/@rohan' }),
+    addSocial({ platform: 'INSTAGRAM', url: 'https://instagram.com/rohan', isVisible: false }),
+  ]);
+  assert.ok(socialCreated.every(r => r.status === 201));
+  assert.deepEqual(socialCreated.map(r => r.body.data.position).sort(), [0, 1, 2]);
+  const githubSocial = socialCreated[0].body.data;
+  const youtubeSocial = socialCreated[1].body.data;
+  const instagramSocial = socialCreated[2].body.data;
+  assert.equal(githubSocial.url, 'https://github.com/rohan');
+  assert.equal(githubSocial.username, 'rohan');
+  for (const body of [{ platform: 'GITHUB', url: 'javascript:alert(1)' }, { platform: 'GITHUB', url: 'https://github.com.evil.example/rohan' },
+    { platform: 'GITHUB', url: 'https://user:pass@github.com/rohan' }, { platform: 'GITHUB', url: 'https://instagram.com/rohan' },
+    { platform: 'GITHUB', url: 'https://github.com/rohan', position: 99 }]) assert.equal((await addSocial(body)).status, 400);
+  let publicSocials = (await request('/public/page_race')).body.data.socials;
+  assert.equal(publicSocials.length, 2);
+  assert.deepEqual(Object.keys(publicSocials[0]).sort(), ['id', 'platform', 'url', 'username']);
+  for (const method of ['PATCH', 'DELETE']) assert.equal((await request(`${editorRoot}/socials/${githubSocial.id}`, { method, cookie: bob.cookie,
+    ...(method === 'PATCH' ? { body: { isVisible: false } } : {}) })).status, 404);
+  assert.equal((await request(`${editorRoot}/socials`, { cookie: bob.cookie })).status, 404);
+  const patchSocial = (id, body) => request(`${editorRoot}/socials/${id}`, { method: 'PATCH', cookie: alice.cookie, body });
+  assert.equal((await patchSocial(githubSocial.id, { platform: 'X' })).status, 400);
+  assert.equal((await patchSocial(githubSocial.id, { platform: 'X', url: 'https://x.com/rohan', username: null })).status, 200);
+  assert.equal((await request('/public/page_race')).body.data.socials.find(s => s.id === githubSocial.id).platform, 'X');
+  const socialOrder = [instagramSocial.id, youtubeSocial.id, githubSocial.id];
+  const reorderSocial = items => request(`${editorRoot}/socials/reorder`, { method: 'POST', cookie: alice.cookie, body: { items } });
+  const revisionBefore = (await db.page.findUnique({ where: { id: lastPage.id } })).revision;
+  assert.equal((await reorderSocial(order(socialOrder.slice(0, 2)))).status, 409);
+  assert.equal((await reorderSocial([{ id: socialOrder[0], position: 0 }, { id: socialOrder[0], position: 1 }, { id: socialOrder[2], position: 2 }])).status, 400);
+  assert.equal((await db.page.findUnique({ where: { id: lastPage.id } })).revision, revisionBefore);
+  assert.equal((await reorderSocial(order(socialOrder))).status, 200);
+  assert.deepEqual((await request('/public/page_race')).body.data.socials.map(s => s.id), [youtubeSocial.id, githubSocial.id]);
+  await patchSocial(instagramSocial.id, { isVisible: true });
+  assert.deepEqual((await request('/public/page_race')).body.data.socials.map(s => s.id), socialOrder);
+  const socialRace = await Promise.all([reorderSocial(order(socialOrder.slice().reverse())), addSocial({ platform: 'DISCORD', url: 'https://discord.gg/example' })]);
+  assert.ok([200, 409].includes(socialRace[0].status));
+  assert.equal(socialRace[1].status, 201);
+  let ownerSocials = (await request(`${editorRoot}/socials`, { cookie: alice.cookie })).body.data;
+  assert.deepEqual(ownerSocials.map(s => s.position), [0, 1, 2, 3]);
+  assert.equal((await request(`${editorRoot}/socials/${socialRace[1].body.data.id}`, { method: 'DELETE', cookie: alice.cookie })).status, 200);
+  ownerSocials = (await request(`${editorRoot}/socials`, { cookie: alice.cookie })).body.data;
+  assert.deepEqual(ownerSocials.map(s => s.position), [0, 1, 2]);
+  const templateBefore = await db.page.findUnique({ where: { id: lastPage.id }, include: { blocks: true } });
+  const apply = body => request(`${editorRoot}/template`, { method: 'POST', cookie: alice.cookie, body });
+  const noConfirm = await apply({ templateKey: 'creator' });
+  assert.equal(noConfirm.status, 409);
+  assert.equal(noConfirm.body.error.code, 'TEMPLATE_REPLACE_REQUIRED');
+  assert.equal((await db.page.findUnique({ where: { id: lastPage.id } })).revision, templateBefore.revision);
+  assert.equal((await request(`${editorRoot}/template`, { method: 'POST', cookie: bob.cookie, body: { templateKey: 'creator', replaceExistingBlocks: true } })).status, 404);
+  const applied = await apply({ templateKey: 'creator', replaceExistingBlocks: true });
+  assert.equal(applied.status, 200);
+  assert.equal(applied.body.data.themeKey, 'gradient');
+  assert.equal(applied.body.data.blocks.length, 3);
+  assert.equal(applied.body.data.socials.length, 3);
+  assert.ok(applied.body.data.blocks.every(b => !templateBefore.blocks.some(old => old.id === b.id)));
+  assert.deepEqual(applied.body.data.appearanceOverrides, {});
+  assert.equal((await request('/public/page_race')).body.data.page.appearance.background.type, 'gradient');
+  assert.equal((await request('/public/page_race')).body.data.blocks.length, 3);
+  // Template creation is atomic with the existing one-page constraint.
+  await request(`/pages/${bobPage.id}`, { method: 'DELETE', cookie: bob.cookie });
+  const fromTemplate = await request('/pages', { method: 'POST', cookie: bob.cookie, body: { templateKey: 'professional', title: 'My portfolio' } });
+  assert.equal(fromTemplate.status, 201);
+  assert.equal(fromTemplate.body.data.themeKey, 'professional');
+  assert.equal(fromTemplate.body.data.blocks.length, 2);
+  assert.equal(fromTemplate.body.data.isPublished, false);
+  const checkSwagger = await (await fetch(`${base}/api/docs-json`)).json();
+  for (const path of ['/api/v1/themes', '/api/v1/templates', '/api/v1/pages/{pageId}/appearance', '/api/v1/pages/{pageId}/template',
+    '/api/v1/pages/{pageId}/socials', '/api/v1/pages/{pageId}/socials/{socialId}', '/api/v1/pages/{pageId}/socials/reorder']) assert.ok(checkSwagger.paths[path], path);
   await docker('stop', redisName);
   assert.equal((await request('/public/page_race')).status, 200, 'public reads fall back to PostgreSQL');
   await db.page.update({ where: { id: lastPage.id }, data: { isPublished: false } });
