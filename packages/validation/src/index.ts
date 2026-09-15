@@ -34,3 +34,6 @@ export const googleRegistrationSchema = z.strictObject({
 export type GoogleRegistrationInput = z.infer<typeof googleRegistrationSchema>;
 
 export * from './pages';
+
+export * from './appearance';
+export * from './socials';

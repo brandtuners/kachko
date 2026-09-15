@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { z, createPageSchema, updatePageSchema, createLinkBlockSchema, updateLinkBlockSchema, pageIdSchema, blockIdSchema, usernameSchema,
-  type CreatePageInput, type UpdatePageInput, type CreateLinkBlockInput, type UpdateLinkBlockInput } from '@kachko/validation';
+import { z, createPageSchema, updatePageSchema, createBlockSchema, updateBlockSchema, reorderBlocksSchema, pageIdSchema, blockIdSchema, usernameSchema,
+  type CreatePageInput, type UpdatePageInput, type CreateBlockInput, type UpdateBlockInput, type ReorderBlocksInput } from '@kachko/validation';
 import { IdentityValidationPipe } from '../identity/identity.controller';
 import { IdentityRateGuard, SessionGuard, RatePolicy, type IdentityRequest } from '../identity/identity.guards';
 import { PagesService } from './pages.service';
@@ -10,7 +10,7 @@ const pageId = new IdentityValidationPipe(pageIdSchema);
 const blockId = new IdentityValidationPipe(blockIdSchema);
 const emptyBody = new IdentityValidationPipe(z.strictObject({}).default({}));
 
-@ApiTags('Pages and links')
+@ApiTags('Pages and blocks')
 @ApiCookieAuth()
 @ApiHeader({ name: 'X-Kachko-CSRF', required: false, description: 'Required value 1 for POST, PATCH and DELETE' })
 @ApiResponse({ status: 400, description: 'VALIDATION_ERROR: invalid IDs, fields or URL' })
@@ -64,18 +64,32 @@ export class PagesController {
     return this.pages.publish(request.identity.id, id, false);
   }
   @Post(':pageId/blocks')
-  @ApiBody({ schema: schema.linkCreateBody, examples: { website: { value: {
+  @ApiBody({ schema: schema.blockCreateBody, examples: { website: { value: {
     type: 'LINK', content: { title: 'My website', url: 'https://example.com/', openInNewTab: true }, isVisible: true,
-  } } } })
-  @ApiResponse({ status: 201, schema: schema.envelope(schema.linkBlock) })
+  } }, text: { value: { type: 'TEXT', content: { text: 'Welcome to my page', alignment: 'left' }, isVisible: true } } } })
+  @ApiResponse({ status: 201, schema: schema.envelope(schema.block) })
   addBlock(@Req() request: IdentityRequest, @Param('pageId', pageId) id: string,
-    @Body(new IdentityValidationPipe(createLinkBlockSchema)) input: CreateLinkBlockInput) { return this.pages.addBlock(request.identity.id, id, input); }
+    @Body(new IdentityValidationPipe(createBlockSchema)) input: CreateBlockInput) { return this.pages.addBlock(request.identity.id, id, input); }
+
+  @Post(':pageId/blocks/reorder')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Atomically reorder every current block, including hidden blocks' })
+  @ApiBody({ schema: schema.reorderBody, examples: { twoBlocks: { value: { items: [
+    { id: 'd6f0b953-461d-43b7-8e16-dbd98c10c1a1', position: 1 },
+    { id: 'd6f0b953-461d-43b7-8e16-dbd98c10c1a2', position: 0 },
+  ] } } } })
+  @ApiResponse({ status: 200, schema: schema.pageResponse })
+  @ApiResponse({ status: 409, description: 'BLOCK_ORDER_CONFLICT: block set changed or contains foreign/missing IDs; reload and retry' })
+  reorder(@Req() request: IdentityRequest, @Param('pageId', pageId) id: string,
+    @Body(new IdentityValidationPipe(reorderBlocksSchema)) input: ReorderBlocksInput) {
+    return this.pages.reorder(request.identity.id, id, input);
+  }
 
   @Patch(':pageId/blocks/:blockId')
-  @ApiBody({ schema: schema.linkUpdateBody })
-  @ApiResponse({ status: 200, schema: schema.envelope(schema.linkBlock) })
+  @ApiBody({ schema: schema.blockUpdateBody })
+  @ApiResponse({ status: 200, schema: schema.envelope(schema.block) })
   updateBlock(@Req() request: IdentityRequest, @Param('pageId', pageId) id: string, @Param('blockId', blockId) block: string,
-    @Body(new IdentityValidationPipe(updateLinkBlockSchema)) input: UpdateLinkBlockInput) {
+    @Body(new IdentityValidationPipe(updateBlockSchema)) input: UpdateBlockInput) {
     return this.pages.updateBlock(request.identity.id, id, block, input);
   }
   @Delete(':pageId/blocks/:blockId')
@@ -91,7 +105,7 @@ export class PublicPagesController {
   constructor(private readonly pages: PagesService) {}
   @Get(':username')
   @Header('Cache-Control', 'no-store')
-  @ApiOperation({ summary: 'Published profile and visible links; no authentication required' })
+  @ApiOperation({ summary: 'Published profile and visible LINK/TEXT blocks; no authentication required' })
   @ApiResponse({ status: 200, schema: schema.publicResponse })
   @ApiResponse({ status: 404, description: 'PAGE_NOT_FOUND: missing, unpublished or inactive/deleted owner' })
   @ApiResponse({ status: 400, description: 'VALIDATION_ERROR: malformed username' })

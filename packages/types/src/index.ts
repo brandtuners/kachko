@@ -27,3 +27,5 @@ export type GoogleIdentityErrorCode = 'GOOGLE_NOT_CONFIGURED' | 'GOOGLE_AUTH_FAI
   | 'GOOGLE_STATE_INVALID' | 'GOOGLE_ONBOARDING_EXPIRED' | 'ACCOUNT_LINK_REQUIRED';
 
 export * from './pages';
+
+export * from './appearance';
