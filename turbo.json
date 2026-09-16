@@ -5,6 +5,32 @@
       "dependsOn": [
         "^build"
       ],
+      "env": [
+        "API_URL",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_CDN_URL",
+        "NEXT_PUBLIC_SENTRY_DSN"
+      ],
+      "passThroughEnv": [
+        "CORS_ORIGINS",
+        "DATABASE_URL",
+        "DEPENDENCY_TIMEOUT_MS",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_LOGIN_REDIRECT_URL",
+        "GOOGLE_REDIRECT_URI",
+        "MEDIA_LOCAL_DIR",
+        "MEDIA_STORAGE",
+        "R2_ACCESS_KEY_ID",
+        "R2_ACCOUNT_ID",
+        "R2_BUCKET",
+        "R2_PUBLIC_URL",
+        "R2_SECRET_ACCESS_KEY",
+        "REDIS_URL",
+        "SENTRY_DSN",
+        "SESSION_COOKIE_NAME",
+        "SESSION_TTL_SECONDS"
+      ],
       "outputs": [
         ".next/**",
         "dist/**",
