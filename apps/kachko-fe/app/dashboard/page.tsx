@@ -25,7 +25,6 @@ import {
   IconArrowUpRight,
   IconCheck,
   IconChart,
-  IconDownload,
   IconEye,
   IconLink,
   IconPlus,
