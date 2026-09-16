@@ -30,3 +30,4 @@ export * from './pages';
 
 export * from './appearance';
 export * from './media';
+export * from './analytics';

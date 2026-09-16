@@ -18,6 +18,7 @@
     "db:validate": "prisma validate",
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
+    "db:analytics:prune": "prisma db execute --file prisma/analytics-retention.sql",
     "db:studio": "prisma studio",
     "db:test": "pnpm --filter api test:db"
   },

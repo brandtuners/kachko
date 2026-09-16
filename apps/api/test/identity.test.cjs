@@ -26,8 +26,9 @@ test('cookie parsing and CSRF reject ambiguous credentials and unsafe browser mu
   assert.equal(sessionCookie({ headers: { cookie } }, config), token);
   assert.equal(sessionCookie({ headers: { cookie: `${cookie}; ${cookie}` } }, config), undefined);
   assert.equal(sessionCookie({ headers: { cookie: 'kachko_session=bad' } }, config), undefined);
-  const guard = new CsrfGuard(config);
-  const context = (method, headers) => ({ switchToHttp: () => ({ getRequest: () => ({ method, headers }) }) });
+  const guard = new CsrfGuard(config, { getAllAndOverride: () => false });
+  const context = (method, headers) => ({ getHandler: () => null, getClass: () => null,
+    switchToHttp: () => ({ getRequest: () => ({ method, headers }) }) });
   assert.equal(guard.canActivate(context('GET', {})), true);
   assert.throws(() => guard.canActivate(context('POST', {})));
   assert.throws(() => guard.canActivate(context('PATCH', { 'x-kachko-csrf': '1', origin: 'null' })));

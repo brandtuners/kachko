@@ -61,6 +61,8 @@ test('Nest HTTP foundation serves health, errors, CORS and OpenAPI', async (t) =
   assert.ok(schema.paths['/api/v1/health']);
   assert.ok(schema.paths['/api/v1/media/upload-url']);
   assert.ok(schema.paths['/api/v1/media/complete']);
+  assert.ok(schema.paths['/api/v1/analytics/events']);
+  assert.ok(schema.paths['/api/v1/pages/{pageId}/analytics/summary']);
   assert.ok(schema.paths['/api/v1/health/ready'].get.responses['503']);
   for (const [postgres, redis] of [['up', 'up'], ['down', 'up'], ['up', 'down'], ['down', 'down'], ['stalled', 'up'], ['up', 'up']]) {
     Object.assign(state, { postgres, redis });

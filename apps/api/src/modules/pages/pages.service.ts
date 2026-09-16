@@ -98,7 +98,7 @@ export class PagesService {
     const page = await this.repository.publicSnapshot(username);
     if (!page) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');
     const result: PublicPage = publicPageSchema.parse({
-      profile: page.user, page: { title: page.title, description: page.description, themeKey: page.themeKey, appearance: resolveAppearance(themeConfig(page.theme), page.appearanceOverrides) },
+      profile: page.user, page: { id: page.id, title: page.title, description: page.description, themeKey: page.themeKey, appearance: resolveAppearance(themeConfig(page.theme), page.appearanceOverrides) },
       blocks: page.blocks.map(block => {
         const content = block.type === 'IMAGE' ? { ...(block.content as Record<string, unknown>), url: block.media?.url } : block.content;
         return publicBlockSchema.parse({ id: block.id, type: block.type, content });

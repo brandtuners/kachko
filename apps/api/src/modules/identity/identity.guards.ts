@@ -8,6 +8,7 @@ import { IdentityService, identityError, tokenDigest } from './identity.service'
 
 export type IdentityRequest = Request & { identity: IdentityUser };
 export const RatePolicy = (name: string, limit: number, seconds: number) => SetMetadata('identityRate', { name, limit, seconds });
+export const SkipCsrf = () => SetMetadata('skipCsrf', true);
 
 export function sessionCookie(request: Request, config: ConfigService): string | undefined {
   const name = config.getOrThrow<string>('SESSION_COOKIE_NAME');
@@ -19,8 +20,9 @@ export function sessionCookie(request: Request, config: ConfigService): string |
 
 @Injectable()
 export class CsrfGuard implements CanActivate {
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService, private readonly reflector: Reflector) {}
   canActivate(context: ExecutionContext) {
+    if (this.reflector.getAllAndOverride<boolean>('skipCsrf', [context.getHandler(), context.getClass()])) return true;
     const request = context.switchToHttp().getRequest<Request>();
     if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return true;
     const origin = request.headers.origin;

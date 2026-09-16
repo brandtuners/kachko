@@ -29,7 +29,7 @@ test('Google provider requires configuration and verified email/nonce after SDK 
 });
 
 test('Google configuration is optional, complete, HTTPS in production and has fixed trusted redirects', () => {
-  const env = { DATABASE_URL: 'postgresql://test:test@localhost/test', REDIS_URL: 'redis://localhost', CORS_ORIGINS: 'https://app.example.com' };
+  const env = { DATABASE_URL: 'postgresql://test:test@localhost/test', REDIS_URL: 'redis://localhost', CORS_ORIGINS: 'https://app.example.com', ANALYTICS_HASH_SALT: 'a'.repeat(32) };
   assert.equal(validateEnvironment(env).GOOGLE_CLIENT_ID, '');
   assert.throws(() => validateEnvironment({ ...env, GOOGLE_CLIENT_ID: 'client' }));
   const enabled = { ...env, GOOGLE_CLIENT_ID: 'client', GOOGLE_CLIENT_SECRET: 'test-secret' };

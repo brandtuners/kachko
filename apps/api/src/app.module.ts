@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { validateEnvironment } from './config/environment';
 import { HealthModule } from './modules/health/health.module';
 import { MediaModule } from './modules/media/media.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { MediaModule } from './modules/media/media.module';
     IdentityModule,
     PagesModule,
     MediaModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

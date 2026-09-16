@@ -47,6 +47,8 @@ export function validateEnvironment(env: Record<string, unknown>) {
   }
   const cookieName = String(env.SESSION_COOKIE_NAME ?? 'kachko_session');
   if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(cookieName)) throw new Error('SESSION_COOKIE_NAME must be a simple cookie name');
+  const analyticsSalt = String(env.ANALYTICS_HASH_SALT ?? (nodeEnv === 'production' ? '' : 'kachko-development-analytics-salt'));
+  if (analyticsSalt.length < 32) throw new Error('ANALYTICS_HASH_SALT must contain at least 32 characters');
   const googleId = String(env.GOOGLE_CLIENT_ID ?? '').trim();
   const googleSecret = String(env.GOOGLE_CLIENT_SECRET ?? '').trim();
   if (Boolean(googleId) !== Boolean(googleSecret)) throw new Error('Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET');
@@ -75,7 +77,7 @@ export function validateEnvironment(env: Record<string, unknown>) {
     if (googleRedirect && !allowedOrigins.includes(new URL(googleRedirect).origin)) throw new Error('Google frontend redirect origin must be in CORS_ORIGINS');
   }
   return {
-    ...env, SESSION_TTL_SECONDS: sessionTtl, SESSION_COOKIE_NAME: cookieName, NODE_ENV: nodeEnv, PORT: port, CORS_ORIGINS: allowedOrigins,
+    ...env, SESSION_TTL_SECONDS: sessionTtl, SESSION_COOKIE_NAME: cookieName, ANALYTICS_HASH_SALT: analyticsSalt, NODE_ENV: nodeEnv, PORT: port, CORS_ORIGINS: allowedOrigins,
     GOOGLE_CLIENT_ID: googleId, GOOGLE_CLIENT_SECRET: googleSecret, GOOGLE_REDIRECT_URI: googleCallback, GOOGLE_LOGIN_REDIRECT_URL: googleRedirect,
     DATABASE_URL: connectionUrl(env, 'DATABASE_URL'),
     REDIS_URL: connectionUrl(env, 'REDIS_URL'),

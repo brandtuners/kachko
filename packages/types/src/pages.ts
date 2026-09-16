@@ -56,7 +56,7 @@ export type DeleteResponse = ApiData<{ deleted: true }>;
 /** Explicit public allowlist: no owner ID, email, session data or hidden blocks. */
 export interface PublicPage {
   profile: { username: string; displayName: string | null; bio: string | null; avatarUrl: string | null };
-  page: { title: string | null; description: string | null; themeKey: PageThemeKey; appearance: ThemeConfig };
+  page: { id: string; title: string | null; description: string | null; themeKey: PageThemeKey; appearance: ThemeConfig };
   blocks: PublicBlock[];
   socials: PublicSocial[];
 }

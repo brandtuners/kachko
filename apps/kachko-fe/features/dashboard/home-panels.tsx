@@ -5,10 +5,8 @@
 // on this screen comes from the analytics endpoints; nothing is decorative data.
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../../lib/api";
-// View models for the future analytics endpoint; not existing API contracts.
-interface AnalyticsTimeseriesPoint { bucket: string; pageViews: number; linkClicks: number; socialClicks: number; uniqueVisitors: number; mobileViews: number }
-interface AnalyticsSummary extends AnalyticsTimeseriesPoint { byDevice: { device: string; count: number }[]; topReferrers: { referrer: string; count: number }[]; byCountry: { country: string; count: number }[] }
-interface AnalyticsTopLink { blockId: string | null; label: string; clicks: number }
+import type { AnalyticsDevice, AnalyticsGeo, AnalyticsPeriod, AnalyticsRange, AnalyticsReferrer,
+  AnalyticsSeriesPoint, AnalyticsSummary, AnalyticsTopLink } from "@kachko/types";
 import { useEditor } from "../editor/use-editor";
 import type { EditorBlock } from "../editor/types";
 import { BLOCK_ICONS, blockSub, blockTitle, PlatformBadge } from "./block-row";
@@ -24,29 +22,50 @@ import {
 
 /** Shared analytics reads — same cache keys the Analytics tab uses, so the
  *  home metrics and the analytics panel are always the same truth. */
-export function useStats(pageId: string) {
+export function useStats(pageId: string, range: AnalyticsRange = "7d") {
+  const options = { staleTime: 15_000, refetchInterval: 15_000, retry: 1 } as const;
   const summary = useQuery({
-    queryKey: ["analytics", pageId, "summary"],
-    queryFn: () => apiFetch<AnalyticsSummary>(`/analytics/pages/${pageId}/summary?range=7d`),
-    retry: false,
+    queryKey: ["analytics", pageId, range, "summary"],
+    queryFn: () => apiFetch<AnalyticsSummary>(`/pages/${pageId}/analytics/summary?range=${range}`),
+    ...options,
   });
   const series = useQuery({
-    queryKey: ["analytics", pageId, "timeseries"],
-    queryFn: () => apiFetch<AnalyticsTimeseriesPoint[]>(`/analytics/pages/${pageId}/timeseries?range=7d`),
-    retry: false,
+    queryKey: ["analytics", pageId, range, "timeseries"],
+    queryFn: () => apiFetch<AnalyticsPeriod & { items: AnalyticsSeriesPoint[] }>(`/pages/${pageId}/analytics/timeseries?range=${range}`),
+    ...options,
   });
   const top = useQuery({
-    queryKey: ["analytics", pageId, "top-links"],
-    queryFn: () => apiFetch<AnalyticsTopLink[]>(`/analytics/pages/${pageId}/top-links?range=7d`),
-    retry: false,
+    queryKey: ["analytics", pageId, range, "top-links"],
+    queryFn: () => apiFetch<AnalyticsPeriod & { items: AnalyticsTopLink[] }>(`/pages/${pageId}/analytics/top-links?range=${range}`),
+    ...options,
   });
-  return { summary, series, top };
+  const referrers = useQuery({
+    queryKey: ["analytics", pageId, range, "referrers"],
+    queryFn: () => apiFetch<AnalyticsPeriod & { items: AnalyticsReferrer[] }>(`/pages/${pageId}/analytics/referrers?range=${range}`),
+    ...options,
+  });
+  const geo = useQuery({
+    queryKey: ["analytics", pageId, range, "geo"],
+    queryFn: () => apiFetch<AnalyticsPeriod & { items: AnalyticsGeo[] }>(`/pages/${pageId}/analytics/geo?range=${range}`),
+    ...options,
+  });
+  const devices = useQuery({
+    queryKey: ["analytics", pageId, range, "devices"],
+    queryFn: () => apiFetch<AnalyticsPeriod & { items: AnalyticsDevice[] }>(`/pages/${pageId}/analytics/devices?range=${range}`),
+    ...options,
+  });
+  return { summary, series, top, referrers, geo, devices };
 }
 
 export function useClicksByBlock(pageId: string): Map<string, number> {
-  const { top } = useStats(pageId);
+  const range: AnalyticsRange = "7d";
+  const top = useQuery({
+    queryKey: ["analytics", pageId, range, "top-links"],
+    queryFn: () => apiFetch<AnalyticsPeriod & { items: AnalyticsTopLink[] }>(`/pages/${pageId}/analytics/top-links?range=${range}`),
+    staleTime: 15_000, refetchInterval: 15_000, retry: 1,
+  });
   const map = new Map<string, number>();
-  for (const l of top.data ?? []) if (l.blockId) map.set(l.blockId, l.clicks);
+  for (const l of top.data?.items ?? []) map.set(l.blockId, l.clicks);
   return map;
 }
 
@@ -103,16 +122,17 @@ export function MetricCard({
 export function MetricsRow() {
   const editor = useEditor();
   const page = editor.page!;
-  const { summary, series } = useStats(page.id);
-  if (summary.isError) return <p role="status">Analytics is not available yet.</p>;
+  const { summary, series, devices } = useStats(page.id);
+  if (summary.isError || series.isError || devices.isError) return <p role="alert">Analytics could not be loaded. Try again shortly.</p>;
+  if (summary.isLoading || series.isLoading || devices.isLoading) return <div className="k-panel p-6 text-sm text-[#9a9f9b]">Loading analytics…</div>;
   const s = summary.data;
-  const pts = series.data ?? [];
+  const pts = series.data?.items ?? [];
 
   const clicks = (s?.linkClicks ?? 0) + (s?.socialClicks ?? 0);
-  const views = s?.pageViews ?? 0;
-  const mobileViews = pts.reduce((a, p) => a + p.mobileViews, 0);
+  const views = s?.totalViews ?? 0;
+  const mobileViews = devices.data?.items.find((item) => item.device === "mobile")?.visits ?? 0;
   const mobileShare = views > 0 ? Math.round((mobileViews / views) * 100) : 0;
-  const ctr = views > 0 ? Math.round((clicks / views) * 100) : 0;
+  const ctr = s?.clickThroughRate ?? 0;
 
   return (
     <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
@@ -121,7 +141,7 @@ export function MetricsRow() {
         label="Views"
         value={fmt(views)}
         bottom={views > 0 ? `${fmt(Math.round(views / Math.max(pts.length, 1)))} per day avg` : "waiting for visitors"}
-        spark={pts.map((p) => p.pageViews)}
+        spark={pts.map((p) => p.views)}
       />
       <MetricCard
         icon={<IconLink className="h-5 w-5" />}
@@ -135,14 +155,14 @@ export function MetricsRow() {
         label="Unique visitors"
         value={fmt(s?.uniqueVisitors ?? 0)}
         bottom="distinct people, 7 days"
-        spark={pts.map((p) => p.uniqueVisitors)}
+        spark={[]}
       />
       <MetricCard
         icon={<IconPhone className="h-5 w-5" />}
         label="Mobile views"
         value={`${mobileShare}%`}
         bottom={views > 0 ? `${fmt(mobileViews)} of ${fmt(views)} views` : "no views yet"}
-        spark={pts.map((p) => p.mobileViews)}
+        spark={[]}
       />
     </div>
   );

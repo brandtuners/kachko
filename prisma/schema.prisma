@@ -83,6 +83,7 @@ model Page {
   revision Int @default(0)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   blocks PageBlock[]
+  analytics AnalyticsEvent[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -97,6 +98,7 @@ model PageBlock {
   mediaId String?
   page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
   media Media? @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+  analytics AnalyticsEvent[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -169,6 +171,7 @@ model SocialProfile {
   position Int
   isVisible Boolean @default(true)
   page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  analytics AnalyticsEvent[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([pageId, position])
@@ -185,4 +188,34 @@ enum SocialPlatform {
   DISCORD
   TWITCH
   SPOTIFY
+}
+
+model AnalyticsEvent {
+  id String @id @default(uuid())
+  pageId String
+  blockId String?
+  socialProfileId String?
+  eventType AnalyticsEventType
+  ipHash String?
+  country String?
+  city String?
+  device String?
+  browser String?
+  os String?
+  referrer String?
+  createdAt DateTime @default(now())
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  block PageBlock? @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  socialProfile SocialProfile? @relation(fields: [socialProfileId], references: [id], onDelete: SetNull)
+
+  @@index([pageId, createdAt])
+  @@index([pageId, eventType, createdAt])
+  @@index([eventType, createdAt])
+  @@index([socialProfileId])
+}
+
+enum AnalyticsEventType {
+  PAGE_VIEW
+  LINK_CLICK
+  SOCIAL_CLICK
 }

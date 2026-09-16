@@ -14,7 +14,7 @@
 
 ### Step-by-step execution flow
 
-**Current handoff:** Rohan has implemented local services, Prisma, readiness and the identity APIs/shared contracts. Girish can now connect auth/profile UI using [the identity contract and local test guide](05-IDENTITY-API.md). Both still need to verify the integrated identity completion gate before beginning the first publishable page.
+**Current handoff:** Rohan has implemented the backend through Step 8, including identity, pages/blocks, appearance/social, managed media and basic analytics. Girish can integrate each completed contract in order; the joint completion gates remain open until both verify the corresponding real browser journeys. See [the analytics contract and local test guide](13-ANALYTICS-API.md) for the latest handoff.
 
 Complete the following steps in order. The Rohan and Girish columns show the tasks each person takes; the dependency column shows what must be ready first. Girish can build contract-backed UI with fixtures while Rohan implements the matching API. A step is complete only after both verify it using the real API.
 
@@ -64,6 +64,8 @@ The repository and pnpm/Turborepo workspace already exist. Continue frontend dev
 **Editor backend:** TEXT CRUD, visibility and full-list transactional reordering are implemented, including public serialization and cache invalidation. See [08-TEXT-AND-REORDER.md](08-TEXT-AND-REORDER.md). Girish still owns text rendering/editor, drag-and-drop/manual order controls and save/retry UX; Step 5 requires their integrated verification.
 
 **Appearance/social backend:** six seeded system themes, three templates, validated appearance overrides, social CRUD/reorder and public cache integration are implemented. See [09-APPEARANCE-AND-SOCIALS.md](09-APPEARANCE-AND-SOCIALS.md). Step 6 remains open for Girish's theme/template/social UI and joint public-renderer verification.
+
+**Analytics integration:** privacy-minimized public PAGE_VIEW/LINK_CLICK/SOCIAL_CLICK ingestion, published-target checks, Redis rate limits, owner-only summary/timeseries/breakdowns, bounded ranges and 12-month pruning are implemented. The public renderer uses Beacon with a keepalive fallback, and the dashboard supports Today/7-day/30-day loading, empty, error and breakdown states. See [13-ANALYTICS-API.md](13-ANALYTICS-API.md). Step 8 remains open only for joint deployed-browser verification.
 
 ### Working agreement and handoff
 

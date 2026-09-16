@@ -32,6 +32,14 @@ test('preserves API errors and does not send CSRF on reads', async () => {
   });
   await assert.rejects(api.apiFetch('/pages'), { code: 'UNAUTHENTICATED' });
 });
+test('analytics ingestion is available through the shared same-origin client', async () => {
+  const api = client(async (url, init) => {
+    assert.equal(url, '/api/v1/analytics/events');
+    assert.equal(init.headers.get('X-Kachko-CSRF'), '1');
+    return Response.json({ data: { accepted: true } }, { status: 202 });
+  });
+  assert.equal((await api.apiFetch('/analytics/events', { method: 'POST', body: '{"eventType":"PAGE_VIEW"}' })).accepted, true);
+});
 test('editor uses page IDs and documented reorder, publish and appearance bodies', async () => {
   const calls = [];
   const page = { id: 'page-1', themeKey: 'minimal', blocks: [], socials: [], appearance: {} };
