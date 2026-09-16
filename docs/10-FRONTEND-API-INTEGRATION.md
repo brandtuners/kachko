@@ -38,5 +38,5 @@ These features must not be described as integrated until their backend contracts
 6. Unpublish and verify the public route returns not found; log out and confirm
    protected API calls return UNAUTHENTICATED.
 
-Automated client checks: `pnpm --filter @kachko/web exec node --test tests/api.test.cjs`.
-Type check: `pnpm --filter @kachko/web exec tsc --noEmit`.
+Automated client checks: `pnpm --filter kachko-fe exec node --test tests/api.test.cjs`.
+Type check: `pnpm --filter kachko-fe exec tsc --noEmit`.

@@ -1,5 +1,5 @@
 {
-  "name": "@kachko/web",
+  "name": "kachko-fe",
   "version": "1.0.0",
   "private": true,
   "scripts": {
