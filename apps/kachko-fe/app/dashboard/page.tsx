@@ -12,6 +12,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { themeBackground, themeVars, themeButtonStyle } from "../../features/page/theme";
+import { isAuthError } from "../../features/editor/api";
 import { apiFetch } from "../../lib/api";
 import { useEditor } from "../../features/editor/use-editor";
 import { useMediaUpload } from "../../features/editor/use-media-upload";
@@ -56,10 +57,14 @@ export default function DashboardPage() {
       <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#fbfaf6] px-6 text-center">
         <ObLogo />
         <h1 className="text-2xl font-bold text-[#111312]">We couldn&apos;t load your page</h1>
-        <p className="text-[#777c79]">You may need to sign in again.</p>
-        <Link href="/login" className="k-btn-ink !rounded-full !px-6 !py-3">
-          Go to login
-        </Link>
+        <p className="text-[#777c79]" role="alert">
+          {isAuthError(editor.error) ? "Your session expired. Please sign in again." : editor.error?.message ?? "Please try loading your page again."}
+        </p>
+        {isAuthError(editor.error) ? (
+          <Link href="/login" className="k-btn-ink !rounded-full !px-6 !py-3">Go to login</Link>
+        ) : (
+          <button type="button" onClick={() => editor.refetch()} className="k-btn-ink !rounded-full !px-6 !py-3">Try again</button>
+        )}
       </main>
     );
   }

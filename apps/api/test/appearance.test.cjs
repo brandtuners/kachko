@@ -38,3 +38,19 @@ test('new system theme migration rows match the runtime theme contract', () => {
   }
   for (const key of ['aurora', 'neon-pop', 'cyan-pulse', 'sunset-lime', 'coral-drift']) assert.equal(themeKeySchema.parse(key), key);
 });
+
+test('neon presentation patches retain strict theme validation', () => {
+  const fs = require('node:fs');
+  const { themeConfigSchema } = require('@kachko/validation');
+  const original = fs.readFileSync('../../prisma/migrations/20260916110000_add_neon_system_themes/migration.sql', 'utf8');
+  const updated = fs.readFileSync('../../prisma/migrations/20260916120000_refine_neon_theme_presentation/migration.sql', 'utf8');
+  for (const key of ['aurora', 'neon-pop', 'cyan-pulse', 'sunset-lime', 'coral-drift']) {
+    const parse = line => [...line.matchAll(/'([^']+)'::jsonb/g)].map(m => JSON.parse(m[1]));
+    const base = parse(original.split('\n').find(line => line.includes(`'${key}'`)));
+    const patch = parse(updated.split('\n').find(line => line.startsWith('UPDATE "Theme"') && line.includes(`'${key}'`)));
+    const theme = Object.fromEntries(['background', 'typography', 'buttons', 'cards'].map((name, i) => [name, {...base[i], ...patch[i]}]));
+    assert.equal(themeConfigSchema.safeParse(theme).success, true, key);
+    theme.background.glow = 'url(https://example.com)';
+    assert.equal(themeConfigSchema.safeParse(theme).success, false);
+  }
+});

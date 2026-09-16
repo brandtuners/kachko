@@ -1,6 +1,11 @@
+BEGIN;
 -- Match the neon reference with a top glow and translucent outlined cards.
 UPDATE "Theme" SET "background" = "background" || '{"via": "#0e0c1d", "glow": "#6c5cff4d"}'::jsonb, "typography" = "typography" || '{"titleSize":20}'::jsonb, "buttons" = "buttons" || '{"variant":"glass","shadow":false}'::jsonb, "cards" = "cards" || '{"background": "#ffffff0a", "border": "#ffffff1a", "blur": 12}'::jsonb, "updatedAt" = CURRENT_TIMESTAMP WHERE "slug" = 'aurora';
 UPDATE "Theme" SET "background" = "background" || '{"via": "#14091f", "glow": "#ff3df047"}'::jsonb, "typography" = "typography" || '{"titleSize":20}'::jsonb, "buttons" = "buttons" || '{"variant":"glass","shadow":false}'::jsonb, "cards" = "cards" || '{"background": "#ffffff0d", "border": "#ff3df040", "blur": 12}'::jsonb, "updatedAt" = CURRENT_TIMESTAMP WHERE "slug" = 'neon-pop';
 UPDATE "Theme" SET "background" = "background" || '{"via": "#041826", "glow": "#22e3ff42"}'::jsonb, "typography" = "typography" || '{"titleSize":20}'::jsonb, "buttons" = "buttons" || '{"variant":"glass","shadow":false}'::jsonb, "cards" = "cards" || '{"background": "#22e3ff0d", "border": "#22e3ff38", "blur": 12}'::jsonb, "updatedAt" = CURRENT_TIMESTAMP WHERE "slug" = 'cyan-pulse';
 UPDATE "Theme" SET "background" = "background" || '{"via": "#1a1405", "glow": "#9dff3d38"}'::jsonb, "typography" = "typography" || '{"titleSize":20}'::jsonb, "buttons" = "buttons" || '{"variant":"glass","shadow":false}'::jsonb, "cards" = "cards" || '{"background": "#9dff3d0d", "border": "#9dff3d38", "blur": 12}'::jsonb, "updatedAt" = CURRENT_TIMESTAMP WHERE "slug" = 'sunset-lime';
 UPDATE "Theme" SET "background" = "background" || '{"via": "#1a0a12", "glow": "#ff5e7a3d"}'::jsonb, "typography" = "typography" || '{"titleSize":20}'::jsonb, "buttons" = "buttons" || '{"variant":"glass","shadow":false}'::jsonb, "cards" = "cards" || '{"background": "#ff5e7a0d", "border": "#ff5e7a38", "blur": 12}'::jsonb, "updatedAt" = CURRENT_TIMESTAMP WHERE "slug" = 'coral-drift';
+
+-- Existing public caches are keyed by page revision.
+UPDATE "Page" SET "revision" = "revision" + 1 WHERE "themeKey" IN ('aurora', 'neon-pop', 'cyan-pulse', 'sunset-lime', 'coral-drift');
+COMMIT;
