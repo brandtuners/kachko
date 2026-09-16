@@ -3,6 +3,7 @@
 // Login form — cream + lime scheme (matches the sign-up screen). Same login
 // contract: email/password → opaque session (AD-05). Redirects to /dashboard
 // on success.
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { schemaResolver } from "../../../lib/form-resolver";
 import { loginSchema } from "@kachko/validation";
@@ -15,6 +16,7 @@ type Form = { email: string; password: string };
 
 export default function LoginForm() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -26,6 +28,7 @@ export default function LoginForm() {
     setServerError(null);
     try {
       await apiFetch("/auth/login", { method: "POST", body: JSON.stringify(values) });
+      queryClient.clear();
       router.push("/dashboard");
     } catch (e: unknown) {
       setServerError(e instanceof ApiClientError ? e.message : "Something went wrong. Try again.");

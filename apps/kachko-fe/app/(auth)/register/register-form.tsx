@@ -4,6 +4,7 @@
 // Same registration contract as before (email/username/password → opaque
 // session, AD-05/AD-06); only the visuals change. On success we hand off to
 // the 8-step onboarding wizard.
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { schemaResolver } from "../../../lib/form-resolver";
 import { registerSchema } from "@kachko/validation";
@@ -16,6 +17,7 @@ type Form = { email: string; username: string; password: string };
 
 export default function RegisterForm() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
   const {
@@ -28,6 +30,7 @@ export default function RegisterForm() {
     setServerError(null);
     try {
       await apiFetch("/auth/register", { method: "POST", body: JSON.stringify(values) });
+      queryClient.clear();
       router.push("/onboarding");
     } catch (e: unknown) {
       setServerError(e instanceof ApiClientError ? e.message : "Something went wrong. Try again.");

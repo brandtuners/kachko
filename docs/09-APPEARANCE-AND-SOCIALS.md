@@ -155,3 +155,15 @@ existing catalog values. Editing an already-applied migration can trigger a
 checksum warning in `prisma migrate dev`; do not reset a database containing data
 to clear it. For shared environments, preserve the original migration file and
 use only the follow-up migration.
+
+### Neon presentation refinement
+
+Migration `20260916120000_refine_neon_theme_presentation` restores the reference
+three-stop gradients, top glow, translucent cards and subtle borders for the five
+neon presets. Their headings are 20px and buttons use the glass variant.
+`background.via` and `background.glow` are optional; `cards.border` is optional.
+Glow/card colors accept validated six- or eight-digit hex values, never arbitrary
+CSS. Custom font loading remains separate. The shared frontend theme helpers apply
+these settings to catalog cards, editor previews and public pages. Existing page
+revisions increment during migration to invalidate public caches; saved overrides
+remain intact.

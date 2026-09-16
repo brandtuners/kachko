@@ -115,6 +115,7 @@ export function useEditor() {
     page: pageQuery.data,
     isLoading: pageQuery.isLoading,
     isError: pageQuery.isError,
+    error: pageQuery.error,
     refetch: pageQuery.refetch,
     themes: themesQuery.data ?? [],
     saveMeta,
