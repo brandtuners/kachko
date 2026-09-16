@@ -37,3 +37,4 @@ export * from './pages';
 
 export * from './appearance';
 export * from './socials';
+export * from './media';

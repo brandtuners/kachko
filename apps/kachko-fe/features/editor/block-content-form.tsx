@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SOCIAL_PLATFORMS, type BlockType } from "./types";
+import { useMediaUpload } from "./use-media-upload";
 
 // Per-type content form. Light, compact — used inside the dashboard's block
 // editor rows (the dark panels were replaced by the reference dashboard).
@@ -16,8 +17,10 @@ export function BlockContentForm({
   onChange: (content: Record<string, unknown>) => void;
 }) {
   const [content, setContent] = useState<Record<string, unknown>>(initial ?? {});
+  const media = useMediaUpload();
   const set = (key: string, value: unknown) => {
     const next = { ...content, [key]: value };
+    if (type === "IMAGE") delete next.url;
     setContent(next);
     onChange(next);
   };
@@ -76,7 +79,23 @@ export function BlockContentForm({
     case "IMAGE":
       return (
         <div className="grid gap-3">
-          {field("url", "Image URL", "https://…")}
+          {content.url ? <img src={String(content.url)} alt="" className="max-h-44 rounded-xl object-cover" /> : null}
+          <label className="dash-label cursor-pointer">
+            {media.isUploading ? "Uploading replacement…" : "Replace image"}
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" disabled={media.isUploading}
+              onChange={async event => {
+                const file = event.target.files?.[0]; event.target.value = "";
+                if (!file) return;
+                const asset = await media.uploadImage(file);
+                if (!asset) return;
+                const next = { ...content, mediaId: asset.id, url: asset.url, alt: String(content.alt || file.name) };
+                setContent(next);
+                const { url: _url, ...payload } = next;
+                void _url;
+                onChange(payload);
+              }} />
+          </label>
+          {media.error ? <p role="alert" className="text-sm text-red-700">{media.error}</p> : null}
           {field("alt", "Alt text", "Describe the image")}
           {field("href", "Link (optional)", "https://…")}
         </div>

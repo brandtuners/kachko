@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { apiFetch, ApiClientError } from "../../lib/api";
 import { useEditor } from "./use-editor";
+import type { MediaAsset, MediaUploadTarget } from "@kachko/types";
 
 // Client-side media upload (M6, §10.4). Resizes with the browser's canvas (no
 // external dep), requests a server-generated upload target, PUTs raw bytes (local
@@ -47,43 +48,49 @@ export function useMediaUpload() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const uploadAvatar = useCallback(
-    async (file: File) => {
+  const uploadFile = useCallback(
+    async (file: File, forAvatar: boolean): Promise<MediaAsset | undefined> => {
       setError(null);
       if (!ALLOWED.includes(file.type)) {
         setError("Unsupported file type. Use PNG, JPG, WebP or GIF.");
-        return;
+        return undefined;
       }
       if (file.size > 5 * 1024 * 1024) {
         setError("That file is over 5 MB.");
-        return;
+        return undefined;
       }
       setIsUploading(true);
       try {
         const { blob, width, height } = await resizeImage(file);
-        const mimeType = blob.type as any;
-        const { storageKey, uploadUrl, method, headers } = await apiFetch<{
-          storageKey: string;
-          uploadUrl: string;
-          method: "PUT" | "POST";
-          headers: Record<string, string>;
-        }>("/media/upload-url", {
+        const mimeType = blob.type;
+        const { storageKey, uploadUrl, method, headers } = await apiFetch<MediaUploadTarget>("/media/upload-url", {
           method: "POST",
-          body: JSON.stringify({ mimeType, size: blob.size, forAvatar: true }),
+          body: JSON.stringify({ mimeType, size: blob.size, forAvatar }),
         });
 
-        const putRes = await fetch(uploadUrl, { method, headers, body: blob, credentials: "include" });
-        if (!putRes.ok) throw new Error("upload failed");
+        let putRes: Response;
+        try {
+          putRes = await fetch(uploadUrl, { method, headers, body: blob,
+            credentials: uploadUrl.startsWith("/") ? "include" : "omit" });
+        } catch {
+          throw new Error(
+            uploadUrl.startsWith("/")
+              ? "Could not reach the upload service."
+              : "Could not reach R2. Check the bucket CORS policy and try again.",
+          );
+        }
+        if (!putRes.ok) throw new Error(`R2 upload failed (${putRes.status}).`);
 
-        const result = await apiFetch<{ storageKey: string; url: string; avatarUrl?: string }>("/media/complete", {
+        const result = await apiFetch<MediaAsset>("/media/complete", {
           method: "POST",
-          body: JSON.stringify({ storageKey, width, height, forAvatar: true }),
+          body: JSON.stringify({ storageKey, width, height, forAvatar }),
         });
-
-        editor.setUserAvatar.mutate(result.avatarUrl ?? result.url);
+        if (forAvatar) await editor.refetch();
+        return result;
       } catch (e) {
         if (e instanceof ApiClientError) setError(e.message);
         else setError((e as Error).message ?? "Upload failed");
+        return undefined;
       } finally {
         setIsUploading(false);
       }
@@ -91,9 +98,18 @@ export function useMediaUpload() {
     [editor],
   );
 
-  const removeAvatar = useCallback(() => {
-    editor.setUserAvatar.mutate(null);
+  const uploadAvatar = useCallback((file: File) => uploadFile(file, true), [uploadFile]);
+  const uploadImage = useCallback((file: File) => uploadFile(file, false), [uploadFile]);
+
+  const removeAvatar = useCallback(async () => {
+    setError(null);
+    try {
+      await apiFetch("/media/avatar", { method: "DELETE" });
+      await editor.refetch();
+    } catch (e) {
+      setError(e instanceof ApiClientError ? e.message : "Could not remove avatar");
+    }
   }, [editor]);
 
-  return { isUploading, error, uploadAvatar, removeAvatar };
+  return { isUploading, error, uploadAvatar, uploadImage, removeAvatar };
 }

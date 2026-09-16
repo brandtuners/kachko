@@ -4,6 +4,9 @@ const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { randomUUID } = require('node:crypto');
 const { setTimeout: delay } = require('node:timers/promises');
+const { access, mkdtemp, rm } = require('node:fs/promises');
+const { tmpdir } = require('node:os');
+const { join } = require('node:path');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('../../dist/generated/prisma/client');
 const { IdentityRepository } = require('../../dist/modules/identity/identity.repository');
@@ -16,10 +19,12 @@ test('page migration enforces single-page ownership and cascades; username chang
   let db;
   let app;
   let redisCreated = false;
+  const mediaDir = await mkdtemp(join(tmpdir(), 'kachko-media-test-'));
   const redisName = `${name}-redis`;
   t.after(async () => {
     try { if (app) await app.close(); if (db) await db.$disconnect(); }
     finally {
+      await rm(mediaDir, { recursive: true, force: true });
       if (created) await docker('rm', '--force', '--volumes', name);
       if (redisCreated) await docker('rm', '--force', '--volumes', redisName);
     }
@@ -77,7 +82,8 @@ test('page migration enforces single-page ownership and cascades; username chang
   const redisPort = (await docker('port', redisName, '6379/tcp')).split(':').at(-1);
   Object.assign(process.env, { NODE_ENV: 'test', DATABASE_URL: connectionString,
     REDIS_URL: `redis://127.0.0.1:${redisPort}`, CORS_ORIGINS: 'http://localhost:3000,http://localhost:4000',
-    DEPENDENCY_TIMEOUT_MS: '1000', GOOGLE_CLIENT_ID: '', GOOGLE_CLIENT_SECRET: '', SESSION_COOKIE_NAME: 'kachko_session' });
+    DEPENDENCY_TIMEOUT_MS: '1000', GOOGLE_CLIENT_ID: '', GOOGLE_CLIENT_SECRET: '', SESSION_COOKIE_NAME: 'kachko_session',
+    MEDIA_STORAGE: 'local', MEDIA_LOCAL_DIR: mediaDir });
   const { NestFactory } = require('@nestjs/core');
   const { AppModule } = require('../../dist/app.module');
   const { configureApp } = require('../../dist/configure-app');
@@ -102,6 +108,31 @@ test('page migration enforces single-page ownership and cascades; username chang
   };
   const alice = await register('page_alice');
   const bob = await register('page_bob');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  const uploadImage = async (cookie, forAvatar = false) => {
+    const authorized = await request('/media/upload-url', { method: 'POST', cookie, body: { mimeType: 'image/png', size: png.length, forAvatar } });
+    assert.equal(authorized.status, 201);
+    const target = authorized.body.data;
+    const put = await fetch(`${base}${target.uploadUrl}`, { method: 'PUT', headers: { ...target.headers, Cookie: cookie }, body: png });
+    assert.equal(put.status, 204);
+    const completed = await request('/media/complete', { method: 'POST', cookie, body: { storageKey: target.storageKey, width: 1, height: 1, forAvatar } });
+    assert.equal(completed.status, 200);
+    assert.equal(completed.body.data.mimeType, 'image/png');
+    assert.equal(completed.body.data.size, png.length);
+    return { ...completed.body.data, storageKey: target.storageKey };
+  };
+  const image = await uploadImage(alice.cookie);
+  const replacedAvatar = await uploadImage(alice.cookie, true);
+  const avatar = await uploadImage(alice.cookie, true);
+  assert.equal((await request('/users/me', { cookie: alice.cookie })).body.data.avatarUrl, avatar.url);
+  assert.equal((await request(`/media/${replacedAvatar.id}`, { cookie: alice.cookie })).status, 404);
+  await assert.rejects(access(join(mediaDir, replacedAvatar.storageKey)));
+  const removedAvatar = await request('/media/avatar', { method: 'DELETE', cookie: alice.cookie });
+  assert.equal(removedAvatar.status, 200);
+  assert.deepEqual(removedAvatar.body.data, { cleared: true, deleted: true });
+  assert.equal((await request('/users/me', { cookie: alice.cookie })).body.data.avatarUrl, null);
+  assert.equal((await request(`/media/${avatar.id}`, { cookie: alice.cookie })).status, 404);
+  await assert.rejects(access(join(mediaDir, avatar.storageKey)));
   assert.equal((await request('/pages')).status, 401);
   assert.equal((await request('/pages', { cookie: alice.cookie })).body.data.length, 0);
   assert.equal((await request('/pages', { method: 'POST', cookie: alice.cookie, body: {}, csrf: false })).status, 403);
@@ -124,8 +155,10 @@ test('page migration enforces single-page ownership and cascades; username chang
   assert.equal((await request('/pages/not-a-uuid', { cookie: alice.cookie })).status, 400);
   assert.equal((await request(root, { method: 'PATCH', cookie: alice.cookie, body: { isPublished: true } })).status, 400);
   assert.equal((await request(`${root}/blocks`, { method: 'POST', cookie: alice.cookie, body: { type: 'LINK', content: { title: 'bad', url: 'javascript:alert(1)' } } })).status, 400);
+  assert.equal((await request(`${root}/blocks`, { method: 'POST', cookie: bob.cookie,
+    body: { type: 'IMAGE', content: { mediaId: image.id, alt: 'stolen' } } })).status, 404);
   for (const [type, content] of Object.entries({
-    IMAGE: { url: 'https://example.com/photo.png', alt: 'Photo' },
+    IMAGE: { mediaId: image.id, alt: 'Photo' },
     SOCIAL: { platform: 'GITHUB', username: 'rohan' }, DIVIDER: {},
     YOUTUBE: { videoId: 'dQw4w9WgXcQ' },
     SPOTIFY: { url: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC' },
@@ -135,11 +168,20 @@ test('page migration enforces single-page ownership and cascades; username chang
     assert.equal(created.status, 201, type);
     const id = created.body.data.id;
     assert.equal(created.body.data.type, type);
+    if (type === 'IMAGE') {
+      assert.equal(created.body.data.content.url, image.url);
+      const publicFile = await fetch(`${base}${image.url}`);
+      assert.equal(publicFile.status, 200);
+      assert.equal(publicFile.headers.get('content-type'), 'image/png');
+      assert.deepEqual(Buffer.from(await publicFile.arrayBuffer()), png);
+      assert.equal((await request(`/media/${image.id}`, { method: 'DELETE', cookie: alice.cookie })).status, 409);
+    }
     const patched = await request(`${root}/blocks/${id}`, { method: 'PATCH', cookie: alice.cookie, body: { content } });
     assert.equal(patched.status, 200, type);
     const invalid = await request(`${root}/blocks/${id}`, { method: 'PATCH', cookie: alice.cookie, body: { content: { text: 'wrong type' } } });
     assert.equal(invalid.status, 400, type);
     assert.equal((await request(`${root}/blocks/${id}`, { method: 'DELETE', cookie: alice.cookie })).status, 200);
+    if (type === 'IMAGE') assert.equal((await request(`/media/${image.id}`, { method: 'DELETE', cookie: alice.cookie })).status, 200);
   }
   const links = await Promise.all([1, 2, 3].map(i => request(`${root}/blocks`, { method: 'POST', cookie: alice.cookie,
     body: { type: 'LINK', content: { title: `Link ${i}`, url: 'HTTPS://Example.COM' }, isVisible: i !== 3 } })));

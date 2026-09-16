@@ -102,15 +102,6 @@ export function useEditor() {
       }),
   });
 
-  const setUserAvatar = useMutation({
-    mutationFn: async (avatarUrl: string | null) => {
-      void avatarUrl;
-      throw new Error("Avatar uploads are not available yet.");
-    },
-    onSuccess: (avatarUrl) =>
-      setPageCache((p) => (p ? { ...p, user: { ...p.user, avatarUrl } } : p)),
-  });
-
   return {
     page: pageQuery.data,
     isLoading: pageQuery.isLoading,
@@ -127,7 +118,6 @@ export function useEditor() {
     editSocial,
     removeSocial,
     pickTheme,
-    setUserAvatar,
   };
 }
 

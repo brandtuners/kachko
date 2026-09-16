@@ -22,8 +22,8 @@ A different port or hostname needs its own explicit allowed origin.
 
 ## Pending backend features
 
-Media, analytics, moderation and QR endpoints do not exist yet. The frontend
-reports unavailable features, does not emit analytics events, and offers copy-link
+Analytics, moderation and QR endpoints do not exist yet. Managed media endpoints
+and the avatar/IMAGE upload UI are integrated. The frontend does not emit analytics events, and offers copy-link
 instead of broken QR downloads. The block selector now offers all ten types; see [11-BLOCK-LIBRARY.md](11-BLOCK-LIBRARY.md).
 These features must not be described as integrated until their backend contracts exist.
 

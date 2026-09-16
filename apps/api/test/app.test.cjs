@@ -17,6 +17,7 @@ test('configuration rejects invalid ports and unsafe origins', () => {
   assert.throws(() => validateEnvironment({ PORT: 'not-a-port' }));
   assert.throws(() => validateEnvironment({ CORS_ORIGINS: '*' }));
   assert.throws(() => validateEnvironment({ NODE_ENV: 'production' }));
+  assert.throws(() => validateEnvironment({ DATABASE_URL: process.env.DATABASE_URL, REDIS_URL: process.env.REDIS_URL, MEDIA_STORAGE: 'r2' }));
   assert.deepEqual(validateEnvironment({ DATABASE_URL: process.env.DATABASE_URL, REDIS_URL: process.env.REDIS_URL }).CORS_ORIGINS, ['http://localhost:3000']);
 });
 
@@ -58,6 +59,8 @@ test('Nest HTTP foundation serves health, errors, CORS and OpenAPI', async (t) =
   assert.equal((await fetch(`${base}/api/v1/health/live`)).status, 200);
   const schema = await (await fetch(`${base}/api/docs-json`)).json();
   assert.ok(schema.paths['/api/v1/health']);
+  assert.ok(schema.paths['/api/v1/media/upload-url']);
+  assert.ok(schema.paths['/api/v1/media/complete']);
   assert.ok(schema.paths['/api/v1/health/ready'].get.responses['503']);
   for (const [postgres, redis] of [['up', 'up'], ['down', 'up'], ['up', 'down'], ['down', 'down'], ['stalled', 'up'], ['up', 'up']]) {
     Object.assign(state, { postgres, redis });

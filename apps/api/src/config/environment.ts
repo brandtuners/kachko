@@ -52,6 +52,17 @@ export function validateEnvironment(env: Record<string, unknown>) {
   if (Boolean(googleId) !== Boolean(googleSecret)) throw new Error('Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET');
   const googleCallback = String(env.GOOGLE_REDIRECT_URI ?? `http://localhost:${port}/api/v1/auth/google/callback`);
   const googleRedirect = String(env.GOOGLE_LOGIN_REDIRECT_URL ?? '');
+  const mediaStorage = String(env.MEDIA_STORAGE ?? 'local');
+  if (!['local', 'r2'].includes(mediaStorage)) throw new Error('MEDIA_STORAGE must be local or r2');
+  const mediaLocalDir = String(env.MEDIA_LOCAL_DIR ?? './tmp/media');
+  if (!mediaLocalDir || mediaLocalDir.includes('\0')) throw new Error('MEDIA_LOCAL_DIR is invalid');
+  const r2Values = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'R2_PUBLIC_URL'] as const;
+  const r2 = Object.fromEntries(r2Values.map(key => [key, String(env[key] ?? '').trim()])) as Record<(typeof r2Values)[number], string>;
+  if (mediaStorage === 'r2' && r2Values.some(key => !r2[key])) throw new Error('R2 storage requires account, credentials, bucket and public URL');
+  if (r2.R2_PUBLIC_URL) {
+    const url = new URL(r2.R2_PUBLIC_URL);
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('R2_PUBLIC_URL must be a clean HTTPS URL');
+  }
   if (googleId) {
     for (const value of [googleCallback, ...(googleRedirect ? [googleRedirect] : [])]) {
       const url = new URL(value);
@@ -69,5 +80,6 @@ export function validateEnvironment(env: Record<string, unknown>) {
     DATABASE_URL: connectionUrl(env, 'DATABASE_URL'),
     REDIS_URL: connectionUrl(env, 'REDIS_URL'),
     DEPENDENCY_TIMEOUT_MS: timeout,
+    MEDIA_STORAGE: mediaStorage, MEDIA_LOCAL_DIR: mediaLocalDir, ...r2,
   };
 }
