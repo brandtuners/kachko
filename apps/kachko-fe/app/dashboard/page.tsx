@@ -9,7 +9,7 @@
 //   Settings  → profile, avatar, socials, publish
 // My QR and View-my-page live in the top bar. The sticky preview card on the
 // right mirrors the public page live, with a phone ↔ desktop toggle.
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { themeBackground, themeVars, themeButtonStyle } from "../../features/page/theme";
 import { isAuthError } from "../../features/editor/api";
@@ -203,6 +203,8 @@ function Panel({ title, sub, action, children }: { title: string; sub?: string; 
 
 function BlocksPanel({ focusId, clearFocus }: { focusId: string | null; clearFocus: () => void }) {
   const editor = useEditor();
+  const upload = useMediaUpload();
+  const imageInput = useRef<HTMLInputElement>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
@@ -226,14 +228,7 @@ function BlocksPanel({ focusId, clearFocus }: { focusId: string | null; clearFoc
   const addBlock = (t: BlockType) => {
     setAddError(null);
     const content = libraryDefaults(t);
-    if (t === "IMAGE") {
-      const url = window.prompt("Enter an HTTPS image URL");
-      if (!url) return;
-      content.url = url;
-      const alt = window.prompt("Describe the image for screen readers");
-      if (!alt) return;
-      content.alt = alt;
-    }
+    if (t === "IMAGE") { imageInput.current?.click(); return; }
     editor.createBlock.mutate(
       { type: t, content },
       {
@@ -284,6 +279,16 @@ function BlocksPanel({ focusId, clearFocus }: { focusId: string | null; clearFoc
         {/* Blocks library — pick a type to create */}
         <div className="k-panel p-5">
           <p className="k-label">Blocks library</p>
+          <input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden"
+            onChange={async event => {
+              const file = event.target.files?.[0]; event.target.value = "";
+              if (!file) return;
+              const media = await upload.uploadImage(file);
+              if (!media) { setAddError(upload.error ?? "Image upload failed"); return; }
+              editor.createBlock.mutate({ type: "IMAGE", content: { mediaId: media.id, alt: file.name } }, {
+                onSuccess: block => setJustAddedId(block.id), onError: error => setAddError(error.message),
+              });
+            }} />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {BLOCK_TYPES.map((t) => {
               const Icon = BLOCK_ICONS[t] ?? IconLink;
@@ -292,7 +297,7 @@ function BlocksPanel({ focusId, clearFocus }: { focusId: string | null; clearFoc
                   key={t}
                   type="button"
                   onClick={() => addBlock(t)}
-                  disabled={editor.createBlock.isPending}
+                  disabled={editor.createBlock.isPending || upload.isUploading}
                   className="group flex flex-col items-start gap-2 rounded-[14px] border border-[#eceee9] bg-white p-3.5 text-left transition hover:border-[#b5d936] hover:shadow-[0_8px_24px_rgba(22,27,22,.06)] disabled:opacity-50"
                 >
                   <span className="k-tile-icon transition group-hover:bg-[var(--k-ink)] group-hover:text-white">
@@ -335,7 +340,7 @@ function libraryDefaults(t: BlockType): Record<string, unknown> {
     case "TEXT":
       return { text: "New text", alignment: "center" };
     case "IMAGE":
-      return { url: PLACEHOLDER_IMAGE, alt: "New image" };
+      return { mediaId: "", alt: "New image" };
     case "SOCIAL":
       return { platform: "INSTAGRAM", username: "your-handle" };
     case "DIVIDER":
@@ -352,8 +357,6 @@ function libraryDefaults(t: BlockType): Record<string, unknown> {
       return { query: "Your city" };
   }
 }
-
-const PLACEHOLDER_IMAGE = "";
 
 /* ------------------------------------------------------------------ My QR */
 
@@ -626,6 +629,7 @@ function LinksPanel() {
                   onChange={async (e) => {
                     const f = e.target.files?.[0];
                     if (f) await upload.uploadAvatar(f);
+                    e.target.value = "";
                   }}
                 />
               </label>

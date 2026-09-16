@@ -4,16 +4,16 @@ import { Prisma } from '../../generated/prisma/client';
 import { blockContentSchemas, createBlockSchema, socialDataSchema, resolveAppearance, appearanceOverridesSchema, type UpdateAppearanceInput, type ApplyTemplateInput, type CreateSocialInput, type UpdateSocialInput, type CreatePageInput, type UpdatePageInput, type CreateBlockInput, type UpdateBlockInput, type ReorderBlocksInput } from '@kachko/validation';
 
 export class PageResourceError extends Error {
-  constructor(readonly code: 'PAGE_NOT_FOUND' | 'BLOCK_NOT_FOUND' | 'THEME_NOT_FOUND' | 'TEMPLATE_NOT_FOUND' | 'SOCIAL_NOT_FOUND') { super(code); }
+  constructor(readonly code: 'PAGE_NOT_FOUND' | 'BLOCK_NOT_FOUND' | 'THEME_NOT_FOUND' | 'TEMPLATE_NOT_FOUND' | 'SOCIAL_NOT_FOUND' | 'MEDIA_NOT_FOUND') { super(code); }
 }
 export class PageInputError extends Error {
   constructor(readonly code: 'VALIDATION_ERROR' | 'BLOCK_ORDER_CONFLICT' | 'SOCIAL_ORDER_CONFLICT' | 'TEMPLATE_REPLACE_REQUIRED', message: string) { super(message); }
 }
-const orderedBlocks = { orderBy: [{ position: 'asc' as const }, { id: 'asc' as const }] };
+const orderedBlocks = { orderBy: [{ position: 'asc' as const }, { id: 'asc' as const }], include: { media: true } };
 const orderedSocials = { orderBy: [{ position: 'asc' as const }, { id: 'asc' as const }] };
 const fullPage = { blocks: orderedBlocks, theme: true, socials: orderedSocials };
 export type StoredPage = Prisma.PageGetPayload<{ include: typeof fullPage }>;
-export type StoredBlock = Prisma.PageBlockGetPayload<object>;
+export type StoredBlock = Prisma.PageBlockGetPayload<{ include: { media: true } }>;
 
 @Injectable()
 export class PagesRepository {
@@ -66,8 +66,10 @@ export class PagesRepository {
   addBlock(userId: string, id: string, data: CreateBlockInput) {
     return this.mutate(userId, id, async (tx, page) => {
       const position = page.blocks.length ? Math.max(...page.blocks.map(block => block.position)) + 1 : 0;
+      const mediaId = data.type === 'IMAGE' ? data.content.mediaId : undefined;
+      if (mediaId && !await tx.media.findFirst({ where: { id: mediaId, userId } })) throw new PageResourceError('MEDIA_NOT_FOUND');
       const block = await tx.pageBlock.create({ data: { pageId: id, type: data.type, position,
-        content: data.content as Prisma.InputJsonObject, isVisible: data.isVisible ?? true } });
+        content: data.content as Prisma.InputJsonObject, mediaId, isVisible: data.isVisible ?? true }, include: { media: true } });
       await tx.page.update({ where: { id }, data: { revision: { increment: 1 } } });
       return block;
     });
@@ -81,10 +83,13 @@ export class PagesRepository {
         if (!parsed.success) throw new PageInputError('VALIDATION_ERROR', `Content must match the stored ${stored.type} block type`);
         data = { ...data, content: parsed.data };
       }
+      const mediaId = stored.type === 'IMAGE' && data.content ? (data.content as { mediaId: string }).mediaId : undefined;
+      if (mediaId && !await tx.media.findFirst({ where: { id: mediaId, userId } })) throw new PageResourceError('MEDIA_NOT_FOUND');
       const block = await tx.pageBlock.update({ where: { id: blockId }, data: {
         ...(data.content ? { content: data.content as Prisma.InputJsonObject } : {}),
+        ...(mediaId ? { mediaId } : {}),
         ...(data.isVisible !== undefined ? { isVisible: data.isVisible } : {}),
-      } });
+      }, include: { media: true } });
       await tx.page.update({ where: { id }, data: { revision: { increment: 1 } } });
       return block;
     });
@@ -122,6 +127,7 @@ export class PagesRepository {
     if (!Array.isArray(value)) throw new Error('Invalid stored template');
     return value.map((raw, position) => {
       const block = createBlockSchema.parse(raw);
+      if (block.type !== 'LINK' && block.type !== 'TEXT') throw new Error('System templates may contain only LINK and TEXT blocks');
       return { type: block.type, content: block.content as Prisma.InputJsonObject, isVisible: block.isVisible, position };
     });
   }

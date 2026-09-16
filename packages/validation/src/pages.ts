@@ -47,10 +47,11 @@ export const createTextBlockSchema = z.strictObject({
   type: z.literal('TEXT'), content: textContentSchema, isVisible: z.boolean().default(true),
 });
 export const imageContentSchema = z.strictObject({
-  url: linkUrlSchema.refine(url => url.startsWith('https://'), 'Image URL must use HTTPS'),
+  mediaId: z.uuid(),
   alt: z.string().trim().min(1).max(300),
   href: z.union([z.literal(''), linkUrlSchema]).optional(),
 });
+export const imageResponseContentSchema = imageContentSchema.extend({ url: z.string().max(2048) });
 export const socialBlockContentSchema = z.strictObject({
   platform: socialPlatformSchema,
   username: z.string().trim().min(1).max(100).regex(/^@?[a-zA-Z0-9_.-]+$/, 'Use a profile handle, not a URL'),
@@ -107,7 +108,7 @@ export type ValidatedTextContent = z.output<typeof textContentSchema>;
 export const publicBlockSchema = z.discriminatedUnion('type', [
   z.strictObject({ id: z.uuid(), type: z.literal('LINK'), content: linkContentSchema }),
   z.strictObject({ id: z.uuid(), type: z.literal('TEXT'), content: textContentSchema }),
-  z.strictObject({ id: z.uuid(), type: z.literal('IMAGE'), content: blockContentSchemas.IMAGE }),
+  z.strictObject({ id: z.uuid(), type: z.literal('IMAGE'), content: imageResponseContentSchema }),
   z.strictObject({ id: z.uuid(), type: z.literal('SOCIAL'), content: blockContentSchemas.SOCIAL }),
   z.strictObject({ id: z.uuid(), type: z.literal('DIVIDER'), content: blockContentSchemas.DIVIDER }),
   z.strictObject({ id: z.uuid(), type: z.literal('YOUTUBE'), content: blockContentSchemas.YOUTUBE }),

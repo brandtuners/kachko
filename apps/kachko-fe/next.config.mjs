@@ -31,7 +31,10 @@ const nextConfig = {
               "font-src 'self' data:",
               // Avatars/media from same-origin proxy + data/blob; R2 CDN would be added here.
               "img-src 'self' data: blob: https:",
-              "connect-src 'self'",
+              // Avatar and IMAGE uploads PUT bytes directly to a short-lived R2
+              // presigned URL. Keep API traffic same-origin while allowing only
+              // Cloudflare's R2 S3 endpoint as the external connection target.
+              "connect-src 'self' https://*.r2.cloudflarestorage.com",
               "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://open.spotify.com",
               "object-src 'none'",
               "base-uri 'self'",

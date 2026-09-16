@@ -533,7 +533,7 @@ export interface TextBlockContent {
 
 ## IMAGE
 
-Current external-image contract: see [11-BLOCK-LIBRARY.md](11-BLOCK-LIBRARY.md) and the blueprint extension. The mediaId example below remains the future managed-upload contract.
+The managed-image contract is implemented; see [12-MEDIA-API.md](12-MEDIA-API.md).
 
 ```typescript
 export interface ImageBlockContent {

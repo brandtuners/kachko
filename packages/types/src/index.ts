@@ -29,3 +29,4 @@ export type GoogleIdentityErrorCode = 'GOOGLE_NOT_CONFIGURED' | 'GOOGLE_AUTH_FAI
 export * from './pages';
 
 export * from './appearance';
+export * from './media';

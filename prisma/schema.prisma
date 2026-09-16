@@ -15,6 +15,7 @@ model User {
   passwordHash String?
   displayName  String?
   avatarUrl    String?
+  avatarMediaId String? @unique
   bio          String?
   role         UserRole  @default(USER)
   isVerified   Boolean   @default(false)
@@ -24,6 +25,8 @@ model User {
   sessions Session[]
   googleAccount GoogleAccount?
   page Page?
+  media Media[] @relation("OwnedMedia")
+  avatarMedia Media? @relation("UserAvatar", fields: [avatarMediaId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -91,12 +94,32 @@ model PageBlock {
   position Int
   isVisible Boolean @default(true)
   content Json
+  mediaId String?
   page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  media Media? @relation(fields: [mediaId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([pageId, position])
   @@index([pageId, isVisible, position])
+  @@index([mediaId])
+}
+
+model Media {
+  id String @id @default(uuid())
+  userId String
+  storageKey String @unique
+  url String
+  mimeType String
+  size BigInt
+  width Int
+  height Int
+  user User @relation("OwnedMedia", fields: [userId], references: [id], onDelete: Cascade)
+  avatarFor User[] @relation("UserAvatar")
+  blocks PageBlock[]
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // Add additional block types only with their validated feature implementations.

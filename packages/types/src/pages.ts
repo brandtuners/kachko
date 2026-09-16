@@ -33,7 +33,7 @@ export interface TextBlock extends Omit<LinkBlock, 'type' | 'content'> {
   type: 'TEXT'; content: TextBlockContent;
 }
 export interface ExtraBlockContents {
-  IMAGE: { url: string; alt: string; href?: string };
+  IMAGE: { mediaId: string; url: string; alt: string; href?: string };
   SOCIAL: { platform: import('./appearance').SocialPlatform; username: string };
   DIVIDER: Record<string, never>;
   YOUTUBE: { videoId: string };

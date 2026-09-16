@@ -24,4 +24,6 @@ export type SocialResponse = ApiData<SocialProfile>;
 export type SocialListResponse = ApiData<SocialProfile[]>;
 
 type TemplateFields<T> = T extends PageBlock ? Pick<T, 'type' | 'content' | 'isVisible'> : never;
-export type TemplateBlock = TemplateFields<PageBlock>;
+// Seed templates currently contain only self-contained blocks. Managed IMAGE
+// blocks require media owned by the applying user and cannot be system seeded.
+export type TemplateBlock = TemplateFields<Extract<PageBlock, { type: 'LINK' | 'TEXT' }>>;

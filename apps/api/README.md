@@ -46,7 +46,7 @@ Unavailable response (HTTP 503):
 
 `DEPENDENCY_TIMEOUT_MS` defaults to `2000` (allowed range `100–10000`). It bounds each readiness probe, PostgreSQL pool connection/query/server statement timeouts, and Redis connection/PING attempts. The PostgreSQL pool is limited to 10 connections. Redis rejects commands while offline and limits its command queue to 100. Future background jobs that require longer SQL execution must deliberately configure their own limits rather than silently inheriting a short request timeout. Readiness proves connectivity only, not that migrations or business features are complete.
 
-Identity authentication/profile routes and Redis identity rate limits are implemented. Page/LINK CRUD and public publishing are also implemented. Request IDs, structured request logging and later editor/media features remain planned work.
+Identity, page/block publishing, appearance/social profiles and managed media are implemented. Request IDs, structured request logging, analytics and QR remain planned work.
 
 ### Verification
 
@@ -76,3 +76,5 @@ Page/LINK CRUD, publishing and public lookup are implemented and listed in Swagg
 TEXT blocks and transactional reordering are implemented. See [editor API examples and validation rules](../../docs/08-TEXT-AND-REORDER.md); apply the TEXT migration with `pnpm db:deploy` and restart the API.
 
 Appearance, system themes/templates and social-profile APIs are implemented. See [the appearance/social setup and endpoint guide](../../docs/09-APPEARANCE-AND-SOCIALS.md); apply migrations and restart the API before testing.
+
+Managed avatar/IMAGE uploads support local storage and Cloudflare R2. See [the media contract, security limits and local flow](../../docs/12-MEDIA-API.md). Run `pnpm --filter api test:pages` for the complete upload, ownership, attachment and deletion journey.

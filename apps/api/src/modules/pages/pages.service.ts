@@ -15,7 +15,10 @@ function summary(page: Page): PageSummary {
 function blockDto(block: StoredBlock): PageBlock {
   const common = { id: block.id, position: block.position, isVisible: block.isVisible,
     createdAt: block.createdAt.toISOString(), updatedAt: block.updatedAt.toISOString() };
-  return { ...common, ...publicBlockSchema.parse({ id: block.id, type: block.type, content: block.content }) };
+  const content = block.type === 'IMAGE'
+    ? { ...(block.content as Record<string, unknown>), url: block.media?.url }
+    : block.content;
+  return { ...common, ...publicBlockSchema.parse({ id: block.id, type: block.type, content }) };
 }
 function themeConfig(theme: Theme) { return { background: theme.background, typography: theme.typography, buttons: theme.buttons, cards: theme.cards }; }
 function socialDto(social: StoredSocial): SocialProfile {
@@ -30,8 +33,10 @@ function themeDto(theme: Theme): SystemTheme {
 }
 function templateDto(template: StoredTemplate): PageTemplate {
   if (!Array.isArray(template.blocks)) throw new Error('Invalid stored template');
+  const blocks = template.blocks.map(value => createBlockSchema.parse(value));
+  if (blocks.some(block => block.type !== 'LINK' && block.type !== 'TEXT')) throw new Error('System templates may contain only LINK and TEXT blocks');
   return { key: templateKeySchema.parse(template.key), name: template.name, description: template.description,
-    themeKey: themeKeySchema.parse(template.themeKey), blocks: template.blocks.map(value => createBlockSchema.parse(value)) };
+    themeKey: themeKeySchema.parse(template.themeKey), blocks: blocks as PageTemplate['blocks'] };
 }
 
 @Injectable()
@@ -94,7 +99,10 @@ export class PagesService {
     if (!page) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');
     const result: PublicPage = publicPageSchema.parse({
       profile: page.user, page: { title: page.title, description: page.description, themeKey: page.themeKey, appearance: resolveAppearance(themeConfig(page.theme), page.appearanceOverrides) },
-      blocks: page.blocks.map(block => publicBlockSchema.parse({ id: block.id, type: block.type, content: block.content })),
+      blocks: page.blocks.map(block => {
+        const content = block.type === 'IMAGE' ? { ...(block.content as Record<string, unknown>), url: block.media?.url } : block.content;
+        return publicBlockSchema.parse({ id: block.id, type: block.type, content });
+      }),
       socials: page.socials.map(social => publicSocialSchema.parse({ id: social.id, platform: social.platform, username: social.username, url: social.url })),
     });
     // Old in-flight readers can populate only their old revision, not the new one.

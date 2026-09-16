@@ -4,6 +4,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnvironment } from './config/environment';
 import { HealthModule } from './modules/health/health.module';
+import { MediaModule } from './modules/media/media.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { HealthModule } from './modules/health/health.module';
     HealthModule,
     IdentityModule,
     PagesModule,
+    MediaModule,
   ],
 })
 export class AppModule {}
