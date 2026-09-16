@@ -36,7 +36,7 @@ const blockAccentBorder = "hover:border-[color:var(--blk-accent)]/60";
 // Renders a single PageBlock based on its type (§6.3). Bright, tappable cards.
 export function BlockView({ block }: { block: PublicBlock }) {
   if (!block.isVisible) return null;
-  const c = block.content as Record<string, any>;
+  const c = block.content as Record<string, unknown>;
 
   switch (block.type) {
     case "LINK": {
@@ -52,7 +52,7 @@ export function BlockView({ block }: { block: PublicBlock }) {
           className={`${blockBase} ${blockNeutral} ${blockAccentBorder}`}
         >
           <span className="font-semibold">
-            {c.title ?? url}
+            {String(c.title ?? url)}
           </span>
           <span className={`${blockAccentText} transition group-hover:translate-x-0.5`}>↗</span>
         </a>
@@ -61,7 +61,7 @@ export function BlockView({ block }: { block: PublicBlock }) {
     case "TEXT":
       return (
         <p className={`px-1 text-base text-[color:var(--page-text,white)] ${c.alignment === "center" ? "text-center" : c.alignment === "right" ? "text-right" : ""}`}>
-          {c.text}
+          {String(c.text ?? "")}
         </p>
       );
     case "DIVIDER":
@@ -163,6 +163,7 @@ export function SocialRow({ socials }: { socials: PublicSocial[] }) {
           target="_blank"
           rel="noopener noreferrer"
           data-event="SOCIAL_CLICK"
+          data-social-profile-id={s.id}
           data-platform={s.platform}
           style={themeButtonStyle()}
           className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/85 transition hover:border-magenta/60 hover:text-magenta"

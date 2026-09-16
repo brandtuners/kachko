@@ -94,10 +94,11 @@ test('page migration enforces single-page ownership and cascades; username chang
   const base = await app.getUrl();
   const redisClient = app.get(RedisService).client;
   for (let i = 0; !redisClient.isReady && i < 40; i++) await delay(50);
-  const request = async (path, { method = 'GET', body, cookie, csrf = true } = {}) => {
+  const request = async (path, { method = 'GET', body, cookie, csrf = true, headers = {} } = {}) => {
     const res = await fetch(`${base}/api/v1${path}`, { method, headers: {
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...(cookie ? { Cookie: cookie } : {}), ...(csrf ? { 'X-Kachko-CSRF': '1' } : {}),
+      ...headers,
     }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(6000) });
     return { status: res.status, body: await res.json(), headers: res.headers };
   };
@@ -432,9 +433,43 @@ test('page migration enforces single-page ownership and cascades; username chang
   assert.equal(fromTemplate.body.data.themeKey, 'professional');
   assert.equal(fromTemplate.body.data.blocks.length, 2);
   assert.equal(fromTemplate.body.data.isPublished, false);
+  // Public analytics accepts only published, visible targets and owner queries stay private.
+  await redisClient.flushDb();
+  const analyticsLink = applied.body.data.blocks.find(block => block.type === 'LINK');
+  const analyticsText = applied.body.data.blocks.find(block => block.type === 'TEXT');
+  const event = (body, headers = {}) => request('/analytics/events', { method: 'POST', body, csrf: false, headers });
+  assert.equal((await event({ pageId: lastPage.id, blockId: analyticsLink.id, eventType: 'PAGE_VIEW' })).status, 400);
+  assert.equal((await event({ pageId: lastPage.id, eventType: 'LINK_CLICK' })).status, 400);
+  assert.equal((await event({ pageId: fromTemplate.body.data.id, eventType: 'PAGE_VIEW' })).status, 404);
+  assert.equal((await event({ pageId: lastPage.id, blockId: analyticsText.id, eventType: 'LINK_CLICK' })).status, 404);
+  assert.equal((await event({ pageId: lastPage.id, socialProfileId: githubSocial.id, eventType: 'SOCIAL_CLICK' })).status, 202);
+  for (const ip of ['203.0.113.1', '203.0.113.1', '203.0.113.2']) {
+    const response = await event({ pageId: lastPage.id, eventType: 'PAGE_VIEW' }, {
+      'x-forwarded-for': ip, referer: 'https://search.example/private?q=secret',
+      'user-agent': 'Mozilla/5.0 (iPhone) Safari/605.1', 'x-vercel-ip-country': 'IN', 'x-vercel-ip-city': 'Mumbai',
+    });
+    assert.equal(response.status, 202);
+  }
+  assert.equal((await event({ pageId: lastPage.id, blockId: analyticsLink.id, eventType: 'LINK_CLICK' })).status, 202);
+  const analyticsRoot = `/pages/${lastPage.id}/analytics`;
+  assert.equal((await request(`${analyticsRoot}/summary`, { cookie: bob.cookie })).status, 404);
+  const analyticsSummary = await request(`${analyticsRoot}/summary?range=7d`, { cookie: alice.cookie });
+  assert.equal(analyticsSummary.status, 200);
+  assert.deepEqual({ views: analyticsSummary.body.data.totalViews, unique: analyticsSummary.body.data.uniqueVisitors,
+    clicks: analyticsSummary.body.data.linkClicks, rate: analyticsSummary.body.data.clickThroughRate },
+    { views: 3, unique: 2, clicks: 1, rate: 33.33 });
+  assert.equal(analyticsSummary.body.data.socialClicks, 1);
+  assert.equal((await request(`${analyticsRoot}/timeseries?range=today`, { cookie: alice.cookie })).body.data.items.at(-1).views, 3);
+  assert.equal((await request(`${analyticsRoot}/top-links`, { cookie: alice.cookie })).body.data.items[0].blockId, analyticsLink.id);
+  assert.equal((await request(`${analyticsRoot}/referrers`, { cookie: alice.cookie })).body.data.items[0].referrer, 'https://search.example');
+  assert.equal((await request(`${analyticsRoot}/devices`, { cookie: alice.cookie })).body.data.items[0].device, 'mobile');
+  assert.equal((await request(`${analyticsRoot}/geo`, { cookie: alice.cookie })).body.data.items[0].country, 'IN');
   const checkSwagger = await (await fetch(`${base}/api/docs-json`)).json();
   for (const path of ['/api/v1/themes', '/api/v1/templates', '/api/v1/pages/{pageId}/appearance', '/api/v1/pages/{pageId}/template',
-    '/api/v1/pages/{pageId}/socials', '/api/v1/pages/{pageId}/socials/{socialId}', '/api/v1/pages/{pageId}/socials/reorder']) assert.ok(checkSwagger.paths[path], path);
+    '/api/v1/pages/{pageId}/socials', '/api/v1/pages/{pageId}/socials/{socialId}', '/api/v1/pages/{pageId}/socials/reorder',
+    '/api/v1/analytics/events', '/api/v1/pages/{pageId}/analytics/summary', '/api/v1/pages/{pageId}/analytics/timeseries',
+    '/api/v1/pages/{pageId}/analytics/top-links', '/api/v1/pages/{pageId}/analytics/referrers',
+    '/api/v1/pages/{pageId}/analytics/geo', '/api/v1/pages/{pageId}/analytics/devices']) assert.ok(checkSwagger.paths[path], path);
   await docker('stop', redisName);
   assert.equal((await request('/public/page_race')).status, 200, 'public reads fall back to PostgreSQL');
   await db.page.update({ where: { id: lastPage.id }, data: { isPublished: false } });

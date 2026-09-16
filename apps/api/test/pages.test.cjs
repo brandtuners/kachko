@@ -41,7 +41,7 @@ test('TEXT validation preserves plain text and bounds content; mixed block schem
   assert.equal(updateBlockSchema.safeParse({ type: 'TEXT', content: { text: 'x' } }).success, false);
   assert.equal(updateBlockSchema.safeParse({ content: { text: 'x', title: 'x', url: 'https://example.com' } }).success, false);
   const publicData = { profile: { username: 'test', displayName: null, bio: null, avatarUrl: null },
-    page: { title: null, description: null, themeKey: 'minimal', appearance: { background: { type: 'solid', color: '#FFFFFF' }, typography: { fontFamily: 'system', titleSize: 32, color: '#111827' }, buttons: { variant: 'filled', radius: 12, background: '#111827', color: '#FFFFFF', shadow: false }, cards: { radius: 12, background: '#FFFFFF', blur: 0 } } }, socials: [], blocks: [{ id: 'd6f0b953-461d-43b7-8e16-dbd98c10c1a1', type: 'TEXT', content: { text: '<b>plain text</b>', alignment: 'right' } }] };
+    page: { id: '20da19cc-7e63-4aa9-8cc0-7d68c26acbd2', title: null, description: null, themeKey: 'minimal', appearance: { background: { type: 'solid', color: '#FFFFFF' }, typography: { fontFamily: 'system', titleSize: 32, color: '#111827' }, buttons: { variant: 'filled', radius: 12, background: '#111827', color: '#FFFFFF', shadow: false }, cards: { radius: 12, background: '#FFFFFF', blur: 0 } } }, socials: [], blocks: [{ id: 'd6f0b953-461d-43b7-8e16-dbd98c10c1a1', type: 'TEXT', content: { text: '<b>plain text</b>', alignment: 'right' } }] };
   assert.equal(publicPageSchema.parse(publicData).blocks[0].content.text, '<b>plain text</b>');
 });
 

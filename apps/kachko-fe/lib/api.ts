@@ -36,7 +36,7 @@ function requestOptions(init: RequestInit = {}): RequestInit {
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  if (/^\/(analytics|moderation)(\/|$)/.test(path)) {
+  if (/^\/moderation(\/|$)/.test(path)) {
     throw new ApiClientError("FEATURE_UNAVAILABLE", "This feature is not available yet.");
   }
   return parse<T>(await fetch(`/api/v1${path}`, requestOptions(init)));

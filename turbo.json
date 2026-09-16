@@ -12,6 +12,7 @@
         "NEXT_PUBLIC_SENTRY_DSN"
       ],
       "passThroughEnv": [
+        "ANALYTICS_HASH_SALT",
         "CORS_ORIGINS",
         "DATABASE_URL",
         "DEPENDENCY_TIMEOUT_MS",

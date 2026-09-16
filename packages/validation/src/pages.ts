@@ -120,7 +120,7 @@ export const publicBlockSchema = z.discriminatedUnion('type', [
 /** Cache/public response allowlist; strict parsing prevents accidental private fields. */
 export const publicPageSchema = z.strictObject({
   profile: z.strictObject({ username: z.string(), displayName: z.string().nullable(), bio: z.string().nullable(), avatarUrl: z.string().nullable() }),
-  page: z.strictObject({ title: z.string().nullable(), description: z.string().nullable(), themeKey: themeKeySchema, appearance: themeConfigSchema }),
+  page: z.strictObject({ id: z.uuid(), title: z.string().nullable(), description: z.string().nullable(), themeKey: themeKeySchema, appearance: themeConfigSchema }),
   blocks: z.array(publicBlockSchema),
   socials: z.array(publicSocialSchema),
 });

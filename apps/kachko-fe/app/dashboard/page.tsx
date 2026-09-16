@@ -11,6 +11,7 @@
 // right mirrors the public page live, with a phone ↔ desktop toggle.
 import { useRef, useState } from "react";
 import Link from "next/link";
+import type { AnalyticsRange } from "@kachko/types";
 import { themeBackground, themeVars, themeButtonStyle } from "../../features/page/theme";
 import { isAuthError } from "../../features/editor/api";
 import { apiFetch } from "../../lib/api";
@@ -457,33 +458,49 @@ function AppearancePanel() {
 function AnalyticsPanel() {
   const editor = useEditor();
   const page = editor.page!;
-  const { summary, series, top } = useStats(page.id); // shared keys with Home metrics
+  const [range, setRange] = useState<AnalyticsRange>("7d");
+  const stats = useStats(page.id, range);
+  const { summary, series, top, referrers, geo, devices } = stats;
+  const queries = [summary, series, top, referrers, geo, devices];
 
   const s = summary.data;
-  const empty = !s || (s.pageViews === 0 && s.linkClicks === 0 && s.socialClicks === 0);
-  const maxPv = Math.max(1, ...(series.data ?? []).map((p) => p.pageViews + p.linkClicks + p.socialClicks));
+  const points = series.data?.items ?? [];
+  const empty = Boolean(s) && s!.totalViews === 0 && s!.linkClicks === 0 && s!.socialClicks === 0;
+  const loading = queries.some((query) => query.isLoading);
+  const failed = queries.some((query) => query.isError);
+  const refreshing = queries.some((query) => query.isFetching);
+  const maxActivity = Math.max(1, ...points.map((point) => point.views + point.linkClicks + point.socialClicks));
+  const rangeLabel = range === "today" ? "today" : range === "7d" ? "last 7 days" : "last 30 days";
 
   return (
     <Panel
       title="Analytics"
-      sub="Privacy-safe, first-party stats — last 7 days."
+      sub={`Privacy-safe, first-party stats — ${rangeLabel}.`}
       action={
-        <button
-          type="button"
-          className="k-btn-line !h-9 !rounded-full !px-4 text-xs"
-          disabled={summary.isFetching}
-          onClick={() => {
-            summary.refetch();
-            series.refetch();
-            top.refetch();
-          }}
-        >
-          {summary.isFetching ? "Refreshing…" : "Refresh"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-full border border-[#e2e5de] bg-white p-1" aria-label="Analytics date range">
+            {(["today", "7d", "30d"] as const).map((value) => (
+              <button key={value} type="button" aria-pressed={range === value} onClick={() => setRange(value)}
+                className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${range === value ? "bg-[var(--k-ink)] text-white" : "text-[var(--k-muted)] hover:bg-[#f3f4ef]"}`}>
+                {value === "today" ? "Today" : value === "7d" ? "7 days" : "30 days"}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="k-btn-line !h-9 !rounded-full !px-4 text-xs" disabled={refreshing}
+            onClick={() => queries.forEach((query) => void query.refetch())}>
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
       }
     >
-      {summary.isLoading ? (
+      {loading ? (
         <div className="k-panel p-10 text-center text-sm text-[#9a9f9b]">Loading stats…</div>
+      ) : failed ? (
+        <div className="k-panel flex flex-col items-center gap-3 p-10 text-center" role="alert">
+          <p className="text-sm font-semibold text-[#b4322c]">We couldn&apos;t load analytics.</p>
+          <p className="text-xs text-[#9a9f9b]">Check your connection and try again.</p>
+          <button type="button" className="k-btn-line !rounded-full" onClick={() => queries.forEach((query) => void query.refetch())}>Try again</button>
+        </div>
       ) : empty ? (
         <div className="k-panel flex flex-col items-center gap-3 p-10 text-center">
           <span className="k-tile-icon !h-12 !w-12 !rounded-full">
@@ -493,63 +510,63 @@ function AnalyticsPanel() {
             No visits yet. Share <code className="font-bold text-[var(--k-ink)]">/@{page.user.username}</code> to start collecting stats.
           </p>
           <p className="max-w-sm text-xs text-[#9a9f9b]">
-            Your own live preview doesn&apos;t count — stats only come from real visitors opening your public page.
+            Analytics starts when visitors open your published page and interact with its links.
           </p>
         </div>
       ) : (
         <div className="grid gap-5">
-          <div className="grid grid-cols-3 gap-4">
-            <StatCard value={s!.pageViews} label="Views" />
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard value={s!.totalViews} label="Views" />
             <StatCard value={s!.linkClicks + s!.socialClicks} label="Clicks" />
             <StatCard value={s!.uniqueVisitors} label="Visitors" />
+            <StatCard value={`${s!.clickThroughRate}%`} label="Link CTR" />
           </div>
 
           <div className="k-panel p-5">
             <p className="k-label">Activity</p>
             <div className="flex h-32 items-end gap-1 overflow-x-auto">
-              {(series.data ?? []).map((p) => {
-                const total = p.pageViews + p.linkClicks + p.socialClicks;
-                const h = Math.max(4, (total / maxPv) * 100);
+              {points.map((point) => {
+                const total = point.views + point.linkClicks + point.socialClicks;
+                const h = Math.max(4, (total / maxActivity) * 100);
                 return (
-                  <div key={p.bucket} className="flex min-w-[8px] flex-1 flex-col items-center justify-end" title={`${new Date(p.bucket).toLocaleDateString()} · ${total}`}>
+                  <div key={point.date} className="flex min-w-[8px] flex-1 flex-col items-center justify-end" title={`${new Date(`${point.date}T00:00:00Z`).toLocaleDateString()} · ${total} events`}>
                     <div className="w-full rounded-t bg-[var(--k-ink)]" style={{ height: `${h}%` }} />
                   </div>
                 );
               })}
             </div>
             <div className="mt-2 flex justify-between text-[10px] text-[#9a9f9b]">
-              {series.data && series.data.length > 1 ? (
+              {points.length > 1 ? (
                 <>
-                  <span>{new Date(series.data[0]!.bucket).toLocaleDateString()}</span>
-                  <span>{new Date(series.data[series.data.length - 1]!.bucket).toLocaleDateString()}</span>
+                  <span>{new Date(`${points[0]!.date}T00:00:00Z`).toLocaleDateString()}</span>
+                  <span>{new Date(`${points[points.length - 1]!.date}T00:00:00Z`).toLocaleDateString()}</span>
                 </>
               ) : null}
             </div>
           </div>
 
-          {top.data && top.data.length ? (
+          {top.data?.items.length ? (
             <div className="k-panel p-5">
               <p className="k-label">Top links</p>
               <ul className="flex flex-col gap-2">
-                {top.data.map((l) => (
-                  <li key={l.blockId ?? l.label} className="flex items-center justify-between gap-3 text-sm">
+                {top.data.items.map((link) => (
+                  <li key={link.blockId} className="flex items-center justify-between gap-3 text-sm">
                     <span className="flex min-w-0 items-center gap-2">
                       <IconChart className="h-4 w-4 shrink-0 text-[#9a9f9b]" />
-                      <span className="truncate text-[var(--k-text)]">{l.label}</span>
+                      <span className="truncate text-[var(--k-text)]">{link.title}</span>
                     </span>
-                    <span className="shrink-0 rounded-full bg-[var(--k-lime-soft)] px-2.5 py-0.5 text-xs font-extrabold text-[#718c1b]">{l.clicks}</span>
+                    <span className="shrink-0 rounded-full bg-[var(--k-lime-soft)] px-2.5 py-0.5 text-xs font-extrabold text-[#718c1b]">{link.clicks}</span>
                   </li>
                 ))}
               </ul>
             </div>
           ) : null}
 
-          {/* Audience breakdowns — present once visitors arrive with real headers */}
-          {s && (s.byDevice.length || s.topReferrers.length || s.byCountry.length) ? (
+          {(devices.data?.items.length || referrers.data?.items.length || geo.data?.items.length) ? (
             <div className="grid gap-5 sm:grid-cols-3">
-              <MiniBreakdown title="Devices" rows={s.byDevice.map((d) => ({ label: d.device, count: d.count }))} />
-              <MiniBreakdown title="Where they came from" rows={s.topReferrers.map((r) => ({ label: r.referrer, count: r.count }))} />
-              <MiniBreakdown title="Countries" rows={s.byCountry.map((c) => ({ label: c.country, count: c.count }))} />
+              <MiniBreakdown title="Devices" rows={(devices.data?.items ?? []).map((item) => ({ label: item.device, count: item.visits }))} />
+              <MiniBreakdown title="Where they came from" rows={(referrers.data?.items ?? []).map((item) => ({ label: item.referrer, count: item.visits }))} />
+              <MiniBreakdown title="Locations" rows={(geo.data?.items ?? []).map((item) => ({ label: item.city ? `${item.city}, ${item.country}` : item.country, count: item.visits }))} />
             </div>
           ) : null}
         </div>

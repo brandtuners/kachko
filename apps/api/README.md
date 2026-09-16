@@ -26,6 +26,8 @@ Copy `apps/api/.env.example` to `apps/api/.env`, or provide the equivalent envir
 
 The scaffold includes configuration validation, global request validation, CORS, Helmet, exception handling, and health routes. Nest uses its Express adapter internally; application code uses Nest modules/controllers/providers. Production requires an explicit comma-separated `CORS_ORIGINS` allowlist.
 
+Basic analytics requires a server-only `ANALYTICS_HASH_SALT` of at least 32 characters. Apply migrations with `pnpm db:deploy` and schedule `pnpm db:analytics:prune` daily for the documented 12-month retention window. See `docs/13-ANALYTICS-API.md`.
+
 The root Prisma schema and initial User/Session migration are implemented. API build/dev/typecheck generate the client under `src/generated/prisma`; only this workspace owns `@prisma/client` and `@prisma/adapter-pg` runtime dependencies. See the [Prisma setup and commands](../../README.md#prisma-and-identity-database). Import `DatabaseModule` into backend feature modules and inject `PrismaService`; it owns the shared client/pool. Import `RedisModule` and inject `RedisService` to reuse its `client`. Do not create a connection per request or import generated models into frontend bundles.
 
 PostgreSQL and Redis connect during NestJS initialization and release their connections through application shutdown hooks. PostgreSQL startup failure is logged without connection details; subsequent readiness probes retry it. Redis connects/reconnects in the background, so a dependency outage does not prevent HTTP startup after the bounded PostgreSQL attempt. SIGINT/SIGTERM hooks are enabled in `main.ts`.
