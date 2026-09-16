@@ -53,18 +53,20 @@ const nextConfig = {
   // Same-origin routing (AD-01): proxy /api/v1/* to the NestJS API in dev so the
   // web app calls relative URLs just like in production (Appendix A).
   async rewrites() {
-    return [
-      {
-        source: "/api/v1/:path*",
-        destination: "http://localhost:4000/api/v1/:path*",
-      },
-      // AD-08: public profiles live at /@username. Serve from /u/[username].
-      {
-        source: "/@:username",
-        destination: "/u/:username",
-      },
-    ];
-  },
+  const apiUrl =
+    process.env.API_URL ?? "http://localhost:4000";
+
+  return [
+    {
+      source: "/api/v1/:path*",
+      destination: `${apiUrl}/api/v1/:path*`,
+    },
+    {
+      source: "/@:username",
+      destination: "/u/:username",
+    },
+  ];
+},
 };
 
 export default nextConfig;
