@@ -5,6 +5,7 @@ A personal link-page platform built with Next.js and NestJS.
 - Frontend: `apps/kachko-fe` — Girish
 - Backend: `apps/api` — Rohan
 - [Development plan](docs/03-DEVELOPMENT-BLUEPRINT.md)
+- [Vercel deployment runbook](docs/15-VERCEL-DEPLOYMENT.md)
 - [Automatic PR review setup](docs/04-PR-REVIEW-AGENT.md)
 
 ## Local PostgreSQL and Redis
