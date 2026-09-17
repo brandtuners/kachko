@@ -529,7 +529,7 @@ function AnalyticsPanel() {
                 const total = point.views + point.linkClicks + point.socialClicks;
                 const h = Math.max(4, (total / maxActivity) * 100);
                 return (
-                  <div key={point.date} className="flex min-w-[8px] flex-1 flex-col items-center justify-end" title={`${new Date(`${point.date}T00:00:00Z`).toLocaleDateString()} · ${total} events`}>
+                  <div key={point.date} className="flex h-full min-w-[8px] flex-1 flex-col items-center justify-end" title={`${new Date(`${point.date}T00:00:00Z`).toLocaleDateString()} · ${total} events`}>
                     <div className="w-full rounded-t bg-[var(--k-ink)]" style={{ height: `${h}%` }} />
                   </div>
                 );
