@@ -48,7 +48,7 @@ Unavailable response (HTTP 503):
 
 `DEPENDENCY_TIMEOUT_MS` defaults to `2000` (allowed range `100–10000`). It bounds each readiness probe, PostgreSQL pool connection/query/server statement timeouts, and Redis connection/PING attempts. The PostgreSQL pool is limited to 10 connections. Redis rejects commands while offline and limits its command queue to 100. Future background jobs that require longer SQL execution must deliberately configure their own limits rather than silently inheriting a short request timeout. Readiness proves connectivity only, not that migrations or business features are complete.
 
-Identity, page/block publishing, appearance/social profiles and managed media are implemented. Request IDs, structured request logging, analytics and QR remain planned work.
+Identity, page/block publishing, appearance/social profiles, managed media, analytics and on-demand QR generation are implemented. Request IDs and structured request logging remain planned work.
 
 ### Verification
 

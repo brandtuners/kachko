@@ -1,5 +1,7 @@
 import type { Page, Theme, SocialProfile as StoredSocial, PageTemplate as StoredTemplate } from '../../generated/prisma/client';
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import QRCode from 'qrcode';
 import { resolveAppearance, appearanceOverridesSchema, themeKeySchema, templateKeySchema, createBlockSchema, publicSocialSchema, type UpdateAppearanceInput, type ApplyTemplateInput, type CreateSocialInput, type UpdateSocialInput,  publicPageSchema, publicBlockSchema, type CreatePageInput, type UpdatePageInput,
   type CreateBlockInput, type UpdateBlockInput, type ReorderBlocksInput } from '@kachko/validation';
 import type { OwnerPage, PageSummary, PageBlock, PublicPage, SocialProfile, SystemTheme, PageTemplate } from '@kachko/types';
@@ -41,7 +43,8 @@ function templateDto(template: StoredTemplate): PageTemplate {
 
 @Injectable()
 export class PagesService {
-  constructor(private readonly repository: PagesRepository, private readonly cache: PublicPageCache) {}
+  constructor(private readonly repository: PagesRepository, private readonly cache: PublicPageCache,
+    private readonly config: ConfigService) {}
   private async execute<T>(action: () => Promise<T>): Promise<T> {
     try { return await action(); }
     catch (error) {
@@ -88,6 +91,13 @@ export class PagesService {
   updateSocial(userId: string, id: string, socialId: string, input: UpdateSocialInput) { return this.execute(async () => ({ data: socialDto(await this.repository.updateSocial(userId, id, socialId, input)) })); }
   deleteSocial(userId: string, id: string, socialId: string) { return this.execute(async () => { await this.repository.deleteSocial(userId, id, socialId); return { data: { deleted: true } }; }); }
   reorderSocials(userId: string, id: string, input: ReorderBlocksInput) { return this.execute(async () => ({ data: (await this.repository.reorderSocials(userId, id, input)).socials.map(socialDto) })); }
+  async qr(userId: string, id: string): Promise<{ data: { url: string; png: Buffer } }> {
+    const page = await this.repository.get(userId, id);
+    if (!page) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');
+    const url = `${this.config.getOrThrow<string>('PUBLIC_APP_URL').replace(/\/$/, '')}/@${page.slug}`;
+    const png = await QRCode.toBuffer(url, { type: 'png', width: 512, margin: 2, errorCorrectionLevel: 'M' });
+    return { data: { url, png } };
+  }
   async publicPage(username: string) {
     // Never authorize public visibility from cache. Checking PostgreSQL first also
     // handles suspension/deletion and old usernames while Redis is unavailable.

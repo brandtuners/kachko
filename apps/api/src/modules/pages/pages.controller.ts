@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Req, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { z, createPageSchema, updatePageSchema, createBlockSchema, updateBlockSchema, reorderBlocksSchema, pageIdSchema, blockIdSchema, usernameSchema,
   type CreatePageInput, type UpdatePageInput, type CreateBlockInput, type UpdateBlockInput, type ReorderBlocksInput } from '@kachko/validation';
 import { IdentityValidationPipe } from '../identity/identity.controller';
@@ -62,6 +63,15 @@ export class PagesController {
   unpublish(@Req() request: IdentityRequest, @Param('id', pageId) id: string, @Body(emptyBody) _body: unknown) {
     void _body;
     return this.pages.publish(request.identity.id, id, false);
+  }
+  @Get(':id/qr')
+  @ApiOperation({ summary: 'Generate a PNG QR code for the canonical public page URL' })
+  @ApiResponse({ status: 200, description: 'PNG QR code; the encoded URL is returned in X-Kachko-QR-URL', content: { 'image/png': { schema: { type: 'string', format: 'binary' } } } })
+  async qr(@Req() request: IdentityRequest, @Param('id', pageId) id: string, @Res({ passthrough: true }) response: Response) {
+    const result = await this.pages.qr(request.identity.id, id);
+    response.setHeader('X-Kachko-QR-URL', result.data.url);
+    response.type('image/png').setHeader('Cache-Control', 'private, no-store');
+    return new StreamableFile(result.data.png);
   }
   @Post(':pageId/blocks')
   @ApiBody({ schema: schema.blockCreateBody, examples: { website: { value: {
