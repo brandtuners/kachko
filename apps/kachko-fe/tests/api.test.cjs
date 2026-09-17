@@ -61,3 +61,8 @@ test('editor uses page IDs and documented reorder, publish and appearance bodies
   assert.deepEqual(JSON.parse(calls.find(c => c.path.endsWith('/appearance')).body), { themeKey: 'dark' });
   assert.ok(calls.every(c => !c.path.includes('/pages/me')));
 });
+test('public page adapter exposes appearance tokens to the public renderer', () => {
+  const source = fs.readFileSync('features/page/public-page.ts', 'utf8');
+  assert.match(source, /\.\.\.result\.page\.appearance/);
+  assert.match(source, /config: result\.page\.appearance/);
+});

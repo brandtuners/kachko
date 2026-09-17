@@ -45,7 +45,10 @@ export async function getPublicPage(slug: string): Promise<PublicPage | null> {
   try {
     const result = await serverApiFetch<ApiPublicPage>(`/public/${encodeURIComponent(slug)}`);
     return { slug: result.profile.username, ...result.page, themeId: result.page.themeKey,
-      theme: { id: result.page.themeKey, slug: result.page.themeKey, name: result.page.themeKey, config: result.page.appearance }, user: result.profile,
+      // The public renderer reads theme tokens from the theme object itself.
+      // Keep `config` for consumers that prefer the grouped shape, while also
+      // exposing the API appearance fields at the renderer level.
+      theme: { id: result.page.themeKey, slug: result.page.themeKey, name: result.page.themeKey, ...result.page.appearance, config: result.page.appearance }, user: result.profile,
       blocks: result.blocks.map((block, position) => ({ ...block, content: { ...block.content }, position, isVisible: true })),
       socials: result.socials.map((social) => ({ ...social, isVisible: true })) };
   } catch (error) {
