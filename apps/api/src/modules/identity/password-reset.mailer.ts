@@ -24,7 +24,12 @@ export class PasswordResetMailer {
       signal: AbortSignal.timeout(5000),
     });
     if (!response.ok) {
-      this.logger.error(`Password reset email delivery failed with status ${response.status}`);
+      // Resend's response identifies configuration errors (invalid key,
+      // unverified sender, restricted recipient) while never containing the
+      // reset token. Keep a bounded diagnostic for operators; the API response
+      // remains generic to callers.
+      const details = (await response.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 500);
+      this.logger.error(`Password reset email delivery failed with status ${response.status}${details ? `: ${details}` : ''}`);
       throw new Error('Password reset email delivery failed');
     }
   }
