@@ -46,7 +46,7 @@ export class AnalyticsIngestionController {
 @UseGuards(IdentityRateGuard, SessionGuard)
 export class AnalyticsQueryController {
   constructor(private readonly analytics: AnalyticsService) {}
-  private query(request: IdentityRequest, id: string, input: AnalyticsRangeInput, method: 'summary' | 'timeseries' | 'topLinks' | 'referrers' | 'geo' | 'devices') {
+  private query(request: IdentityRequest, id: string, input: AnalyticsRangeInput, method: 'summary' | 'timeseries' | 'topLinks' | 'topSocials' | 'referrers' | 'geo' | 'devices') {
     return this.analytics[method](request.identity.id, id, input);
   }
 
@@ -65,6 +65,10 @@ export class AnalyticsQueryController {
   @Get('top-links')
   @rangeQuery()
   topLinks(@Req() req: IdentityRequest, @Param('pageId', pageId) id: string, @Query(range) input: AnalyticsRangeInput) { return this.query(req, id, input, 'topLinks'); }
+
+  @Get('top-socials')
+  @rangeQuery()
+  topSocials(@Req() req: IdentityRequest, @Param('pageId', pageId) id: string, @Query(range) input: AnalyticsRangeInput) { return this.query(req, id, input, 'topSocials'); }
 
   @Get('referrers')
   @rangeQuery()

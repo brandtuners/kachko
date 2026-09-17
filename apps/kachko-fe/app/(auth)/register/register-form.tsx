@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiFetch, ApiClientError } from "../../../lib/api";
 import { IconArrowRight } from "../../../components/icons";
+import { AuthDivider, GoogleButton } from "../../../features/auth/google-auth";
 
 type Form = { email: string; username: string; password: string };
 
@@ -42,6 +43,8 @@ export default function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="k-panel flex w-full flex-col gap-3.5 p-5">
+      <GoogleButton label="Sign up with Google" />
+      <AuthDivider />
       <div>
         <input
           className="ob-input"

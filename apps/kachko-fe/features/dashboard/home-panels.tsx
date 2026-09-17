@@ -6,7 +6,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../../lib/api";
 import type { AnalyticsDevice, AnalyticsGeo, AnalyticsPeriod, AnalyticsRange, AnalyticsReferrer,
-  AnalyticsSeriesPoint, AnalyticsSummary, AnalyticsTopLink } from "@kachko/types";
+  AnalyticsSeriesPoint, AnalyticsSummary, AnalyticsTopLink, AnalyticsTopSocial } from "@kachko/types";
 import { useEditor } from "../editor/use-editor";
 import type { EditorBlock } from "../editor/types";
 import { BLOCK_ICONS, blockSub, blockTitle, PlatformBadge } from "./block-row";
@@ -39,6 +39,11 @@ export function useStats(pageId: string, range: AnalyticsRange = "7d") {
     queryFn: () => apiFetch<AnalyticsPeriod & { items: AnalyticsTopLink[] }>(`/pages/${pageId}/analytics/top-links?range=${range}`),
     ...options,
   });
+  const topSocials = useQuery({
+    queryKey: ["analytics", pageId, range, "top-socials"],
+    queryFn: () => apiFetch<AnalyticsPeriod & { items: AnalyticsTopSocial[] }>(`/pages/${pageId}/analytics/top-socials?range=${range}`),
+    ...options,
+  });
   const referrers = useQuery({
     queryKey: ["analytics", pageId, range, "referrers"],
     queryFn: () => apiFetch<AnalyticsPeriod & { items: AnalyticsReferrer[] }>(`/pages/${pageId}/analytics/referrers?range=${range}`),
@@ -54,7 +59,7 @@ export function useStats(pageId: string, range: AnalyticsRange = "7d") {
     queryFn: () => apiFetch<AnalyticsPeriod & { items: AnalyticsDevice[] }>(`/pages/${pageId}/analytics/devices?range=${range}`),
     ...options,
   });
-  return { summary, series, top, referrers, geo, devices };
+  return { summary, series, top, topSocials, referrers, geo, devices };
 }
 
 export function useClicksByBlock(pageId: string): Map<string, number> {

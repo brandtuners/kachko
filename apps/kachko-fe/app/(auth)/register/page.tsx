@@ -1,8 +1,6 @@
 // Sign-up entry screen — cream + lime scheme (kachko_dashboard.html).
 // Logo lockup up top, ink headline with a lime accent, real form on a white
-// panel. The reference's Google button is intentionally omitted — Kachko V1
-// ships email/password auth only (AD-05), and a dead OAuth button would mislead
-// users.
+// panel. Google and email/password both use the real identity API.
 import Link from "next/link";
 import RegisterForm from "./register-form";
 import { ObLogo } from "../../../features/onboarding/ob-shell";

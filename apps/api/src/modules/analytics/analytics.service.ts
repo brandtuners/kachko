@@ -105,6 +105,9 @@ export class AnalyticsService {
   topLinks(userId: string, pageId: string, query: AnalyticsRangeInput) {
     return this.breakdown(userId, pageId, query, (from, to) => this.repository.topLinks(pageId, from, to));
   }
+  topSocials(userId: string, pageId: string, query: AnalyticsRangeInput) {
+    return this.breakdown(userId, pageId, query, (from, to) => this.repository.topSocials(pageId, from, to));
+  }
   referrers(userId: string, pageId: string, query: AnalyticsRangeInput) {
     return this.breakdown(userId, pageId, query, (from, to) => this.repository.referrers(pageId, from, to));
   }

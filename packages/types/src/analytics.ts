@@ -12,6 +12,7 @@ export interface AnalyticsSummary extends AnalyticsPeriod {
 }
 export interface AnalyticsSeriesPoint { date: string; views: number; linkClicks: number; socialClicks: number }
 export interface AnalyticsTopLink { blockId: string; title: string; clicks: number }
+export interface AnalyticsTopSocial { targetId: string; platform: string; label: string; clicks: number }
 export interface AnalyticsReferrer { referrer: string; visits: number }
 export interface AnalyticsGeo { country: string; city: string | null; visits: number }
 export interface AnalyticsDevice { device: string; visits: number }
@@ -19,6 +20,7 @@ export type AnalyticsAcceptedResponse = ApiData<{ accepted: true }>;
 export type AnalyticsSummaryResponse = ApiData<AnalyticsSummary>;
 export type AnalyticsTimeseriesResponse = ApiData<AnalyticsPeriod & { items: AnalyticsSeriesPoint[] }>;
 export type AnalyticsTopLinksResponse = ApiData<AnalyticsPeriod & { items: AnalyticsTopLink[] }>;
+export type AnalyticsTopSocialsResponse = ApiData<AnalyticsPeriod & { items: AnalyticsTopSocial[] }>;
 export type AnalyticsReferrersResponse = ApiData<AnalyticsPeriod & { items: AnalyticsReferrer[] }>;
 export type AnalyticsGeoResponse = ApiData<AnalyticsPeriod & { items: AnalyticsGeo[] }>;
 export type AnalyticsDevicesResponse = ApiData<AnalyticsPeriod & { items: AnalyticsDevice[] }>;

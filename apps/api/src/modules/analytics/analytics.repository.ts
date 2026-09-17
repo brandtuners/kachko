@@ -75,6 +75,29 @@ export class AnalyticsRepository {
       ORDER BY "clicks" DESC, e."blockId" ASC LIMIT 10`;
   }
 
+  topSocials(pageId: string, from: Date, to: Date) {
+    return this.db.$queryRaw<{ targetId: string; platform: string; label: string; clicks: number }[]>`
+      WITH social_clicks AS (
+        SELECT e."socialProfileId" AS "targetId", s."platform"::text AS "platform",
+          COALESCE(NULLIF(s."username", ''), s."url") AS "label", COUNT(*)::int AS "clicks"
+        FROM "AnalyticsEvent" e
+        JOIN "SocialProfile" s ON s."id" = e."socialProfileId" AND s."pageId" = e."pageId"
+        WHERE e."pageId" = ${pageId} AND e."eventType" = 'SOCIAL_CLICK'::"AnalyticsEventType"
+          AND e."socialProfileId" IS NOT NULL AND e."createdAt" >= ${from} AND e."createdAt" <= ${to}
+        GROUP BY e."socialProfileId", s."platform", s."username", s."url"
+        UNION ALL
+        SELECT e."blockId" AS "targetId", COALESCE(b."content"->>'platform', 'SOCIAL') AS "platform",
+          COALESCE(NULLIF(b."content"->>'username', ''), 'Social link') AS "label", COUNT(*)::int AS "clicks"
+        FROM "AnalyticsEvent" e
+        JOIN "PageBlock" b ON b."id" = e."blockId" AND b."pageId" = e."pageId" AND b."type" = 'SOCIAL'::"BlockType"
+        WHERE e."pageId" = ${pageId} AND e."eventType" = 'SOCIAL_CLICK'::"AnalyticsEventType"
+          AND e."blockId" IS NOT NULL AND e."createdAt" >= ${from} AND e."createdAt" <= ${to}
+        GROUP BY e."blockId", b."content"->>'platform', b."content"->>'username'
+      )
+      SELECT "targetId", "platform", "label", "clicks" FROM social_clicks
+      ORDER BY "clicks" DESC, "targetId" ASC LIMIT 10`;
+  }
+
   referrers(pageId: string, from: Date, to: Date) {
     return this.db.$queryRaw<{ referrer: string; visits: number }[]>`
       SELECT "referrer", COUNT(*)::int AS "visits"

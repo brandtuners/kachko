@@ -34,6 +34,7 @@ import {
 } from "../../components/icons";
 import { SOCIAL_ICONS } from "../../components/icons";
 import { ObLogo } from "../../features/onboarding/ob-shell";
+import { PageQr } from "../../features/share/page-qr";
 
 export default function DashboardPage() {
   const editor = useEditor();
@@ -378,7 +379,7 @@ function QrPanel() {
   return (
     <Panel title="My QR" sub="Print-ready code that opens your page.">
       <div className="k-panel flex flex-col items-center gap-6 p-8 sm:flex-row">
-        <p role="status">QR downloads are not available yet. You can copy your page link below.</p>
+        <PageQr url={url} username={page.user.username} size={190} />
         <div className="min-w-0 flex-1 text-center sm:text-left">
           <p className="text-sm font-extrabold text-[var(--k-ink)]">@{page.user.username}</p>
           <code className="mt-1 block truncate text-sm text-[var(--k-muted)]">{url}</code>
@@ -460,8 +461,8 @@ function AnalyticsPanel() {
   const page = editor.page!;
   const [range, setRange] = useState<AnalyticsRange>("7d");
   const stats = useStats(page.id, range);
-  const { summary, series, top, referrers, geo, devices } = stats;
-  const queries = [summary, series, top, referrers, geo, devices];
+  const { summary, series, top, topSocials, referrers, geo, devices } = stats;
+  const queries = [summary, series, top, topSocials, referrers, geo, devices];
 
   const s = summary.data;
   const points = series.data?.items ?? [];
@@ -545,20 +546,46 @@ function AnalyticsPanel() {
             </div>
           </div>
 
-          {top.data?.items.length ? (
-            <div className="k-panel p-5">
-              <p className="k-label">Top links</p>
-              <ul className="flex flex-col gap-2">
-                {top.data.items.map((link) => (
-                  <li key={link.blockId} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <IconChart className="h-4 w-4 shrink-0 text-[#9a9f9b]" />
-                      <span className="truncate text-[var(--k-text)]">{link.title}</span>
-                    </span>
-                    <span className="shrink-0 rounded-full bg-[var(--k-lime-soft)] px-2.5 py-0.5 text-xs font-extrabold text-[#718c1b]">{link.clicks}</span>
-                  </li>
-                ))}
-              </ul>
+          {(top.data?.items.length || topSocials.data?.items.length) ? (
+            <div className="grid gap-5 sm:grid-cols-2">
+              {top.data?.items.length ? (
+                <div className="k-panel p-5">
+                  <p className="k-label">Top links</p>
+                  <ul className="flex flex-col gap-2">
+                    {top.data.items.map((link) => (
+                      <li key={link.blockId} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <IconChart className="h-4 w-4 shrink-0 text-[#9a9f9b]" />
+                          <span className="truncate text-[var(--k-text)]">{link.title}</span>
+                        </span>
+                        <span className="shrink-0 rounded-full bg-[var(--k-lime-soft)] px-2.5 py-0.5 text-xs font-extrabold text-[#718c1b]">{link.clicks}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {topSocials.data?.items.length ? (
+                <div className="k-panel p-5">
+                  <p className="k-label">Top social links</p>
+                  <ul className="flex flex-col gap-2">
+                    {topSocials.data.items.map((social) => {
+                      const Icon = SOCIAL_ICONS[social.platform] ?? IconLink;
+                      return (
+                        <li key={social.targetId} className="flex items-center justify-between gap-3 text-sm">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <Icon className="h-4 w-4 shrink-0 text-[#9a9f9b]" />
+                            <span className="min-w-0">
+                              <span className="block truncate text-[var(--k-text)]">{social.label}</span>
+                              <span className="block text-[10px] font-bold uppercase tracking-wide text-[#9a9f9b]">{social.platform}</span>
+                            </span>
+                          </span>
+                          <span className="shrink-0 rounded-full bg-[var(--k-lime-soft)] px-2.5 py-0.5 text-xs font-extrabold text-[#718c1b]">{social.clicks}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
             </div>
           ) : null}
 

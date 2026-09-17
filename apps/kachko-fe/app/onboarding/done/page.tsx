@@ -1,9 +1,8 @@
 "use client";
 
 // Step 08 — completion (reference: "sign up process 08.png").
-// Centered white card with the page QR + share line; "Continue →" lands on the
-// (now light) dashboard. QR uses the owner-scoped raw-bytes endpoint directly
-// via <img> — it is NOT the {data} envelope, so apiFetch must not wrap it.
+// Centered white card with a locally generated page QR + share line;
+// "Continue →" lands on the dashboard. No page URL is sent to a QR service.
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -11,6 +10,7 @@ import { ensurePage } from "../../../features/editor/api";
 import { ObShell } from "../../../features/onboarding/ob-shell";
 import { useOnboarding } from "../../../features/onboarding/store";
 import { IconCopy, IconCheck } from "../../../components/icons";
+import { PageQr } from "../../../features/share/page-qr";
 
 export default function OnboardingDoneStep() {
   const router = useRouter();
@@ -51,7 +51,7 @@ export default function OnboardingDoneStep() {
           <div className="grid aspect-square place-items-center text-sm text-[var(--k-muted)]">Loading…</div>
         ) : p ? (
           <>
-            <p role="status">QR downloads are not available yet. You can copy your page link below.</p>
+            <div className="flex justify-center"><PageQr url={url} username={p.user.username} size={216} /></div>
             <p className="mt-4 text-center text-sm font-extrabold text-[var(--k-ink)]">{p.user.displayName ?? `@${p.user.username}`}</p>
             <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#e6e8e1] bg-[#f8f9f4] px-3 py-2">
               <code className="min-w-0 flex-1 truncate text-xs text-[var(--k-muted)]">{url}</code>
@@ -65,7 +65,7 @@ export default function OnboardingDoneStep() {
               </button>
             </div>
             <p className="mt-3 text-center text-xs text-[var(--k-muted)]">
-              Point a phone camera here to open your page.
+              Point a phone camera at the QR code to open your page.
             </p>
           </>
         ) : (

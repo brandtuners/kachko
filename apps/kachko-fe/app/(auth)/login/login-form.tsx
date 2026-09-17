@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiFetch, ApiClientError } from "../../../lib/api";
 import { IconArrowRight } from "../../../components/icons";
+import { AuthDivider, GoogleButton } from "../../../features/auth/google-auth";
 
 type Form = { email: string; password: string };
 
@@ -37,6 +38,8 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="k-panel flex w-full flex-col gap-3.5 p-5">
+      <GoogleButton label="Continue with Google" />
+      <AuthDivider />
       <div>
         <input
           className="ob-input"

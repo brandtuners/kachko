@@ -80,7 +80,9 @@ GOOGLE_LOGIN_REDIRECT_URL=http://localhost:3000/auth/google/callback
 
 The API redirects there with `?status=onboarding` or `?status=authenticated`. These values are UI hints only: verify them through `/auth/google/pending` or `/auth/me`. The callback URL contains no kachko session token or pending credential. For onboarding, show the shared username form, then POST complete with `credentials: 'include'` and the CSRF header. For returning users, fetch `/auth/me` and enter the dashboard. Errors currently render the standard JSON error envelope at the API callback, rather than redirecting error details to the FE.
 
-As with password sessions, production frontend/API must be same-site HTTPS origins for SameSite=Lax cookies. No frontend files have been changed; the shared contracts and API are ready for integration.
+The frontend now provides Google actions on both `/login` and `/register`. Returning accounts proceed to `/dashboard`; new Google identities are verified at `/auth/google/callback`, where the user selects the required username before continuing to onboarding.
+
+As with password sessions, production frontend/API must be same-site HTTPS origins for SameSite=Lax cookies. When the frontend proxies `/api/v1/*` to a separately deployed API, register the frontend callback URL with Google and use it for `GOOGLE_REDIRECT_URI`, for example `https://kachko.vercel.app/api/v1/auth/google/callback`. Set `GOOGLE_LOGIN_REDIRECT_URL=https://kachko.vercel.app/auth/google/callback`. This keeps the state and session cookies on the same browser origin used by frontend API calls.
 
 ## Security and data
 

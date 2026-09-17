@@ -56,12 +56,13 @@ The following endpoints require the owner's session cookie. A foreign page ID re
 GET /api/v1/pages/:pageId/analytics/summary?range=7d
 GET /api/v1/pages/:pageId/analytics/timeseries?range=7d
 GET /api/v1/pages/:pageId/analytics/top-links?range=7d
+GET /api/v1/pages/:pageId/analytics/top-socials?range=7d
 GET /api/v1/pages/:pageId/analytics/referrers?range=7d
 GET /api/v1/pages/:pageId/analytics/geo?range=7d
 GET /api/v1/pages/:pageId/analytics/devices?range=7d
 ```
 
-Supported ranges are `today`, `7d`, and `30d`; omitted range defaults to `7d`. Responses never return individual events. The summary includes total views, unique visitors, link/social clicks, and link click-through rate. Timeseries fills empty UTC dates with zeroes. Each breakdown is bounded in SQL.
+Supported ranges are `today`, `7d`, and `30d`; omitted range defaults to `7d`. Responses never return individual events. The summary includes total views, unique visitors, link/social clicks, and link click-through rate. Timeseries fills empty UTC dates with zeroes. `top-links` ranks regular link blocks, while `top-socials` ranks social profiles and `SOCIAL` blocks. Each breakdown is bounded in SQL.
 
 ## Local checks
 

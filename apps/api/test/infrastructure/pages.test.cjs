@@ -461,6 +461,9 @@ test('page migration enforces single-page ownership and cascades; username chang
   assert.equal(analyticsSummary.body.data.socialClicks, 1);
   assert.equal((await request(`${analyticsRoot}/timeseries?range=today`, { cookie: alice.cookie })).body.data.items.at(-1).views, 3);
   assert.equal((await request(`${analyticsRoot}/top-links`, { cookie: alice.cookie })).body.data.items[0].blockId, analyticsLink.id);
+  const topSocial = (await request(`${analyticsRoot}/top-socials`, { cookie: alice.cookie })).body.data.items[0];
+  assert.deepEqual({ targetId: topSocial.targetId, platform: topSocial.platform, clicks: topSocial.clicks },
+    { targetId: githubSocial.id, platform: 'X', clicks: 1 });
   assert.equal((await request(`${analyticsRoot}/referrers`, { cookie: alice.cookie })).body.data.items[0].referrer, 'https://search.example');
   assert.equal((await request(`${analyticsRoot}/devices`, { cookie: alice.cookie })).body.data.items[0].device, 'mobile');
   assert.equal((await request(`${analyticsRoot}/geo`, { cookie: alice.cookie })).body.data.items[0].country, 'IN');
@@ -468,7 +471,7 @@ test('page migration enforces single-page ownership and cascades; username chang
   for (const path of ['/api/v1/themes', '/api/v1/templates', '/api/v1/pages/{pageId}/appearance', '/api/v1/pages/{pageId}/template',
     '/api/v1/pages/{pageId}/socials', '/api/v1/pages/{pageId}/socials/{socialId}', '/api/v1/pages/{pageId}/socials/reorder',
     '/api/v1/analytics/events', '/api/v1/pages/{pageId}/analytics/summary', '/api/v1/pages/{pageId}/analytics/timeseries',
-    '/api/v1/pages/{pageId}/analytics/top-links', '/api/v1/pages/{pageId}/analytics/referrers',
+    '/api/v1/pages/{pageId}/analytics/top-links', '/api/v1/pages/{pageId}/analytics/top-socials', '/api/v1/pages/{pageId}/analytics/referrers',
     '/api/v1/pages/{pageId}/analytics/geo', '/api/v1/pages/{pageId}/analytics/devices']) assert.ok(checkSwagger.paths[path], path);
   await docker('stop', redisName);
   assert.equal((await request('/public/page_race')).status, 200, 'public reads fall back to PostgreSQL');
