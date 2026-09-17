@@ -11,6 +11,6 @@ import { MediaStorage } from './media.storage';
   imports: [DatabaseModule, RedisModule, IdentityModule],
   controllers: [MediaController, PublicMediaController],
   providers: [MediaRepository, MediaService, MediaStorage],
-  exports: [MediaRepository],
+  exports: [MediaRepository, MediaStorage],
 })
 export class MediaModule {}

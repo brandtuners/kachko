@@ -35,6 +35,7 @@ import {
 import { SOCIAL_ICONS } from "../../components/icons";
 import { ObLogo } from "../../features/onboarding/ob-shell";
 import { PageQr } from "../../features/share/page-qr";
+import { publicPageUrl } from "../../lib/public-url";
 
 export default function DashboardPage() {
   const editor = useEditor();
@@ -364,7 +365,7 @@ function libraryDefaults(t: BlockType): Record<string, unknown> {
 function QrPanel() {
   const editor = useEditor();
   const page = editor.page!;
-  const url = typeof window !== "undefined" ? `${window.location.origin}/@${page.user.username}` : "";
+  const url = typeof window !== "undefined" ? publicPageUrl(page.user.username, window.location.origin) : "";
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -789,7 +790,40 @@ function LinksPanel() {
             <IconArrowUpRight className="h-4 w-4" />
           </Link>
         </div>
+        <DeleteAccount />
       </div>
     </Panel>
+  );
+}
+
+function DeleteAccount() {
+  const [open, setOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const remove = async () => {
+    setDeleting(true); setError(null);
+    try {
+      await apiFetch("/users/me", { method: "DELETE", body: JSON.stringify({ confirmation, ...(password ? { password } : {}) }) });
+      window.location.assign("/");
+    } catch (value) {
+      setDeleting(false);
+      setError(value instanceof Error ? value.message : "Could not delete your account.");
+    }
+  };
+  return (
+    <div className="xl:col-span-2 rounded-[18px] border border-red-200 bg-red-50 px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><p className="font-extrabold text-red-900">Delete account</p><p className="mt-1 text-sm text-red-700">Permanently removes your page, media, sessions, and account data.</p></div>
+        {!open ? <button type="button" onClick={() => setOpen(true)} className="rounded-full border border-red-300 bg-white px-4 py-2 text-sm font-bold text-red-700">Delete account</button> : null}
+      </div>
+      {open ? <div className="mt-4 grid max-w-md gap-3">
+        <input className="k-input" type="password" autoComplete="current-password" placeholder="Current password (email accounts)" value={password} onChange={event => setPassword(event.target.value)} />
+        <input className="k-input" placeholder="Type DELETE to confirm" value={confirmation} onChange={event => setConfirmation(event.target.value)} />
+        {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
+        <div className="flex gap-2"><button type="button" disabled={confirmation !== "DELETE" || deleting} onClick={remove} className="rounded-full bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{deleting ? "Deleting…" : "Permanently delete"}</button><button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm">Cancel</button></div>
+      </div> : null}
+    </div>
   );
 }

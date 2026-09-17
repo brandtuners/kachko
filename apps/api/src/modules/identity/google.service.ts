@@ -47,7 +47,9 @@ export class GoogleService {
     const session = await this.identity.googleLogin(profile.subject, previous);
     if (session) return { session };
     if (await this.repository.findByEmail(profile.email)) {
-      identityError(409, 'ACCOUNT_LINK_REQUIRED', 'Sign in using your existing method; Google account linking is not yet supported');
+      const linkPending = randomToken();
+      await this.store(`google:link:${tokenDigest(linkPending)}`, profile);
+      return { linkPending };
     }
     const pending = randomToken();
     await this.store(`google:pending:${tokenDigest(pending)}`, profile);
@@ -62,5 +64,23 @@ export class GoogleService {
   async complete(token: string | undefined, input: GoogleRegistrationInput, previous?: string) {
     const profile = await this.pending(token, true);
     return this.identity.googleRegister(profile, input, previous);
+  }
+  async completeLink(token: string | undefined, userId: string) {
+    if (!validToken(token)) identityError(401, 'GOOGLE_LINK_EXPIRED', 'Restart Google sign-in');
+    const key = `google:link:${tokenDigest(token!)}`;
+    const raw = await this.read(key, false);
+    if (!raw) identityError(401, 'GOOGLE_LINK_EXPIRED', 'Restart Google sign-in');
+    const profile = JSON.parse(raw) as GoogleProfile;
+    try {
+      const linked = await this.repository.linkGoogle(userId, profile.subject, profile.email);
+      if (!linked) identityError(409, 'GOOGLE_LINK_MISMATCH', 'Sign in to the account that uses this Google email');
+      await this.read(key, true);
+      return { data: { linked: true as const } };
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+        identityError(409, 'GOOGLE_ACCOUNT_UNAVAILABLE', 'This Google account is already linked');
+      }
+      throw error;
+    }
   }
 }

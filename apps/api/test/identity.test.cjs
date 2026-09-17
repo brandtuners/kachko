@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { registerSchema, profileSchema, usernameSchema } = require('@kachko/validation');
+const { registerSchema, profileSchema, usernameSchema, passwordResetRequestSchema, passwordResetConfirmSchema,
+  createReportSchema, deleteAccountSchema } = require('@kachko/validation');
 const { validateEnvironment } = require('../dist/config/environment');
 const { CsrfGuard, sessionCookie } = require('../dist/modules/identity/identity.guards');
 const { ConfigService } = require('@nestjs/config');
@@ -17,6 +18,16 @@ test('shared identity contracts normalize names, protect fields and bound inputs
     assert.equal(profileSchema.safeParse(body).success, false);
   }
   assert.deepEqual(profileSchema.parse({ bio: null, displayName: null }), { bio: null, displayName: null });
+});
+
+test('launch protection contracts reject unsafe reset, report and deletion inputs', () => {
+  assert.equal(passwordResetRequestSchema.parse({ email: ' User@Example.com ' }).email, 'user@example.com');
+  assert.equal(passwordResetConfirmSchema.safeParse({ token: 'x'.repeat(32), password: 'long-password-123' }).success, true);
+  assert.equal(passwordResetConfirmSchema.safeParse({ token: 'short', password: 'long-password-123' }).success, false);
+  assert.equal(createReportSchema.safeParse({ pageId: 'not-an-id', reason: 'SPAM' }).success, false);
+  assert.equal(createReportSchema.safeParse({ pageId: '123e4567-e89b-42d3-a456-426614174000', reason: 'OTHER', details: 'too short' }).success, false);
+  assert.deepEqual(deleteAccountSchema.parse({ confirmation: 'DELETE' }), { confirmation: 'DELETE' });
+  assert.equal(deleteAccountSchema.safeParse({ confirmation: 'delete' }).success, false);
 });
 
 test('cookie parsing and CSRF reject ambiguous credentials and unsafe browser mutations', () => {

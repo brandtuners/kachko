@@ -467,12 +467,43 @@ test('page migration enforces single-page ownership and cascades; username chang
   assert.equal((await request(`${analyticsRoot}/referrers`, { cookie: alice.cookie })).body.data.items[0].referrer, 'https://search.example');
   assert.equal((await request(`${analyticsRoot}/devices`, { cookie: alice.cookie })).body.data.items[0].device, 'mobile');
   assert.equal((await request(`${analyticsRoot}/geo`, { cookie: alice.cookie })).body.data.items[0].country, 'IN');
+  // Launch protections: public reporting, role-gated moderation, suspension,
+  // audit logging and irreversible account deletion.
+  await redisClient.flushDb();
+  assert.equal((await request('/moderation/reports', { method: 'POST', body: { pageId: lastPage.id, reason: 'SPAM' }, csrf: false })).status, 403);
+  const reported = await request('/moderation/reports', { method: 'POST', body: { pageId: lastPage.id, reason: 'SPAM', details: 'Repeated unsolicited promotional links.' } });
+  assert.equal(reported.status, 202);
+  assert.equal((await request('/moderation/reports', { cookie: alice.cookie })).status, 403);
+  await db.user.update({ where: { id: bob.id }, data: { role: 'ADMIN' } });
+  const reports = await request('/moderation/reports?status=OPEN', { cookie: bob.cookie });
+  assert.equal(reports.status, 200);
+  assert.equal(reports.body.data[0].page.user.id, alice.id);
+  const reportId = reports.body.data[0].id;
+  assert.equal((await request(`/moderation/reports/${reportId}/status`, { method: 'POST', cookie: bob.cookie, body: { status: 'RESOLVED' } })).status, 200);
+  assert.equal((await request(`/moderation/users/${alice.id}/status`, { method: 'PATCH', cookie: bob.cookie, body: { isActive: false } })).status, 200);
+  assert.equal((await request('/public/page_race')).status, 404);
+  assert.equal((await request('/auth/me', { cookie: alice.cookie })).status, 401);
+  const audit = await request('/moderation/audit-logs', { cookie: bob.cookie });
+  assert.equal(audit.status, 200);
+  assert.ok(audit.body.data.some(row => row.action === 'REPORT_STATUS_CHANGED'));
+  assert.ok(audit.body.data.some(row => row.action === 'USER_SUSPENDED'));
+  // Restore only for the Redis-outage public gate below; suspension already
+  // revoked the user's sessions and cannot be bypassed by this direct fixture.
+  await db.user.update({ where: { id: alice.id }, data: { isActive: true } });
+  await db.page.update({ where: { id: lastPage.id }, data: { isPublished: true, publishedAt: new Date() } });
+  const deleted = await request('/users/me', { method: 'DELETE', cookie: bob.cookie, body: { confirmation: 'DELETE', password: 'test-password-123' } });
+  assert.equal(deleted.status, 200);
+  assert.equal(await db.user.count({ where: { id: bob.id } }), 0);
+  assert.equal((await request('/auth/me', { cookie: bob.cookie })).status, 401);
+  assert.ok(await db.auditLog.findFirst({ where: { action: 'ACCOUNT_DELETED', entityId: bob.id } }));
   const checkSwagger = await (await fetch(`${base}/api/docs-json`)).json();
   for (const path of ['/api/v1/themes', '/api/v1/templates', '/api/v1/pages/{pageId}/appearance', '/api/v1/pages/{pageId}/template',
     '/api/v1/pages/{pageId}/socials', '/api/v1/pages/{pageId}/socials/{socialId}', '/api/v1/pages/{pageId}/socials/reorder',
     '/api/v1/analytics/events', '/api/v1/pages/{pageId}/analytics/summary', '/api/v1/pages/{pageId}/analytics/timeseries',
     '/api/v1/pages/{pageId}/analytics/top-links', '/api/v1/pages/{pageId}/analytics/top-socials', '/api/v1/pages/{pageId}/analytics/referrers',
-    '/api/v1/pages/{pageId}/analytics/geo', '/api/v1/pages/{pageId}/analytics/devices']) assert.ok(checkSwagger.paths[path], path);
+    '/api/v1/pages/{pageId}/analytics/geo', '/api/v1/pages/{pageId}/analytics/devices', '/api/v1/moderation/reports',
+    '/api/v1/moderation/reports/{id}/status', '/api/v1/moderation/users/{id}/status', '/api/v1/moderation/audit-logs',
+    '/api/v1/users/me', '/api/v1/auth/password-reset/request', '/api/v1/auth/password-reset/confirm']) assert.ok(checkSwagger.paths[path], path);
   await docker('stop', redisName);
   assert.equal((await request('/public/page_race')).status, 200, 'public reads fall back to PostgreSQL');
   await db.page.update({ where: { id: lastPage.id }, data: { isPublished: false } });

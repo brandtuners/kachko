@@ -77,7 +77,7 @@ pnpm --filter kachko-fe dev
 
 Frontend: `http://localhost:3000`. API health: `http://localhost:4000/api/v1/health`.
 
-**Current scope:** local infrastructure, Prisma identity models/migration, NestJS PostgreSQL/Redis providers, and dependency readiness are implemented. Set the required `DATABASE_URL` and `REDIS_URL` in `apps/api/.env`. `/api/v1/health/ready` returns `200` when both services respond and `503` on failure; `/api/v1/health/live` remains independent of dependency availability. Identity authentication/profile APIs and shared contracts are now implemented; frontend integration remains pending. See the [API README](apps/api/README.md) for response examples, timeouts, lifecycle behavior, and `pnpm --filter api test:infra`.
+**Current scope:** the full product path through share/SEO/QR and launch protections is implemented, including password recovery, public reports, role-protected moderation, audit logs, suspension, and permanent account deletion. Apply all migrations and configure the deployment environment before browser verification. `/api/v1/health/ready` returns `200` when PostgreSQL and Redis respond and `503` on failure; `/api/v1/health/live` remains independent of dependency availability. See the [API README](apps/api/README.md) and [launch-protection guide](docs/14-LAUNCH-PROTECTIONS.md).
 
 ## Prisma and identity database
 
@@ -144,3 +144,5 @@ Page/LINK CRUD, publishing and public lookup are implemented and listed in Swagg
 TEXT blocks and transactional reordering are implemented. See [editor API examples and validation rules](docs/08-TEXT-AND-REORDER.md); apply the TEXT migration with `pnpm db:deploy` and restart the API.
 
 Appearance, system themes/templates and social-profile APIs are implemented. See [the appearance/social setup and endpoint guide](docs/09-APPEARANCE-AND-SOCIALS.md); apply migrations and restart the API before testing.
+
+Canonical `/@username` sharing, QR downloads, SEO/Open Graph metadata, password reset, reports/moderation, audit logging, suspension and account deletion are implemented. See [the launch-protection guide](docs/14-LAUNCH-PROTECTIONS.md) for deployment variables, API contracts and verification commands.

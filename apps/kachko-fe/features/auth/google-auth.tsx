@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { googleRegistrationSchema, type GoogleRegistrationInput } from "@kachko/validation";
+import { googleRegistrationSchema, loginSchema, type GoogleRegistrationInput, type LoginInput } from "@kachko/validation";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -39,7 +39,7 @@ function GoogleMark() {
   );
 }
 
-type CallbackStatus = "authenticated" | "onboarding" | "invalid";
+type CallbackStatus = "authenticated" | "onboarding" | "link-required" | "invalid";
 
 export function GoogleCallback({ status }: { status: CallbackStatus }) {
   const router = useRouter();
@@ -68,6 +68,7 @@ export function GoogleCallback({ status }: { status: CallbackStatus }) {
           if (active) setEmail(pending.email);
           return;
         }
+        if (status === "link-required") return;
         throw new Error("Google did not return a valid sign-in status.");
       } catch (error: unknown) {
         if (active) setLoadError(error instanceof ApiClientError ? error.message : "Google sign-in could not be verified. Please start again.");
@@ -97,6 +98,8 @@ export function GoogleCallback({ status }: { status: CallbackStatus }) {
       </div>
     );
   }
+
+  if (status === "link-required") return <GoogleLinkExistingAccount />;
 
   if (status !== "onboarding" || !email) {
     return (
@@ -133,6 +136,38 @@ export function GoogleCallback({ status }: { status: CallbackStatus }) {
       <p className="text-center text-xs text-[var(--k-muted)]">
         By continuing, you confirm you are at least 13 and agree to the <a href="/legal/terms" className="font-bold hover:underline">Terms</a> and <a href="/legal/privacy" className="font-bold hover:underline">Privacy Policy</a>.
       </p>
+    </form>
+  );
+}
+
+function GoogleLinkExistingAccount() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [serverError, setServerError] = useState<string | null>(null);
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginInput>({ resolver: schemaResolver(loginSchema) });
+
+  async function link(values: LoginInput) {
+    setServerError(null);
+    try {
+      await apiFetch("/auth/login", { method: "POST", body: JSON.stringify(values) });
+      await apiFetch("/auth/google/link/complete", { method: "POST", body: "{}" });
+      queryClient.clear();
+      router.replace("/dashboard");
+    } catch (error: unknown) {
+      setServerError(error instanceof ApiClientError ? error.message : "We couldn't link this Google account. Please start again.");
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit(link)} className="k-panel flex w-full flex-col gap-3.5 p-5">
+      <div className="rounded-xl bg-[#f4f6ef] px-4 py-3 text-sm text-[var(--k-muted)]">
+        This email already has a KACHKO account. Sign in once to securely attach Google to it.
+      </div>
+      <div><input className="ob-input" type="email" autoComplete="email" placeholder="Existing account email" aria-label="Email address" aria-invalid={!!errors.email} {...register("email")} />{errors.email?.message ? <p className="mt-1.5 text-xs text-[#b4322c]">{errors.email.message}</p> : null}</div>
+      <div><input className="ob-input" type="password" autoComplete="current-password" placeholder="Password" aria-label="Password" aria-invalid={!!errors.password} {...register("password")} />{errors.password?.message ? <p className="mt-1.5 text-xs text-[#b4322c]">{errors.password.message}</p> : null}</div>
+      {serverError ? <p role="alert" className="text-sm text-[#b4322c]">{serverError}</p> : null}
+      <button type="submit" disabled={isSubmitting} className="ob-btn-white">{isSubmitting ? "Linking…" : "Sign in and link Google"}<IconArrowRight className="h-4 w-4" /></button>
+      <a href="/api/v1/auth/google" className="text-center text-sm font-bold hover:underline">Use a different Google account</a>
     </form>
   );
 }

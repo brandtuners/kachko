@@ -23,16 +23,33 @@ model User {
   deletedAt    DateTime?
 
   sessions Session[]
+  passwordResetTokens PasswordResetToken[]
   googleAccount GoogleAccount?
   page Page?
   media Media[] @relation("OwnedMedia")
   avatarMedia Media? @relation("UserAvatar", fields: [avatarMediaId], references: [id], onDelete: Restrict)
+  reports Report[] @relation("ReportReporter")
+  handledReports Report[] @relation("ReportHandler")
+  auditLogs AuditLog[] @relation("AuditActor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Unique email/username constraints already create their lookup indexes.
   @@index([createdAt])
+}
+
+model PasswordResetToken {
+  id String @id @default(uuid())
+  userId String
+  tokenHash String @unique
+  expiresAt DateTime
+  usedAt DateTime?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
 }
 
 enum UserRole {
@@ -84,8 +101,58 @@ model Page {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   blocks PageBlock[]
   analytics AnalyticsEvent[]
+  reports Report[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Report {
+  id String @id @default(uuid())
+  pageId String
+  reporterId String?
+  reason ReportReason
+  details String?
+  status ReportStatus @default(OPEN)
+  handledById String?
+  handledAt DateTime?
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  reporter User? @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  handledBy User? @relation("ReportHandler", fields: [handledById], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([pageId, createdAt])
+  @@index([reporterId, createdAt])
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  IMPERSONATION
+  ILLEGAL_CONTENT
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  REJECTED
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+  actorId String?
+  action String
+  entityType String
+  entityId String?
+  metadata Json @default("{}")
+  actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([createdAt])
 }
 
 model PageBlock {

@@ -37,5 +37,8 @@ test('Google configuration is optional, complete, HTTPS in production and has fi
   assert.throws(() => validateEnvironment({ ...enabled, NODE_ENV: 'production' }));
   assert.throws(() => validateEnvironment({ ...enabled, GOOGLE_LOGIN_REDIRECT_URL: 'https://evil.example/callback' }));
   assert.throws(() => validateEnvironment({ ...enabled, GOOGLE_REDIRECT_URI: 'https://api.example.com/wrong' }));
-  assert.equal(validateEnvironment({ ...enabled, NODE_ENV: 'production', GOOGLE_REDIRECT_URI: 'https://api.example.com/api/v1/auth/google/callback', GOOGLE_LOGIN_REDIRECT_URL: 'https://app.example.com/auth/google/callback' }).GOOGLE_LOGIN_REDIRECT_URL, 'https://app.example.com/auth/google/callback');
+  const production = { ...enabled, NODE_ENV: 'production', PUBLIC_APP_URL: 'https://app.example.com',
+    RESEND_API_KEY: 're_test', EMAIL_FROM: 'KACHKO <no-reply@example.com>',
+    GOOGLE_REDIRECT_URI: 'https://api.example.com/api/v1/auth/google/callback', GOOGLE_LOGIN_REDIRECT_URL: 'https://app.example.com/auth/google/callback' };
+  assert.equal(validateEnvironment(production).GOOGLE_LOGIN_REDIRECT_URL, 'https://app.example.com/auth/google/callback');
 });

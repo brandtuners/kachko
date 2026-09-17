@@ -47,6 +47,16 @@ export function validateEnvironment(env: Record<string, unknown>) {
   }
   const cookieName = String(env.SESSION_COOKIE_NAME ?? 'kachko_session');
   if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(cookieName)) throw new Error('SESSION_COOKIE_NAME must be a simple cookie name');
+  const resetTtl = Number(env.PASSWORD_RESET_TTL_SECONDS ?? 3600);
+  if (!Number.isInteger(resetTtl) || resetTtl < 300 || resetTtl > 86400) throw new Error('PASSWORD_RESET_TTL_SECONDS must be between 300 and 86400');
+  const publicAppUrl = String(env.PUBLIC_APP_URL ?? (nodeEnv === 'production' ? '' : 'http://localhost:3000'));
+  let parsedPublicUrl: URL;
+  try { parsedPublicUrl = new URL(publicAppUrl); } catch { throw new Error('PUBLIC_APP_URL must be an absolute HTTP(S) origin'); }
+  if (!['http:', 'https:'].includes(parsedPublicUrl.protocol) || parsedPublicUrl.origin !== publicAppUrl ||
+      (nodeEnv === 'production' && parsedPublicUrl.protocol !== 'https:')) throw new Error('PUBLIC_APP_URL must be an absolute HTTP(S) origin');
+  const resendKey = String(env.RESEND_API_KEY ?? '').trim();
+  const emailFrom = String(env.EMAIL_FROM ?? '').trim();
+  if (nodeEnv === 'production' && (!resendKey || !emailFrom)) throw new Error('RESEND_API_KEY and EMAIL_FROM are required in production');
   const analyticsSalt = String(env.ANALYTICS_HASH_SALT ?? (nodeEnv === 'production' ? '' : 'kachko-development-analytics-salt'));
   if (analyticsSalt.length < 32) throw new Error('ANALYTICS_HASH_SALT must contain at least 32 characters');
   const googleId = String(env.GOOGLE_CLIENT_ID ?? '').trim();
@@ -77,7 +87,9 @@ export function validateEnvironment(env: Record<string, unknown>) {
     if (googleRedirect && !allowedOrigins.includes(new URL(googleRedirect).origin)) throw new Error('Google frontend redirect origin must be in CORS_ORIGINS');
   }
   return {
-    ...env, SESSION_TTL_SECONDS: sessionTtl, SESSION_COOKIE_NAME: cookieName, ANALYTICS_HASH_SALT: analyticsSalt, NODE_ENV: nodeEnv, PORT: port, CORS_ORIGINS: allowedOrigins,
+    ...env, SESSION_TTL_SECONDS: sessionTtl, SESSION_COOKIE_NAME: cookieName, PASSWORD_RESET_TTL_SECONDS: resetTtl,
+    PUBLIC_APP_URL: publicAppUrl, RESEND_API_KEY: resendKey, EMAIL_FROM: emailFrom,
+    ANALYTICS_HASH_SALT: analyticsSalt, NODE_ENV: nodeEnv, PORT: port, CORS_ORIGINS: allowedOrigins,
     GOOGLE_CLIENT_ID: googleId, GOOGLE_CLIENT_SECRET: googleSecret, GOOGLE_REDIRECT_URI: googleCallback, GOOGLE_LOGIN_REDIRECT_URL: googleRedirect,
     DATABASE_URL: connectionUrl(env, 'DATABASE_URL'),
     REDIS_URL: connectionUrl(env, 'REDIS_URL'),

@@ -11,6 +11,7 @@ import type { EditorPage } from "../editor/types";
 import { BlockView, SocialRow } from "../page/block-view";
 import { themeBackground, themeVars } from "../page/theme";
 import { IconCheck, IconClipboard } from "../../components/icons";
+import { publicPageUrl } from "../../lib/public-url";
 
 type Device = "phone" | "desktop";
 
@@ -28,7 +29,7 @@ export function PhonePreview({ page, isPublished }: { page: EditorPage; isPublis
   const name = page.user.displayName ?? page.user.username;
 
   const share = async () => {
-    const url = `${window.location.origin}/@${page.user.username}`;
+    const url = publicPageUrl(page.user.username, window.location.origin);
     try {
       if (navigator.share) {
         await navigator.share({ title: `${name} on Kachko`, url });

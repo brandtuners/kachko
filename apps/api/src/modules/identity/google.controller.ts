@@ -1,15 +1,17 @@
-import { Body, Controller, Get, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiBody, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import { googleRegistrationSchema, type GoogleRegistrationInput } from '@kachko/validation';
+import { googleRegistrationSchema, z, type GoogleRegistrationInput } from '@kachko/validation';
 import { GoogleService, GOOGLE_FLOW_TTL } from './google.service';
-import { IdentityRateGuard, RatePolicy, sessionCookie } from './identity.guards';
+import { IdentityRateGuard, RatePolicy, SessionGuard, sessionCookie, type IdentityRequest } from './identity.guards';
 import { IdentityValidationPipe } from './identity.controller';
 import { identityCookieOptions, setIdentitySession } from './identity.cookies';
 
 const STATE_COOKIE = 'kachko_google_state';
 const PENDING_COOKIE = 'kachko_google_pending';
+const LINK_COOKIE = 'kachko_google_link_pending';
+const emptyBody = new IdentityValidationPipe(z.strictObject({}).default({}));
 function cookie(request: Request, name: string) {
   const values = (request.headers.cookie ?? '').split(';').map(v => v.trim()).filter(v => v.startsWith(`${name}=`));
   const value = values[0]?.slice(name.length + 1);
@@ -34,6 +36,7 @@ export class GoogleController {
   async start(@Res() response: Response) {
     const flow = await this.google.start();
     response.clearCookie(PENDING_COOKIE, identityCookieOptions(this.config));
+    response.clearCookie(LINK_COOKIE, identityCookieOptions(this.config));
     response.cookie(STATE_COOKIE, flow.state, { ...identityCookieOptions(this.config), maxAge: GOOGLE_FLOW_TTL * 1000 });
     response.redirect(flow.url);
   }
@@ -48,16 +51,21 @@ export class GoogleController {
     response.clearCookie(STATE_COOKIE, identityCookieOptions(this.config));
     if (result.session) {
       response.clearCookie(PENDING_COOKIE, identityCookieOptions(this.config));
+      response.clearCookie(LINK_COOKIE, identityCookieOptions(this.config));
       setIdentitySession(this.config, response, result.session);
     }
-    else response.cookie(PENDING_COOKIE, result.pending, { ...identityCookieOptions(this.config), maxAge: GOOGLE_FLOW_TTL * 1000 });
+    else if ('linkPending' in result) {
+      response.clearCookie(PENDING_COOKIE, identityCookieOptions(this.config));
+      response.cookie(LINK_COOKIE, result.linkPending, { ...identityCookieOptions(this.config), maxAge: GOOGLE_FLOW_TTL * 1000 });
+    } else response.cookie(PENDING_COOKIE, result.pending, { ...identityCookieOptions(this.config), maxAge: GOOGLE_FLOW_TTL * 1000 });
     const redirect = this.config.get<string>('GOOGLE_LOGIN_REDIRECT_URL');
     if (redirect) {
       const url = new URL(redirect);
-      url.searchParams.set('status', result.session ? 'authenticated' : 'onboarding');
+      url.searchParams.set('status', result.session ? 'authenticated' : 'linkPending' in result ? 'link-required' : 'onboarding');
       return response.redirect(url.toString());
     }
-    return response.json({ data: result.session ? { onboardingRequired: false, user: result.session.user } : { onboardingRequired: true } });
+    return response.json({ data: result.session ? { onboardingRequired: false, user: result.session.user }
+      : 'linkPending' in result ? { linkRequired: true } : { onboardingRequired: true } });
   }
   @Get('pending')
   @ApiResponse({ status: 200, description: '{data:{email:string}}; requires pending onboarding cookie' })
@@ -78,5 +86,19 @@ export class GoogleController {
     response.clearCookie(PENDING_COOKIE, identityCookieOptions(this.config));
     setIdentitySession(this.config, response, session);
     return { data: session.user };
+  }
+
+  @Post('link/complete')
+  @HttpCode(200)
+  @RatePolicy('google-link', 5, 3600)
+  @UseGuards(SessionGuard)
+  @ApiHeader({ name: 'X-Kachko-CSRF', required: true })
+  @ApiResponse({ status: 200, description: '{data:{linked:true}}; requires existing account session and link grant cookie' })
+  async completeLink(@Body(emptyBody) _body: unknown, @Req() request: IdentityRequest,
+    @Res({ passthrough: true }) response: Response) {
+    void _body;
+    const result = await this.google.completeLink(cookie(request, LINK_COOKIE), request.identity.id);
+    response.clearCookie(LINK_COOKIE, identityCookieOptions(this.config));
+    return result;
   }
 }

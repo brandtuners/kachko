@@ -10,18 +10,20 @@ interface ReportRow {
   status: string;
   details: string | null;
   createdAt: string;
-  page?: { slug: string } | null;
-  reporter?: { username: string };
+  page: { slug: string; user: { id: string; username: string; isActive: boolean } };
+  reporter?: { username: string } | null;
 }
+interface AuditRow { id: string; action: string; entityType: string; entityId: string | null; createdAt: string; actor?: { username: string } | null }
 
 // Admin console (M9). Role-gated at the API (SessionAuthGuard + RoleGuard).
 // Cream + lime scheme now app-wide; lists moderation reports with quick
 // resolve/dismiss actions.
 export default function AdminPage() {
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["admin", "reports"],
     queryFn: () => apiFetch<ReportRow[]>("/moderation/reports?status=OPEN"),
   });
+  const audit = useQuery({ queryKey: ["admin", "audit"], queryFn: () => apiFetch<AuditRow[]>("/moderation/audit-logs") });
 
   if (isLoading) {
     return (
@@ -54,7 +56,7 @@ export default function AdminPage() {
           <p className="mt-1 text-sm text-[var(--k-muted)]">Open abuse reports across KACHKO.</p>
         </header>
 
-        {reports.length === 0 ? (
+        {isError ? <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800">You do not have access to moderation, or the reports could not be loaded.</div> : reports.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[#dfe2dc] bg-white/70 p-10 text-center text-[var(--k-muted)]">
             No open reports. The community is (for now) well-behaved.
           </div>
@@ -68,17 +70,24 @@ export default function AdminPage() {
                       {r.reason}
                     </span>
                     <span className="text-sm text-[var(--k-text)]">
-                      {r.page?.slug ? `@${r.page.slug}` : "general"} · by {r.reporter?.username ?? "anon"}
+                      @{r.page.slug} · by {r.reporter?.username ?? "anonymous"}
                     </span>
                   </div>
                   <div className="flex gap-2">
+                    {r.page.user.isActive ? <button
+                      onClick={async () => {
+                        await apiFetch(`/moderation/users/${r.page.user.id}/status`, { method: "PATCH", body: JSON.stringify({ isActive: false }) });
+                        refetch(); audit.refetch();
+                      }}
+                      className="k-btn-line !h-8 !rounded-lg !border-red-200 !px-3 !text-xs !text-red-700"
+                    >Suspend owner</button> : <span className="rounded-full bg-gray-100 px-3 py-2 text-xs font-bold text-gray-600">Suspended</span>}
                     <button
                       onClick={async () => {
                         await apiFetch(`/moderation/reports/${r.id}/status`, {
                           method: "POST",
                           body: JSON.stringify({ status: "RESOLVED" }),
                         });
-                        refetch();
+                        refetch(); audit.refetch();
                       }}
                       className="k-btn-lime !h-8 !rounded-lg !px-3 !text-xs"
                     >
@@ -90,7 +99,7 @@ export default function AdminPage() {
                           method: "POST",
                           body: JSON.stringify({ status: "REJECTED" }),
                         });
-                        refetch();
+                        refetch(); audit.refetch();
                       }}
                       className="k-btn-line !h-8 !rounded-lg !px-3 !text-xs"
                     >
@@ -104,6 +113,13 @@ export default function AdminPage() {
             ))}
           </ul>
         )}
+        <section className="mt-12">
+          <h2 className="text-2xl font-extrabold tracking-[-.5px] text-[var(--k-ink)]">Audit log</h2>
+          <p className="mt-1 text-sm text-[var(--k-muted)]">Recent privileged account and moderation actions.</p>
+          <div className="mt-4 overflow-hidden rounded-2xl border border-[#e9ebe6] bg-white">
+            {audit.isLoading ? <p className="p-5 text-sm text-[var(--k-muted)]">Loading audit log…</p> : audit.isError ? <p className="p-5 text-sm text-[#b4322c]">Audit logs require administrator access.</p> : audit.data?.length ? <ul>{audit.data.map(row => <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-[#eceee9] px-4 py-3 last:border-0"><span className="text-sm"><strong>{row.action.replaceAll("_", " ").toLowerCase()}</strong> · {row.entityType}{row.entityId ? ` ${row.entityId}` : ""}</span><span className="text-xs text-[var(--k-muted)]">{row.actor?.username ?? "system"} · {new Date(row.createdAt).toLocaleString()}</span></li>)}</ul> : <p className="p-5 text-sm text-[var(--k-muted)]">No privileged actions recorded yet.</p>}
+          </div>
+        </section>
       </div>
     </main>
   );

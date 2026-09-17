@@ -3,8 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { hash, verify, Algorithm } from '@node-rs/argon2';
 import { createHash, randomBytes } from 'node:crypto';
 import type { IdentityUser, UsernameResponse } from '@kachko/types';
-import { RESERVED_USERNAMES, type RegisterInput, type LoginInput, type ProfileInput } from '@kachko/validation';
+import { RESERVED_USERNAMES, type RegisterInput, type LoginInput, type ProfileInput,
+  type PasswordResetRequestInput, type PasswordResetConfirmInput } from '@kachko/validation';
 import { IdentityRepository } from './identity.repository';
+import { PasswordResetMailer } from './password-reset.mailer';
 
 export function identityError(status: number, code: string, message: string): never {
   throw new HttpException({ code, message }, status);
@@ -20,7 +22,8 @@ const isUniqueError = (error: unknown) => typeof error === 'object' && error !==
 @Injectable()
 export class IdentityService {
   private dummyHash?: Promise<string>;
-  constructor(private readonly repository: IdentityRepository, private readonly config: ConfigService) {}
+  constructor(private readonly repository: IdentityRepository, private readonly config: ConfigService,
+    private readonly mailer: PasswordResetMailer) {}
 
   private newSession() {
     const token = randomBytes(32).toString('base64url');
@@ -84,6 +87,22 @@ export class IdentityService {
   async logout(token?: string) {
     if (token) await this.repository.revokeSession(tokenDigest(token));
     return { data: { loggedOut: true as const } };
+  }
+  async requestPasswordReset(input: PasswordResetRequestInput) {
+    const token = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + this.config.getOrThrow<number>('PASSWORD_RESET_TTL_SECONDS') * 1000);
+    const account = await this.repository.createPasswordReset(input.email, tokenDigest(token), expiresAt);
+    // Keep the response indistinguishable for known/unknown accounts and for
+    // provider outages. The mailer records delivery failures for operators.
+    if (account) await this.mailer.send(account.email, token).catch(() => undefined);
+    return { data: { accepted: true as const } };
+  }
+  async confirmPasswordReset(input: PasswordResetConfirmInput) {
+    const passwordHash = await hash(input.password, passwordOptions);
+    if (!await this.repository.resetPassword(tokenDigest(input.token), passwordHash)) {
+      identityError(400, 'RESET_TOKEN_INVALID', 'This password reset link is invalid or expired');
+    }
+    return { data: { reset: true as const } };
   }
   async availability(username: string): Promise<UsernameResponse> {
     if ((RESERVED_USERNAMES as readonly string[]).includes(username)) {

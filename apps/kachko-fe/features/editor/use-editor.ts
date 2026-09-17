@@ -14,8 +14,7 @@ import {
   updatePageMeta,
   updateSocial,
 } from "./api";
-import { apiFetch } from "../../lib/api";
-import type { EditorBlock, EditorPage, EditorSocial } from "./types";
+import type { EditorPage } from "./types";
 
 export const pageKey = ["my-page"] as const;
 

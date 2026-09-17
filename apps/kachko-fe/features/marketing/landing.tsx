@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- static reference-design mockups intentionally use raw images */
 
 // Kachko marketing landing — faithful port of kachko-landing-page.html (the
 // user's compiled Vite/Tailwind bundle). Every section, component and style

@@ -42,6 +42,7 @@ All paths below use `http://localhost:4000/api/v1` locally.
 | GET | `/auth/google/callback` | Google-only callback; validates state/code, then logs in or requests onboarding |
 | GET | `/auth/google/pending` | Returns `{data:{email}}` for a valid pending onboarding cookie |
 | POST | `/auth/google/complete` | Accepts `{username,displayName?}`; creates user + Google link + session atomically; returns 201 `{data:IdentityUser}` |
+| POST | `/auth/google/link/complete` | Authenticated confirmation that attaches a pending Google identity to the matching existing account |
 
 POST complete requires `X-Kachko-CSRF: 1`, JSON, and the pending cookie. Email, Google subject, roles and tokens cannot be supplied in the body. Username validation is shared with password registration. No account exists until username completion succeeds. The pending cookie never authenticates protected API routes.
 
@@ -51,7 +52,7 @@ With no frontend redirect configured, callback returns one of:
 {"data":{"onboardingRequired":true}}
 ```
 
-or `{data:{onboardingRequired:false,user:IdentityUser}}`, with the ordinary kachko session cookie. After login, use the existing `/auth/me`, `/users/me`, `/users/me` PATCH and `/auth/logout` endpoints.
+or `{data:{onboardingRequired:false,user:IdentityUser}}`, with the ordinary kachko session cookie. An email collision returns `{data:{linkRequired:true}}` and a short-lived HTTP-only link-grant cookie. After login, use the existing `/auth/me`, `/users/me`, `/users/me` PATCH and `/auth/logout` endpoints.
 
 ## Browser test without frontend changes
 
@@ -68,7 +69,7 @@ or `{data:{onboardingRequired:false,user:IdentityUser}}`, with the ordinary kach
 6. Execute `POST /api/v1/auth/logout` from Swagger with the CSRF header; `/auth/me` should then return 401.
 7. Open `/api/v1/auth/google` again and use the same Google account: it logs into the same kachko user without another username step.
 
-If that email already belongs to a password account, expect 409 `ACCOUNT_LINK_REQUIRED`. Sign in with the existing method. This feature deliberately does not merge accounts by email or link a Google identity based only on an already-present session. Explicit account linking will need a separate authenticated confirmation flow. For a new-user test, use a Google account whose email is not already registered in the development database.
+If that email already belongs to a password account, the callback requests account linking. Sign in to the existing account, then POST `{}` to `/auth/google/link/complete` with the session, CSRF header and link-grant cookie. The API requires the authenticated account email to exactly match Google's verified email; the grant is single-use and expires after ten minutes. Merely matching an email never links an account.
 
 ## Girish's integration
 
@@ -78,7 +79,7 @@ Use browser navigation (an anchor or `window.location.assign`) to the API `/auth
 GOOGLE_LOGIN_REDIRECT_URL=http://localhost:3000/auth/google/callback
 ```
 
-The API redirects there with `?status=onboarding` or `?status=authenticated`. These values are UI hints only: verify them through `/auth/google/pending` or `/auth/me`. The callback URL contains no kachko session token or pending credential. For onboarding, show the shared username form, then POST complete with `credentials: 'include'` and the CSRF header. For returning users, fetch `/auth/me` and enter the dashboard. Errors currently render the standard JSON error envelope at the API callback, rather than redirecting error details to the FE.
+The API redirects there with `?status=onboarding`, `?status=authenticated`, or `?status=link-required`. These values are UI hints only; the authority stays in HTTP-only cookies and the authenticated API. For onboarding, show the shared username form and POST complete. For `link-required`, authenticate the existing password account and POST `/auth/google/link/complete`. Returning users verify `/auth/me` and enter the dashboard.
 
 The frontend now provides Google actions on both `/login` and `/register`. Returning accounts proceed to `/dashboard`; new Google identities are verified at `/auth/google/callback`, where the user selects the required username before continuing to onboarding.
 
@@ -87,7 +88,7 @@ As with password sessions, production frontend/API must be same-site HTTPS origi
 ## Security and data
 
 - Authorization-code flow uses PKCE S256, a random state bound to an HTTP-only cookie, and nonce verification.
-- Redis stores hashed state/pending keys for 10 minutes. State is consumed atomically before code exchange; onboarding grants are consumed atomically before account creation. Missing, expired, mismatched or reused state is rejected. Validation errors preserve the pending grant; DB conflicts require restarting Google sign-in after choosing another username.
+- Redis stores hashed state/onboarding/link grants for 10 minutes. State is consumed atomically before code exchange; onboarding and link grants are single-use. Linking additionally requires a valid existing session, an exact verified-email match, and an unlinked Google subject. Missing, expired, mismatched or reused credentials are rejected.
 - Google's official `google-auth-library` verifies ID-token signature, issuer, audience and expiry. The API also requires the expected nonce, a verified valid email and a nonempty Google subject.
 - Google subject is the stable login key in `GoogleAccount`, unique and linked to one User. Email changes at Google do not change the linked user or silently rewrite the kachko email.
 - New Google users have passwordHash=null and isVerified=true. They use the same session expiry/revocation and inactive/deleted-user checks as password users.
@@ -95,7 +96,7 @@ As with password sessions, production frontend/API must be same-site HTTPS origi
 - Provider exchange/verification requests have a five-second per-request timeout and sanitized errors. State/pending operations use the dependency timeout and fail closed on Redis outage.
 - Rate limits: Google start 10/min/IP, callback 20/min/IP, complete 3/hour/IP; pending uses the shared identity limit. Browser return callbacks use state verification instead of requiring the mutation CSRF header.
 
-Additional error codes: 503 GOOGLE_NOT_CONFIGURED; 401 GOOGLE_AUTH_FAILED or GOOGLE_ONBOARDING_EXPIRED; 403 GOOGLE_STATE_INVALID; 409 ACCOUNT_LINK_REQUIRED or ACCOUNT_UNAVAILABLE. Existing validation/CSRF/rate-limit errors still apply.
+Additional error codes: 503 GOOGLE_NOT_CONFIGURED; 401 GOOGLE_AUTH_FAILED, GOOGLE_ONBOARDING_EXPIRED or GOOGLE_LINK_EXPIRED; 403 GOOGLE_STATE_INVALID; 409 GOOGLE_LINK_MISMATCH, GOOGLE_ACCOUNT_UNAVAILABLE or ACCOUNT_UNAVAILABLE. Existing validation/CSRF/rate-limit errors still apply.
 
 ## Verification
 

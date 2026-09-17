@@ -4,6 +4,8 @@ import { BlockView, SocialRow } from "../../../features/page/block-view";
 import { getPublicPage } from "../../../features/page/public-page";
 import { AnalyticsBeacon } from "./analytics-beacon";
 import { themeVars, themeBackground, type ThemeJson } from "../../../features/page/theme";
+import { absoluteAssetUrl, publicPageUrl } from "../../../lib/public-url";
+import { ReportPage } from "../../../features/moderation/report-page";
 
 // Public profile page (§8.1, §6.3, AD-08). Server-rendered for SEO + speed.
 export async function generateMetadata({
@@ -18,17 +20,17 @@ export async function generateMetadata({
   const title = page.title ?? `${displayName} · KACHKO`;
   const description =
     page.description ?? `All of ${displayName}'s links in one place — claim your corner of the internet on KACHKO.`;
-  const shareUrl = `https://kachko.app/${page.user.username}`;
-  const ogImage = page.user.avatarUrl ? `https://kachko.app${page.user.avatarUrl}` : undefined;
+  const shareUrl = publicPageUrl(page.user.username);
+  const ogImage = page.user.avatarUrl ? absoluteAssetUrl(page.user.avatarUrl) : undefined;
   return {
     title,
     description,
-    metadataBase: new URL("https://kachko.app"),
+    metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
     openGraph: {
       title,
       description,
       type: "profile",
-      url: `/${page.user.username}`,
+      url: shareUrl,
       images: ogImage ? [{ url: ogImage, alt: `${displayName} on KACHKO` }] : undefined,
     },
     twitter: {
@@ -68,6 +70,7 @@ export default async function PublicProfilePage({
             pages paint their OWN theme background, only the blocks follow it. */}
         <div className="relative mb-5">
           {page.user.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- URL can be the authenticated local media proxy or R2
             <img
               src={page.user.avatarUrl}
               alt={`${displayName} avatar`}
@@ -108,6 +111,7 @@ export default async function PublicProfilePage({
           </svg>
           Made with <span className="font-bold text-[color:var(--page-text,white)] opacity-70">KACHKO</span>
         </footer>
+        <ReportPage pageId={page.id} />
       </div>
 
       <AnalyticsBeacon pageId={page.id} />

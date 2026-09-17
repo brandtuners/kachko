@@ -79,6 +79,7 @@ export function BlockContentForm({
     case "IMAGE":
       return (
         <div className="grid gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- user-managed media can be local or R2-backed */}
           {content.url ? <img src={String(content.url)} alt="" className="max-h-44 rounded-xl object-cover" /> : null}
           <label className="dash-label cursor-pointer">
             {media.isUploading ? "Uploading replacement…" : "Replace image"}

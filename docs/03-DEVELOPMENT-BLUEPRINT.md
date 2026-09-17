@@ -14,7 +14,7 @@
 
 ### Step-by-step execution flow
 
-**Current handoff:** Rohan has implemented the backend through Step 8, including identity, pages/blocks, appearance/social, managed media and basic analytics. Girish can integrate each completed contract in order; the joint completion gates remain open until both verify the corresponding real browser journeys. See [the analytics contract and local test guide](13-ANALYTICS-API.md) for the latest handoff.
+**Current handoff:** implementation now reaches Step 10, including canonical sharing/SEO/QR, password recovery, public reports, role-protected moderation, audit logs, suspension and permanent account deletion. The joint completion gates remain open until both developers verify the corresponding deployed browser journeys. See [the analytics guide](13-ANALYTICS-API.md) and [launch-protection guide](14-LAUNCH-PROTECTIONS.md).
 
 Complete the following steps in order. The Rohan and Girish columns show the tasks each person takes; the dependency column shows what must be ready first. Girish can build contract-backed UI with fixtures while Rohan implements the matching API. A step is complete only after both verify it using the real API.
 

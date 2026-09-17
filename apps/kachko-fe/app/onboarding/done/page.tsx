@@ -11,6 +11,7 @@ import { ObShell } from "../../../features/onboarding/ob-shell";
 import { useOnboarding } from "../../../features/onboarding/store";
 import { IconCopy, IconCheck } from "../../../components/icons";
 import { PageQr } from "../../../features/share/page-qr";
+import { publicPageUrl } from "../../../lib/public-url";
 
 export default function OnboardingDoneStep() {
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function OnboardingDoneStep() {
 
   const page = useQuery({ queryKey: ["my-page"], queryFn: ensurePage });
   const p = page.data;
-  const url = typeof window !== "undefined" && p ? `${window.location.origin}/@${p.user.username}` : "";
+  const url = typeof window !== "undefined" && p ? publicPageUrl(p.user.username, window.location.origin) : "";
 
   const copy = async () => {
     try {

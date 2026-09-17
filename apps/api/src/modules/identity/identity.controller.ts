@@ -4,8 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { ApiBody, ApiCookieAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { SchemaObject } from '@nestjs/swagger/dist/interfaces/open-api-spec.interface';
 import type { Request, Response } from 'express';
-import { z, registerSchema, loginSchema, profileSchema, usernameSchema,
-  type RegisterInput, type LoginInput, type ProfileInput } from '@kachko/validation';
+import { z, registerSchema, loginSchema, profileSchema, usernameSchema, passwordResetRequestSchema, passwordResetConfirmSchema,
+  type RegisterInput, type LoginInput, type ProfileInput, type PasswordResetRequestInput, type PasswordResetConfirmInput } from '@kachko/validation';
 import { IdentityService, identityError } from './identity.service';
 import { IdentityRateGuard, SessionGuard, RatePolicy, sessionCookie, type IdentityRequest } from './identity.guards';
 
@@ -61,6 +61,21 @@ export class AuthController {
     const session = await this.identity.login(input, sessionCookie(request, this.config));
     setIdentitySession(this.config, response, session);
     return { data: session.user };
+  }
+  @Post('password-reset/request')
+  @HttpCode(202)
+  @RatePolicy('password-reset-request', 3, 3600)
+  @ApiBody({ schema: bodySchema(passwordResetRequestSchema) })
+  @ApiResponse({ status: 202, description: 'Always accepted to prevent account enumeration' })
+  requestPasswordReset(@Body(new IdentityValidationPipe(passwordResetRequestSchema)) input: PasswordResetRequestInput) {
+    return this.identity.requestPasswordReset(input);
+  }
+  @Post('password-reset/confirm')
+  @HttpCode(200)
+  @RatePolicy('password-reset-confirm', 5, 3600)
+  @ApiBody({ schema: bodySchema(passwordResetConfirmSchema) })
+  confirmPasswordReset(@Body(new IdentityValidationPipe(passwordResetConfirmSchema)) input: PasswordResetConfirmInput) {
+    return this.identity.confirmPasswordReset(input);
   }
   @Get('me')
   @UseGuards(SessionGuard)

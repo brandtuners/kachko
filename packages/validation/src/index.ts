@@ -17,6 +17,10 @@ export const registerSchema = z.strictObject({
   displayName: z.string().trim().min(1).max(80).optional(),
 });
 export const loginSchema = z.strictObject({ email: emailSchema, password: z.string().min(1).max(128) });
+export const passwordResetRequestSchema = z.strictObject({ email: emailSchema });
+export const passwordResetConfirmSchema = z.strictObject({
+  token: z.string().min(32).max(256), password: passwordSchema,
+});
 export const profileSchema = z.strictObject({
   displayName: z.string().trim().min(1).max(80).nullable().optional(),
   bio: z.string().trim().max(500).nullable().optional(),
@@ -24,6 +28,8 @@ export const profileSchema = z.strictObject({
 }).refine(value => Object.keys(value).length > 0, 'Provide at least one profile field');
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
+export type PasswordResetConfirmInput = z.infer<typeof passwordResetConfirmSchema>;
 export type ProfileInput = z.infer<typeof profileSchema>;
 export { z };
 
@@ -39,3 +45,4 @@ export * from './appearance';
 export * from './socials';
 export * from './media';
 export * from './analytics';
+export * from './moderation';
