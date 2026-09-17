@@ -10,11 +10,15 @@ import {
   listThemes,
   reorderBlocks,
   setTheme,
+  setAppearanceConfig,
+  setBackgroundImage,
   updateBlock,
   updatePageMeta,
   updateSocial,
 } from "./api";
+import type { BackgroundImageSettings } from "./api";
 import type { EditorPage } from "./types";
+import type { ThemeConfig } from "@kachko/types";
 
 export const pageKey = ["my-page"] as const;
 
@@ -100,6 +104,14 @@ export function useEditor() {
         return { ...prev, ...p, theme };
       }),
   });
+  const setBackground = useMutation({
+    mutationFn: (settings: BackgroundImageSettings) => setBackgroundImage(settings),
+    onSuccess: (page) => qc.setQueryData(pageKey, page),
+  });
+  const saveAppearance = useMutation({
+    mutationFn: (config: ThemeConfig) => setAppearanceConfig(config),
+    onSuccess: (page) => qc.setQueryData(pageKey, page),
+  });
 
   return {
     page: pageQuery.data,
@@ -117,6 +129,8 @@ export function useEditor() {
     editSocial,
     removeSocial,
     pickTheme,
+    setBackground,
+    saveAppearance,
   };
 }
 

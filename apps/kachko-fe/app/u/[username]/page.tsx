@@ -84,7 +84,7 @@ export default async function PublicProfilePage({
         </div>
 
         {/* Name + handle */}
-        <h1 style={{ fontSize: "var(--page-title-size, 32px)" }} className="text-center text-2xl font-bold text-[color:var(--page-text,white)] sm:text-3xl">{displayName}</h1>
+        <h1 style={{ fontSize: "var(--page-title-size, 32px)", color: "var(--page-title-color, var(--page-text, white))" }} className="text-center text-2xl font-bold sm:text-3xl">{displayName}</h1>
         <p className="mt-1 text-center text-sm text-[color:var(--page-text,white)] opacity-70">@{page.user.username}</p>
 
         {page.description ? (
@@ -105,12 +105,12 @@ export default async function PublicProfilePage({
 
         {/* Footer — brand mark + wordmark, theme-neutral (the logo PNG is
             cream-filled, so on the user's theme we use the SVG arch instead). */}
-        <footer className="mt-12 flex items-center justify-center gap-1.5 text-xs text-[color:var(--page-text,white)] opacity-70">
+        {page.theme?.config?.footer.visible ? <footer className="mt-12 flex items-center justify-center gap-1.5 text-xs text-[color:var(--page-text,white)] opacity-70">
           <svg viewBox="0 0 48 48" className="h-3.5 w-3.5" aria-hidden>
             <path d="M8 40V18c0-8.3 6.7-15 15-15s15 6.7 15 15v22h-7V18c0-4.4-3.6-8-8-8s-8 3.6-8 8v22H8Z" fill="currentColor" />
           </svg>
           Made with <span className="font-bold text-[color:var(--page-text,white)] opacity-70">KACHKO</span>
-        </footer>
+        </footer> : null}
         <ReportPage pageId={page.id} />
       </div>
 

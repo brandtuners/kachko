@@ -136,6 +136,8 @@ export class PagesRepository {
       const theme = input.themeKey ? await tx.theme.findUnique({ where: { slug: input.themeKey } }) : page.theme;
       if (!theme) throw new PageResourceError('THEME_NOT_FOUND');
       const overrides = appearanceOverridesSchema.parse(input.overrides ?? (input.themeKey ? {} : page.appearanceOverrides));
+      const imageMediaId = overrides.background && 'imageMediaId' in overrides.background ? overrides.background.imageMediaId : undefined;
+      if (imageMediaId && !await tx.media.findFirst({ where: { id: imageMediaId, userId } })) throw new PageResourceError('MEDIA_NOT_FOUND');
       resolveAppearance({ background: theme.background, typography: theme.typography, buttons: theme.buttons, cards: theme.cards }, overrides);
       return tx.page.update({ where: { id }, data: { themeKey: theme.slug,
         appearanceOverrides: overrides as Prisma.InputJsonObject, revision: { increment: 1 } }, include: fullPage });

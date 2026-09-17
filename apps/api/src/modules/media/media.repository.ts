@@ -30,11 +30,12 @@ export class MediaRepository {
     });
   }
   async usage(userId: string, id: string) {
-    const [blocks, avatar] = await Promise.all([
+    const [blocks, avatar, backgrounds] = await Promise.all([
       this.db.pageBlock.count({ where: { mediaId: id, page: { userId } } }),
       this.db.user.count({ where: { id: userId, avatarMediaId: id } }),
+      this.db.page.count({ where: { userId, appearanceOverrides: { path: ['background', 'imageMediaId'], equals: id } } }),
     ]);
-    return blocks + avatar;
+    return blocks + avatar + backgrounds;
   }
   delete(userId: string, id: string) { return this.db.media.delete({ where: { id, userId } }); }
   removeAvatar(userId: string) {

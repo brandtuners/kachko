@@ -1,14 +1,18 @@
 import type { ApiData } from './index';
 import type { PageBlock, PageThemeKey } from './pages';
 export interface ThemeConfig {
-  background: { type: 'solid'; color: string } | { type: 'gradient'; from: string; to: string; via?: string; glow?: string; angle: number };
-  typography: { fontFamily: 'system' | 'sans' | 'serif' | 'mono'; titleSize: number; color: string };
+  background: ({
+    imageMediaId?: string; imageOpacity?: number; imageFit?: 'cover' | 'contain';
+    imagePositionX?: number; imagePositionY?: number;
+  } & ({ type: 'solid'; color: string } | { type: 'gradient'; from: string; to: string; via?: string; glow?: string; angle: number }));
+  typography: { fontFamily: 'system' | 'manrope' | 'dmSans' | 'inter' | 'lato' | 'poppins' | 'spaceGrotesk' | 'sans' | 'verdana' | 'trebuchet' | 'serif' | 'lora' | 'playfair' | 'times' | 'palatino' | 'mono' | 'spaceMono' | 'courier'; titleSize: number; color: string; titleColor?: string };
   buttons: { variant: 'filled' | 'outline' | 'glass'; radius: number; background: string; color: string; shadow: boolean };
   cards: { radius: number; background: string; border?: string; blur: number };
+  footer: { visible: boolean };
 }
 export interface AppearanceOverrides {
   background?: ThemeConfig['background']; typography?: Partial<ThemeConfig['typography']>;
-  buttons?: Partial<ThemeConfig['buttons']>; cards?: Partial<ThemeConfig['cards']>;
+  buttons?: Partial<ThemeConfig['buttons']>; cards?: Partial<ThemeConfig['cards']>; footer?: Partial<ThemeConfig['footer']>;
 }
 export interface SystemTheme { id: string; key: PageThemeKey; name: string; config: ThemeConfig }
 export interface PageTemplate {

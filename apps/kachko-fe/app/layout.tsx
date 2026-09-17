@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
+import { DM_Sans, Inter, Lato, Lora, Manrope, Playfair_Display, Poppins, Space_Grotesk, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "../features/query-provider";
 
@@ -15,6 +15,14 @@ const manrope = Manrope({
   variable: "--font-manrope",
   display: "swap",
 });
+const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans", display: "swap" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const lato = Lato({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-lato", display: "swap" });
+const poppins = Poppins({ subsets: ["latin"], weight: ["400", "600", "700"], variable: "--font-poppins", display: "swap" });
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk", display: "swap" });
+const lora = Lora({ subsets: ["latin"], variable: "--font-lora", display: "swap" });
+const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair", display: "swap" });
+const spaceMono = Space_Mono({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-space-mono", display: "swap" });
 
 export const metadata: Metadata = {
   title: "KACHKO — your one link",
@@ -23,7 +31,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={manrope.variable}>
+    <html lang="en" className={[manrope.variable, dmSans.variable, inter.variable, lato.variable, poppins.variable, spaceGrotesk.variable, lora.variable, playfair.variable, spaceMono.variable].join(" ")}>
       <body>
         <QueryProvider>{children}</QueryProvider>
       </body>

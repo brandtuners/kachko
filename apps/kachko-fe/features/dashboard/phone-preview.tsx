@@ -150,7 +150,7 @@ function ProfileHead({
           {name.slice(0, 1).toUpperCase()}
         </span>
       )}
-      <p style={{ fontSize: "var(--page-title-size, 32px)" }} className="mt-2.5 max-w-full truncate font-bold">{name}</p>
+      <p style={{ fontSize: "var(--page-title-size, 32px)", color: "var(--page-title-color, var(--page-text, white))" }} className="mt-2.5 max-w-full truncate font-bold">{name}</p>
       <p className="text-[11px] text-[color:var(--page-text,white)] opacity-70">@{page.user.username}</p>
       {page.description ? (
         <p className="mt-2 line-clamp-3 text-[11.5px] leading-relaxed text-[color:var(--page-text,white)] opacity-70">{page.description}</p>
@@ -168,7 +168,11 @@ function ProfileHead({
 
       <SocialRow socials={page.socials} />
 
-      <p className="mt-8 text-[9px] font-semibold uppercase tracking-widest text-[color:var(--page-text,white)] opacity-70">Kachko</p>
+      {page.theme?.config?.footer.visible ? <p className="mt-8 flex items-center justify-center gap-1.5 text-[9px] text-[color:var(--page-text,white)] opacity-70">
+        <svg viewBox="0 0 48 48" className="h-3 w-3" aria-hidden><path d="M8 40V18c0-8.3 6.7-15 15-15s15 6.7 15 15v22h-7V18c0-4.4-3.6-8-8-8s-8 3.6-8 8v22H8Z" fill="currentColor" /></svg>
+        Made with <span className="font-bold">KACHKO</span>
+      </p> : null}
+      <p className={`${page.theme?.config?.footer.visible ? "mt-3" : "mt-8"} text-[9px] text-[color:var(--page-text,white)] underline opacity-60`}>Report this page</p>
     </div>
   );
 }

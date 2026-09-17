@@ -5,8 +5,16 @@ const { updateAppearanceSchema, appearanceOverridesSchema, createSocialSchema, u
 test('appearance accepts allowlisted values and rejects CSS/URLs, extra fields and out-of-range options', () => {
   assert.equal(updateAppearanceSchema.safeParse({ themeKey: 'dark' }).success, true);
   assert.deepEqual(appearanceOverridesSchema.parse({ buttons: { radius: 20 } }), { buttons: { radius: 20 } });
+  assert.equal(updateAppearanceSchema.safeParse({ overrides: { background: { type: 'solid', color: '#111312',
+    imageMediaId: '20da19cc-7e63-4aa9-8cc0-7d68c26acbd2', imageOpacity: 0.35, imageFit: 'cover', imagePositionX: 25, imagePositionY: 70 } } }).success, true);
+  assert.equal(updateAppearanceSchema.safeParse({ overrides: { typography: { titleColor: '#ABCDEF' }, footer: { visible: false } } }).success, true);
+  for (const fontFamily of ['system', 'manrope', 'dmSans', 'inter', 'lato', 'poppins', 'spaceGrotesk', 'sans', 'verdana', 'trebuchet', 'serif', 'lora', 'playfair', 'times', 'palatino', 'mono', 'spaceMono', 'courier']) {
+    assert.equal(updateAppearanceSchema.safeParse({ overrides: { typography: { fontFamily } } }).success, true, fontFamily);
+  }
   for (const overrides of [{ css: 'body{}' }, { background: { type: 'image', url: 'https://example.com' } },
     { background: { type: 'solid', color: '#fff;display:none' } }, { typography: { fontFamily: 'url(evil)' } },
+    { background: { type: 'solid', color: '#111312', imageFit: 'stretch' } },
+    { background: { type: 'solid', color: '#111312', imagePositionX: 101 } },
     { buttons: { radius: -1 } }, { cards: { blur: 25 } }, { typography: { titleSize: 49 } }]) {
     assert.equal(updateAppearanceSchema.safeParse({ overrides }).success, false);
   }

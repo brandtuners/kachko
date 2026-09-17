@@ -52,7 +52,11 @@ Customize the current theme:
 }
 ```
 
-Colors require six-digit hex. Background is either `{type:"solid",color}` or `{type:"gradient",from,to,angle}` with integer angle 0–360. Title size is integer 20–48, button/card radius 0–32, card blur 0–24, button variant filled/outline/glass, shadow boolean. Arbitrary CSS, style tags, URLs, image backgrounds and unknown fields are rejected. Color-contrast/accessibility checks remain part of the frontend acceptance gate; arbitrary valid custom colors are not guaranteed to be accessible.
+Colors require six-digit hex. Background is either `{type:"solid",color}` or `{type:"gradient",from,to,angle}` with integer angle 0–360. Title size is integer 20–48, button/card radius 0–32, card blur 0–24, button variant filled/outline/glass, shadow boolean. Backgrounds may optionally reference an owner-uploaded `imageMediaId` with `imageOpacity` between 0.1 and 0.8, `imageFit` set to `cover` or `contain`, and integer `imagePositionX`/`imagePositionY` percentages from 0–100; the renderer applies a readability overlay. Arbitrary CSS, style tags, external image URLs and unknown fields are rejected. Color-contrast/accessibility checks remain part of the frontend acceptance gate; arbitrary valid custom colors are not guaranteed to be accessible.
+
+Typography may set an optional `titleColor` independently of the page copy color. Footer visibility is controlled by `{footer:{visible:boolean}}`; it defaults to visible for existing themes and pages.
+
+`typography.fontFamily` supports `system`, `manrope`, `dmSans`, `inter`, `lato`, `poppins`, `spaceGrotesk`, `sans` (Arial), `verdana`, `trebuchet`, `serif` (Georgia), `lora`, `playfair`, `times`, `palatino`, `mono`, `spaceMono`, and `courier`. Bundled web fonts are self-hosted by the frontend build.
 
 `overrides` is a **complete replacement of stored overrides**, not a deep PATCH of prior overrides. Its provided section fields merge with the selected system theme. Background, if supplied, must be a complete solid/gradient definition. `{overrides:{}}` clears customizations. Selecting a theme resets previous overrides unless you also supply overrides in the same request. The API returns fully resolved `appearance` for direct preview/public use and `appearanceOverrides` on OwnerPage for editing. Save these semantics consistently in the client.
 

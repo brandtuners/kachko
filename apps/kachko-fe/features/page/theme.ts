@@ -9,7 +9,7 @@ export type ThemeJson = {
   config?: ThemeConfig;
   slug?: string;
   name?: string;
-  background?: { from?: string; via?: string; to?: string; glow?: string };
+  background?: { from?: string; via?: string; to?: string; glow?: string; imageMediaId?: string; imageOpacity?: number; imageFit?: 'cover' | 'contain'; imagePositionX?: number; imagePositionY?: number };
   typography?: { font?: string; heading?: string };
   buttons?: { style?: string; radius?: string; glow?: string };
   cards?: { bg?: string; border?: string };
@@ -22,6 +22,18 @@ export const ACCENT_COLORS: Record<string, string> = {
   lime: "#9dff3d",
   sun: "#ffd23d",
   coral: "#ff5e7a",
+};
+
+export const PAGE_FONT_STACKS: Record<ThemeConfig['typography']['fontFamily'], string> = {
+  system: 'system-ui, sans-serif', manrope: 'var(--font-manrope), Manrope, Arial, sans-serif',
+  dmSans: 'var(--font-dm-sans), "DM Sans", Arial, sans-serif', inter: 'var(--font-inter), Inter, Arial, sans-serif',
+  lato: 'var(--font-lato), Lato, Arial, sans-serif', poppins: 'var(--font-poppins), Poppins, Arial, sans-serif',
+  spaceGrotesk: 'var(--font-space-grotesk), "Space Grotesk", Arial, sans-serif', sans: 'Arial, Helvetica, sans-serif',
+  verdana: 'Verdana, Geneva, sans-serif', trebuchet: '"Trebuchet MS", Arial, sans-serif', serif: 'Georgia, serif',
+  lora: 'var(--font-lora), Lora, Georgia, serif', playfair: 'var(--font-playfair), "Playfair Display", Georgia, serif',
+  times: '"Times New Roman", Times, serif', palatino: 'Palatino, "Palatino Linotype", serif',
+  mono: 'ui-monospace, SFMono-Regular, Menlo, monospace', spaceMono: 'var(--font-space-mono), "Space Mono", monospace',
+  courier: '"Courier New", Courier, monospace',
 };
 
 const ELECTRIC = "#6c5cff";
@@ -43,8 +55,9 @@ export function themeVars(theme?: ThemeJson | null): Record<string, string> {
   if (theme?.config) {
     const { buttons, cards, typography } = theme.config;
     return { "--page-text": typography.color,
-      "--page-font": { system: 'system-ui, sans-serif', sans: 'Arial, sans-serif', serif: 'Georgia, serif', mono: 'monospace' }[typography.fontFamily],
+      "--page-font": PAGE_FONT_STACKS[typography.fontFamily],
       "--page-title-size": `${typography.titleSize}px`,
+      "--page-title-color": typography.titleColor ?? typography.color,
       "--button-bg": buttons.variant === 'filled' ? buttons.background : buttons.variant === 'glass' ? cards.background : 'transparent',
       "--button-text": buttons.variant === 'outline' ? typography.color : buttons.color,
       "--button-radius": `${buttons.radius}px`,
@@ -68,9 +81,12 @@ export function themeVars(theme?: ThemeJson | null): Record<string, string> {
 export function themeBackground(theme?: ThemeJson | null): string {
   if (theme?.config) {
     const bg = theme.config.background;
-    if (bg.type === "solid") return bg.color;
+    const position = `${bg.imagePositionX ?? 50}% ${bg.imagePositionY ?? 50}%`;
+    const image = bg.imageMediaId ? `url("/api/v1/media/files/${encodeURIComponent(bg.imageMediaId)}") ${position} / ${bg.imageFit ?? 'cover'} no-repeat` : '';
+    const overlay = bg.imageMediaId ? `linear-gradient(rgba(0,0,0,${1 - (bg.imageOpacity ?? 0.35)}), rgba(0,0,0,${1 - (bg.imageOpacity ?? 0.35)}))` : '';
+    if (bg.type === "solid") return [overlay, image, bg.color].filter(Boolean).join(', ');
     const gradient = `linear-gradient(${bg.angle}deg, ${bg.from}, ${bg.via ? `${bg.via}, ` : ''}${bg.to})`;
-    return bg.glow ? `radial-gradient(ellipse 140% 420px at 50% -100px, ${bg.glow}, transparent 85%), ${gradient}` : gradient;
+    return [overlay, image, bg.glow ? `radial-gradient(ellipse 140% 420px at 50% -100px, ${bg.glow}, transparent 85%)` : '', gradient].filter(Boolean).join(', ');
   }
   const from = str(theme?.background?.from, "#07060f");
   const via = str(theme?.background?.via, "#0e0c1d");

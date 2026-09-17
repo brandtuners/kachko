@@ -12,7 +12,6 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import type { AnalyticsRange } from "@kachko/types";
-import { themeBackground, themeVars, themeButtonStyle } from "../../features/page/theme";
 import { isAuthError } from "../../features/editor/api";
 import { apiFetch } from "../../lib/api";
 import { useEditor } from "../../features/editor/use-editor";
@@ -21,6 +20,7 @@ import { BLOCK_LABELS, BLOCK_TYPES, SOCIAL_PLATFORMS, type BlockType } from "../
 import { Avatar, BottomDock, TopNav, type DashTab } from "../../features/dashboard/dash-chrome";
 import { BLOCK_ICONS, DashBlockRow } from "../../features/dashboard/block-row";
 import { PhonePreview } from "../../features/dashboard/phone-preview";
+import { DesignPanel } from "../../features/dashboard/design-panel";
 import { HeroArch, MetricsRow, QuickLinks, MountainArt, useClicksByBlock, useStats } from "../../features/dashboard/home-panels";
 import {
   IconArrowUpRight,
@@ -403,60 +403,14 @@ function QrPanel() {
 /* ------------------------------------------------------------- Design */
 
 function AppearancePanel() {
-  const editor = useEditor();
-  const current = editor.page?.themeId ?? null;
-  // Preview restyles live: clicking a theme applies it immediately (the phone
-  // on the right is the feedback), like the reference.
   return (
-    <Panel title="Design" sub="Pick a theme — your page and preview update instantly.">
-      <div className="k-panel p-6">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {editor.themes.map((t) => {
-            const bg = themeBackground(t);
-            const vars = themeVars(t);
-            const active = current === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                aria-pressed={active}
-                disabled={editor.pickTheme.isPending}
-                onClick={() => editor.pickTheme.mutate(t.id)}
-                className={`rounded-2xl border p-2 text-left transition ${
-                  active ? "border-[#b5d936] shadow-[0_0_0_3px_rgba(181,217,54,0.25)]" : "border-[#eceee9] hover:border-[#dfe2dc]"
-                }`}
-              >
-                <div className="relative overflow-hidden rounded-xl border border-[#eceee9]" style={{ ...vars, background: bg, aspectRatio: "9 / 14" }}>
-                  <div className="absolute inset-0 flex flex-col items-center gap-1.5 px-3 pt-5">
-                    <span className="h-6 w-6 rounded-full" style={{ background: "var(--page-text, white)" }} />
-                    <span className="h-1.5 w-12 rounded-full opacity-60" style={{ background: "var(--page-text, white)" }} />
-                    <span className="mt-2 h-4 w-full rounded-md border" style={themeButtonStyle()} />
-                    <span className="h-4 w-full rounded-md border" style={themeButtonStyle()} />
-                    <span className="h-4 w-full rounded-md border" style={themeButtonStyle()} />
-                  </div>
-                  {active ? (
-                    <span className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-[var(--k-ink)] text-white">
-                      <IconCheck className="h-3.5 w-3.5" />
-                    </span>
-                  ) : null}
-                </div>
-                <p className="mt-2 flex items-center justify-between px-1 text-xs font-extrabold text-[var(--k-ink)]">
-                  {t.name}
-                  {active ? <span className="text-[10px] font-bold uppercase tracking-wide text-[#718c1b]">Active</span> : null}
-                </p>
-              </button>
-            );
-          })}
-          {editor.pickTheme.isError ? <p role="alert">Could not save theme. Please try again.</p> : null}
-          {editor.themes.length === 0 ? <p className="text-sm text-[var(--k-muted)]">No themes available.</p> : null}
-        </div>
+    <Panel title="Design" sub="Shape every visual detail of your page.">
+      <div className="k-panel p-4 sm:p-6">
+        <DesignPanel />
       </div>
     </Panel>
   );
 }
-
-/* ----------------------------------------------------------- Analytics */
-
 function AnalyticsPanel() {
   const editor = useEditor();
   const page = editor.page!;

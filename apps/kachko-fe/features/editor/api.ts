@@ -1,4 +1,4 @@
-import type { OwnerPage, PageSummary, IdentityUser, SystemTheme } from "@kachko/types";
+import type { OwnerPage, PageSummary, IdentityUser, SystemTheme, ThemeConfig } from "@kachko/types";
 import { apiFetch, ApiClientError } from "../../lib/api";
 import type { EditorBlock, EditorPage, EditorSocial, EditorTheme } from "./types";
 
@@ -111,4 +111,25 @@ export async function setTheme(themeKey: string): Promise<EditorPage> {
   return editorPage(await apiFetch<OwnerPage>(`${await pagePath()}/appearance`, {
     method: "PATCH", body: JSON.stringify({ themeKey }),
   }));
+}
+
+export async function setAppearanceConfig(config: ThemeConfig): Promise<EditorPage> {
+  return editorPage(await apiFetch<OwnerPage>(`${await pagePath()}/appearance`, {
+    method: "PATCH",
+    body: JSON.stringify({ overrides: config }),
+  }));
+}
+
+export type BackgroundImageSettings = {
+  imageMediaId: string;
+  imageOpacity: number;
+  imageFit: 'cover' | 'contain';
+  imagePositionX: number;
+  imagePositionY: number;
+};
+
+export async function setBackgroundImage(settings: BackgroundImageSettings): Promise<EditorPage> {
+  const page = await getMyPage();
+  if (!page.theme?.config) throw new ApiClientError("THEME_NOT_FOUND", "Theme configuration is unavailable");
+  return setAppearanceConfig({ ...page.theme.config, background: { ...page.theme.config.background, ...settings } });
 }
