@@ -20,8 +20,8 @@ export default function OnboardingTitleStep() {
     setSaving(true);
     store.set("pageTitle", title.trim());
     try {
-      await ensurePage();
-      await updatePageMeta({ title: title.trim() });
+      const page = await ensurePage();
+      await updatePageMeta(page.id, { title: title.trim() });
     } catch {
       /* dashboard will surface it */
     }

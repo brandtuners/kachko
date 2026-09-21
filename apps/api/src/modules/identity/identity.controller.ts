@@ -21,9 +21,10 @@ export class IdentityValidationPipe implements PipeTransform {
 const bodySchema = (schema: z.ZodType) => z.toJSONSchema(schema, { io: 'input' }) as SchemaObject;
 const userSchema: SchemaObject = {
   type: 'object', required: ['data'], properties: { data: {
-    type: 'object', required: ['id', 'email', 'username', 'displayName', 'bio', 'avatarUrl'], properties: {
+    type: 'object', required: ['id', 'email', 'username', 'displayName', 'bio', 'avatarUrl', 'role'], properties: {
       id: { type: 'string', format: 'uuid' }, email: { type: 'string', format: 'email' }, username: { type: 'string' },
       displayName: { type: 'string', nullable: true }, bio: { type: 'string', nullable: true }, avatarUrl: { type: 'string', nullable: true },
+      role: { type: 'string', enum: ['USER', 'MODERATOR', 'ADMIN'] },
     },
   } },
 };

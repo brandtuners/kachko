@@ -36,16 +36,20 @@ function KachkoMark() {
   );
 }
 
-export function TopNav({ tab, go, isPublished }: { tab: DashTab; go: (t: DashTab) => void; isPublished: boolean }) {
+export function Header({ tab, go, isPublished }: { tab: DashTab; go: (t: DashTab) => void; isPublished: boolean }) {
   const editor = useEditor();
   const user = editor.page?.user;
   const name = user?.displayName ?? user?.username ?? "Kachko";
   return (
     <header className="k-topbar">
       <div className="mx-auto flex w-full max-w-[1380px] items-center justify-between gap-3 px-5 sm:px-8 lg:px-[58px]">
-        <KachkoMark />
+        <div className="flex min-w-0 items-center gap-3">
+          <KachkoMark />
+          <PageSwitcher />
+        </div>
 
         <div className="flex items-center gap-2.5">
+          <SaveStatus />
           <button
             type="button"
             aria-label="My QR"
@@ -56,37 +60,71 @@ export function TopNav({ tab, go, isPublished }: { tab: DashTab; go: (t: DashTab
             <IconQr className="h-[18px] w-[18px]" />
           </button>
 
-          {/* View my page — kept from the old dock (draft-aware: unpublished
-              pages 404, so it points at the Home publish banner instead). */}
-          {isPublished ? (
-            <Link
-              href={user ? `/@${user.username}` : "/"}
-              target="_blank"
-              rel="noreferrer"
-              className="k-btn-ink !h-10 !px-4"
-            >
-              View my page
-              <IconArrowUpRight className="h-4 w-4" />
-            </Link>
-          ) : (
-            <button
-              type="button"
-              onClick={() => go("home")}
-              title="Publish your page first — visitors currently get a 404"
-              className="k-btn-ink !h-10 !px-4 !opacity-90"
-            >
-              View my page
-              <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
-                Draft
-              </span>
-            </button>
-          )}
+          <PreviewButton username={user?.username} pageSlug={editor.page?.isPrimary ? undefined : editor.page?.slug} isPublished={isPublished} goHome={() => go("home")} />
+          <PublishButton isPublished={isPublished} />
 
           <AccountMenu name={name} handle={user?.username ?? ""} go={go} active={tab === "links"} />
         </div>
       </div>
     </header>
   );
+}
+
+export const TopNav = Header;
+
+export function SaveStatus() {
+  const editor = useEditor();
+  const mutations = [editor.createPage, editor.removePage, editor.saveMeta, editor.createBlock, editor.editBlock, editor.removeBlock, editor.moveBlock,
+    editor.createSocial, editor.editSocial, editor.removeSocial, editor.pickTheme, editor.setBackground, editor.saveAppearance];
+  const saving = mutations.some((mutation) => mutation.isPending);
+  const failed = mutations.some((mutation) => mutation.isError);
+  return <span role="status" className={`hidden text-xs font-bold sm:inline ${failed ? "text-[#b4322c]" : saving ? "text-[#718c1b]" : "text-[#8b908c]"}`}>{failed ? "Save error" : saving ? "Saving…" : "Saved"}</span>;
+}
+
+function PageSwitcher() {
+  const editor = useEditor();
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [title, setTitle] = useState("");
+  const [slug, setSlug] = useState("");
+  const [typed, setTyped] = useState("");
+  const current = editor.page;
+  const closeCreate = () => { setCreating(false); setTitle(""); setSlug(""); editor.createPage.reset(); };
+  const normalizedSlug = slug.trim().toLowerCase().replace(/\s+/g, "-");
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <select aria-label="Current page" value={editor.selectedPageId ?? ""} onChange={(event) => editor.selectPage(event.target.value)}
+        className="h-9 max-w-[150px] rounded-full border border-[#dfe2dc] bg-white px-3 text-xs font-bold text-[#303431] outline-none focus:border-[#a4cf29]">
+        {editor.pages.map((page) => <option key={page.id} value={page.id}>{page.title ?? page.slug}{page.isPrimary ? " · Primary" : ""}</option>)}
+      </select>
+      <button type="button" onClick={() => setCreating(true)} title="Create another page" aria-label="Create another page" className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#dfe2dc] bg-white text-lg font-bold hover:border-[#a4cf29]">+</button>
+      {editor.pages.length > 1 ? <button type="button" onClick={() => setDeleting(true)} title="Delete selected page" aria-label="Delete selected page" className="hidden h-9 rounded-full border border-red-200 px-3 text-xs font-bold text-red-700 hover:bg-red-50 md:block">Delete</button> : null}
+
+      {creating ? <div className="fixed inset-0 z-[70] grid place-items-center bg-[#111312]/45 px-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget && !editor.createPage.isPending) closeCreate(); }}>
+        <form className="w-full max-w-md rounded-3xl border border-[#dfe3d9] bg-[#fbfaf6] p-6 shadow-[0_24px_80px_rgba(17,19,18,.3)]" onSubmit={(event) => { event.preventDefault(); editor.createPage.mutate({ title: title.trim() || undefined, slug: normalizedSlug }, { onSuccess: closeCreate }); }}>
+          <h2 className="text-xl font-extrabold">Create another page</h2>
+          <p className="mt-1 text-sm text-[var(--k-muted)]">It will have its own links, design, analytics, and public URL.</p>
+          <label className="mt-5 block text-xs font-bold">Page name<input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} placeholder="Portfolio" className="dash-input mt-2" /></label>
+          <label className="mt-4 block text-xs font-bold">Page URL<input value={slug} onChange={(event) => setSlug(event.target.value)} maxLength={40} placeholder="portfolio" className="dash-input mt-2" /></label>
+          <p className="mt-2 truncate text-xs text-[var(--k-muted)]">/{current?.user.username ?? "username"}/{normalizedSlug || "page-slug"}</p>
+          {editor.createPage.error ? <p role="alert" className="mt-3 text-sm text-red-700">{editor.createPage.error.message}</p> : null}
+          <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={closeCreate} disabled={editor.createPage.isPending} className="k-btn-line !rounded-full">Cancel</button><button type="submit" disabled={editor.createPage.isPending || normalizedSlug.length < 2} className="k-btn-ink disabled:opacity-50">{editor.createPage.isPending ? "Creating…" : "Create page"}</button></div>
+        </form>
+      </div> : null}
+
+      {deleting && current ? <div className="fixed inset-0 z-[70] grid place-items-center bg-[#111312]/45 px-4 backdrop-blur-sm"><div role="alertdialog" aria-modal="true" className="w-full max-w-md rounded-3xl border border-[#dfe3d9] bg-[#fbfaf6] p-6 shadow-[0_24px_80px_rgba(17,19,18,.3)]"><h2 className="text-xl font-extrabold">Delete “{current.title ?? current.slug}”?</h2><p className="mt-2 text-sm text-[var(--k-muted)]">This permanently removes this page, its blocks, analytics and reports. If it is primary, the oldest remaining page becomes primary.</p><label className="mt-5 block text-xs font-bold">Type <span className="font-mono">{current.slug}</span> to confirm<input autoFocus value={typed} onChange={(event) => setTyped(event.target.value)} className="dash-input mt-2" /></label>{editor.removePage.error ? <p role="alert" className="mt-3 text-sm text-red-700">{editor.removePage.error.message}</p> : null}<div className="mt-6 flex justify-end gap-2"><button type="button" disabled={editor.removePage.isPending} onClick={() => { setDeleting(false); setTyped(""); }} className="k-btn-line !rounded-full">Cancel</button><button type="button" disabled={editor.removePage.isPending || typed !== current.slug} onClick={() => editor.removePage.mutate(current.id, { onSuccess: () => { setDeleting(false); setTyped(""); } })} className="h-11 rounded-full bg-[#b4322c] px-5 text-sm font-extrabold text-white disabled:opacity-50">{editor.removePage.isPending ? "Deleting…" : "Delete permanently"}</button></div></div></div> : null}
+    </div>
+  );
+}
+
+export function PreviewButton({ username, pageSlug, isPublished, goHome }: { username?: string; pageSlug?: string; isPublished: boolean; goHome: () => void }) {
+  return isPublished && username ? <Link href={`/${username}${pageSlug ? `/${pageSlug}` : ""}`} target="_blank" rel="noreferrer" className="k-btn-line !h-10 !rounded-full !px-4">Preview <IconArrowUpRight className="h-4 w-4" /></Link>
+    : <button type="button" onClick={goHome} title="Publish your page first" className="k-btn-line !h-10 !rounded-full !px-4">Preview <span className="text-[10px] text-amber-700">Draft</span></button>;
+}
+
+export function PublishButton({ isPublished }: { isPublished: boolean }) {
+  const editor = useEditor();
+  return <button type="button" disabled={isPublished || editor.saveMeta.isPending} onClick={() => editor.saveMeta.mutate({ isPublished: true })} className="k-btn-ink !h-10 !px-4 disabled:opacity-60">{isPublished ? "Published" : editor.saveMeta.isPending ? "Publishing…" : "Publish"}</button>;
 }
 
 /** Reference `.account`: avatar + name + role + chevron. The chevron opens a
@@ -195,7 +233,7 @@ export function Avatar({ size = 8 }: { size?: number }) {
 // Floating dock, reference `.bottom-dock`: icon-over-label pills, active =
 // lime chip with a dot below. Home · Links (page editor) · Design (themes) ·
 // Analytics · Settings (profile). QR + View page live in the top bar.
-export function BottomDock({ tab, go }: { tab: DashTab; go: (t: DashTab) => void }) {
+export function Sidebar({ tab, go }: { tab: DashTab; go: (t: DashTab) => void }) {
   const items: { key: DashTab; label: string; icon: (p: { className?: string }) => JSX.Element }[] = [
     { key: "home", label: "Home", icon: IconEye },
     { key: "blocks", label: "Links", icon: IconLink },

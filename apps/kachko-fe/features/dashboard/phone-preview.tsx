@@ -2,34 +2,33 @@
 
 // Fixed mobile preview (reference: kachko_dashboard.html `.preview-card`).
 // Shows the page exactly as visitors see it — same theme engine and same
-// BlockView/SocialRow components the public /@username page uses — fed by the
+// PublicPageRenderer the public /[username] page uses — fed by the
 // live optimistic editor state, so edits appear instantly.
 // The devices pill is a REAL viewport toggle (phone ↔ desktop) of the same
 // live content, and the share icon copies/passes the actual public URL.
 import { useState } from "react";
 import type { EditorPage } from "../editor/types";
-import { BlockView, SocialRow } from "../page/block-view";
+import { PublicPageRenderer } from "../page/public-page-renderer";
 import { themeBackground, themeVars } from "../page/theme";
 import { IconCheck, IconClipboard } from "../../components/icons";
 import { publicPageUrl } from "../../lib/public-url";
 
 type Device = "phone" | "desktop";
 
-export function PhonePreview({ page, isPublished }: { page: EditorPage; isPublished: boolean }) {
+export function LivePreview({ page, isPublished }: { page: EditorPage; isPublished: boolean }) {
   const [device, setDevice] = useState<Device>("phone");
   const [copied, setCopied] = useState(false);
 
   // The API expands the full theme row on /pages/me, so the preview uses the
-  // exact same theme engine (CSS vars + gradient) as the public /@username page.
+  // exact same theme engine (CSS vars + gradient) as the public /[username] page.
   const themeJson = page.theme ?? null;
   const vars = themeVars(themeJson);
   const background = themeBackground(themeJson);
 
-  const blocks = [...page.blocks].sort((a, b) => a.position - b.position);
   const name = page.user.displayName ?? page.user.username;
 
   const share = async () => {
-    const url = publicPageUrl(page.user.username, window.location.origin);
+    const url = publicPageUrl(page.user.username, window.location.origin, page.isPrimary ? undefined : page.slug);
     try {
       if (navigator.share) {
         await navigator.share({ title: `${name} on Kachko`, url });
@@ -97,7 +96,7 @@ export function PhonePreview({ page, isPublished }: { page: EditorPage; isPublis
               className="h-full overflow-y-auto overscroll-contain px-4 pb-8 pt-14 text-center"
               style={{ ...vars, color: "var(--page-text, white)", fontFamily: "var(--page-font, inherit)", background, scrollbarWidth: "thin" }}
             >
-              <ProfileHead name={name} page={page} blocks={blocks} />
+              <PublicPageRenderer page={page} compact reportAction={<p className={`${page.theme?.config?.footer.visible ? "mt-3" : "mt-8"} text-[9px] text-[color:var(--page-text,white)] underline opacity-60`}>Report this page</p>} />
             </div>
           </div>
         </div>
@@ -109,7 +108,7 @@ export function PhonePreview({ page, isPublished }: { page: EditorPage; isPublis
             <span className="h-2.5 w-2.5 rounded-full bg-[#e5e7e0]" />
             <span className="h-2.5 w-2.5 rounded-full bg-[#e5e7e0]" />
             <span className="ml-2 truncate rounded-md bg-white px-2 py-0.5 text-[10px] text-[#9a9f9b]">
-              kachko.app/@{page.user.username}
+              kachko.app/{page.user.username}{page.isPrimary ? "" : `/${page.slug}`}
             </span>
           </div>
           <div
@@ -117,7 +116,7 @@ export function PhonePreview({ page, isPublished }: { page: EditorPage; isPublis
             style={{ ...vars, color: "var(--page-text, white)", fontFamily: "var(--page-font, inherit)", background, scrollbarWidth: "thin" }}
           >
             <div className="mx-auto max-w-[560px]">
-              <ProfileHead name={name} page={page} blocks={blocks} />
+              <PublicPageRenderer page={page} compact reportAction={<p className={`${page.theme?.config?.footer.visible ? "mt-3" : "mt-8"} text-[9px] text-[color:var(--page-text,white)] underline opacity-60`}>Report this page</p>} />
             </div>
           </div>
         </div>
@@ -125,54 +124,8 @@ export function PhonePreview({ page, isPublished }: { page: EditorPage; isPublis
 
       <p className="mt-3 text-center text-[11px] text-[#9a9f9b]">
         {isPublished ? "Exactly what visitors get at " : "Publish to share — visitors currently get a 404 at "}
-        <code className="font-bold text-[#718c1b]">/@{page.user.username}</code>
+        <code className="font-bold text-[#718c1b]">/{page.user.username}{page.isPrimary ? "" : `/${page.slug}`}</code>
       </p>
-    </div>
-  );
-}
-
-function ProfileHead({
-  name,
-  page,
-  blocks,
-}: {
-  name: string;
-  page: EditorPage;
-  blocks: EditorPage["blocks"];
-}) {
-  return (
-    <div className="flex flex-col items-center">
-      {page.user.avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={page.user.avatarUrl} alt="" className="h-16 w-16 rounded-full object-cover ring-2 ring-white/40" />
-      ) : (
-        <span className="grid h-16 w-16 place-items-center rounded-full bg-white/15 text-xl font-bold text-[color:var(--page-text,white)] ring-2 ring-white/40">
-          {name.slice(0, 1).toUpperCase()}
-        </span>
-      )}
-      <p style={{ fontSize: "var(--page-title-size, 32px)", color: "var(--page-title-color, var(--page-text, white))" }} className="mt-2.5 max-w-full truncate font-bold">{name}</p>
-      <p className="text-[11px] text-[color:var(--page-text,white)] opacity-70">@{page.user.username}</p>
-      {page.description ? (
-        <p className="mt-2 line-clamp-3 text-[11.5px] leading-relaxed text-[color:var(--page-text,white)] opacity-70">{page.description}</p>
-      ) : null}
-
-      <div className="mt-5 flex w-full flex-col gap-2.5">
-        {blocks.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-white/20 px-3 py-6 text-[11px] text-[color:var(--page-text,white)] opacity-70">
-            Your blocks will appear here
-          </p>
-        ) : (
-          blocks.map((b) => <BlockView key={b.id} block={b} />)
-        )}
-      </div>
-
-      <SocialRow socials={page.socials} />
-
-      {page.theme?.config?.footer.visible ? <p className="mt-8 flex items-center justify-center gap-1.5 text-[9px] text-[color:var(--page-text,white)] opacity-70">
-        <svg viewBox="0 0 48 48" className="h-3 w-3" aria-hidden><path d="M8 40V18c0-8.3 6.7-15 15-15s15 6.7 15 15v22h-7V18c0-4.4-3.6-8-8-8s-8 3.6-8 8v22H8Z" fill="currentColor" /></svg>
-        Made with <span className="font-bold">KACHKO</span>
-      </p> : null}
-      <p className={`${page.theme?.config?.footer.visible ? "mt-3" : "mt-8"} text-[9px] text-[color:var(--page-text,white)] underline opacity-60`}>Report this page</p>
     </div>
   );
 }

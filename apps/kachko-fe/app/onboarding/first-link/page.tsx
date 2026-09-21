@@ -6,7 +6,7 @@
 // so the dashboard opens with content already in place.
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { addBlock } from "../../../features/editor/api";
+import { addBlock, ensurePage } from "../../../features/editor/api";
 import { ObShell } from "../../../features/onboarding/ob-shell";
 import { useOnboarding } from "../../../features/onboarding/store";
 import { IconClipboard, IconGlobe, IconLink, IconUpload } from "../../../components/icons";
@@ -44,7 +44,8 @@ export default function OnboardingFirstLinkStep() {
     store.set("firstLink", clean);
     if (!store.linkBlockCreated) {
       try {
-        await addBlock("LINK", { title: "My first link", url: clean });
+        const page = await ensurePage();
+        await addBlock(page.id, "LINK", { title: "My first link", url: clean });
         store.set("linkBlockCreated", true);
       } catch {
         setToast("Couldn't save that link — you can add it from the dashboard.");

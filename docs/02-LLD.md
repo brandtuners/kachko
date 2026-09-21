@@ -193,7 +193,8 @@ The raw session token is never stored in the database; only a cryptographic hash
 model Page {
   id           String          @id @default(uuid())
   userId       String
-  slug         String          @unique
+  slug         String
+  isPrimary    Boolean         @default(false)
   title        String?
   description  String?
   isPublished  Boolean         @default(false)
@@ -209,11 +210,15 @@ model Page {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
+  @@unique([userId, slug])
   @@index([userId])
+  @@index([userId, isPrimary])
   @@index([userId, updatedAt])
   @@index([isPublished])
 }
 ```
+
+The migration also creates a partial unique index on `userId WHERE isPrimary = true` so an owner can never have two primary pages. Prisma schema syntax does not currently express that partial index.
 
 ---
 
@@ -1109,6 +1114,7 @@ Never trust IDs supplied by the browser.
 /dashboard/settings
 
 /[username]
+/[username]/[pageSlug]
 
 /admin
 /admin/users
@@ -1124,6 +1130,7 @@ Never trust IDs supplied by the browser.
 DashboardLayout
 ├── Sidebar
 ├── Header
+│   ├── PageSwitcher
 │   ├── SaveStatus
 │   ├── PreviewButton
 │   └── PublishButton
@@ -2332,7 +2339,8 @@ Use DB constraints for invariants:
 ```text
 users.email UNIQUE
 users.username UNIQUE
-pages.slug UNIQUE
+pages(user_id, slug) UNIQUE
+pages(user_id) UNIQUE WHERE is_primary = true
 domains.domain UNIQUE
 media.storage_key UNIQUE
 sessions.token_hash UNIQUE
@@ -2811,7 +2819,7 @@ Google login has moved into the current identity milestone. [06-GOOGLE-LOGIN.md]
 
 ## Implemented Page/LINK foundation
 
-See [07-PAGE-LINK-CONTRACT.md](07-PAGE-LINK-CONTRACT.md) for the current shared contracts and migration. V1 enforces at most one Page per User, supports LINK/TEXT blocks and a minimal theme key, and updates page slugs transactionally with usernames. The broader block enum and domains above are later extensions; the theme catalog/relation, templates and socials are now implemented. Page/LINK HTTP routes, publishing and public lookup are implemented. Page.revision increments transactionally on page/block/profile edits and selects versioned public cache entries; PostgreSQL publication/owner checks precede cache reads. See the linked API contract for the implemented cache behavior.
+See [07-PAGE-LINK-CONTRACT.md](07-PAGE-LINK-CONTRACT.md) for the current shared contracts and migration. V1 supports multiple Pages per User. Exactly one page is primary: it is served at `/[username]`, while additional pages are served at `/[username]/[pageSlug]`. Slugs are unique within an owner, not globally, and username changes do not rewrite page slugs. Deleting the primary page promotes the owner's oldest remaining page. The broader block enum and domains above are later extensions; the theme catalog/relation, templates and socials are now implemented. Page/LINK HTTP routes, publishing and both public lookup forms are implemented. Page.revision increments transactionally on page/block/profile edits and selects versioned public cache entries; PostgreSQL publication/owner checks precede cache reads. See the linked API contract for the implemented cache behavior.
 
 
 ## Implemented TEXT and reorder contract

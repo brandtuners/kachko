@@ -79,13 +79,13 @@ The repository and pnpm/Turborepo workspace already exist. Continue frontend dev
 
 For this project, use the following blueprint conventions when examples in the LLD differ. Record them in shared contracts and OpenAPI as endpoints are implemented:
 
-- All business endpoints use `/api/v1`. Public lookup is `GET /api/v1/public/:username`.
+- All business endpoints use `/api/v1`. Primary public lookup is `GET /api/v1/public/:username`; additional pages use `GET /api/v1/public/:username/:pageSlug`.
 - Use the nested block paths and `POST .../blocks/reorder` from section 23, rather than the alternate LLD paths/methods.
 - Use section 18 envelopes consistently, including wrapping the current-user response in `data`. `GET /auth/me` checks the session/current identity; `GET /users/me` reads the editable profile (both under `/api/v1`).
-- Choose username before submitting registration, so the LLD's required unique `User.username` can be stored immediately. The UI may collect it as a separate step before submitting the combined registration request. For V1, the single page slug follows the username; username changes update it transactionally and invalidate old/new public URLs.
+- Choose username before submitting registration, so the LLD's required unique `User.username` can be stored immediately. The UI may collect it as a separate step before submitting the combined registration request. In V1 the primary public URL follows the username, while page slugs are stable, owner-scoped identifiers used by additional-page URLs.
 - `LINK` URLs allow HTTP(S). Add `mailto:`/`tel:` only with their dedicated validated block types later.
 - Identity contract: [05-IDENTITY-API.md](05-IDENTITY-API.md) defines implemented envelopes, validation, custom-header CSRF, cookie settings and limits. `PATCH /users/me` includes username updates; the separate LLD username PATCH example is consolidated here. Avatar updates wait for verified media ownership.
-- Page/LINK foundation conventions are defined in [07-PAGE-LINK-CONTRACT.md](07-PAGE-LINK-CONTRACT.md): one page per user, LINK/TEXT content and a themeKey reference to the system Theme catalog. Appearance/templates/social contracts are defined in [09-APPEARANCE-AND-SOCIALS.md](09-APPEARANCE-AND-SOCIALS.md), including nested social paths and POST reorder.
+- Page/LINK foundation conventions are defined in [07-PAGE-LINK-CONTRACT.md](07-PAGE-LINK-CONTRACT.md): multiple pages per user, one primary page, owner-scoped slugs, LINK/TEXT content and a themeKey reference to the system Theme catalog. Appearance/templates/social contracts are defined in [09-APPEARANCE-AND-SOCIALS.md](09-APPEARANCE-AND-SOCIALS.md), including nested social paths and POST reorder.
 - Shared block packages contain data/types/validation. React editors and renderers stay in the frontend registry.
 - Social profiles, account deletion, and basic abuse reporting/moderation are launch requirements, consistent with the LLD acceptance/security requirements. Google OAuth is included in the current identity milestone; see [06-GOOGLE-LOGIN.md](06-GOOGLE-LOGIN.md). Other OAuth providers, account linking, imports, advanced embeds/analytics, and a richer admin dashboard follow the core release.
 
@@ -425,6 +425,7 @@ Use Server Components for:
 
 ```text
 /[username]
+/[username]/[pageSlug]
 ```
 
 Use Client Components only where interaction is required:
@@ -669,9 +670,10 @@ createdAt
 
 ## Page
 
-A user can eventually have multiple pages.
-
-V1 can initially expose one page in the UI.
+A user can create and manage multiple pages in V1. Exactly one is primary when
+the user owns any pages. The primary page uses `/[username]`; additional pages
+use `/[username]/[pageSlug]`. The dashboard page switcher selects the page being
+edited, and deleting the primary page promotes the oldest remaining page.
 
 Fields:
 
@@ -679,6 +681,7 @@ Fields:
 id
 userId
 slug
+isPrimary
 title
 description
 isPublished
@@ -688,10 +691,11 @@ createdAt
 updatedAt
 ```
 
-Constraint:
+Constraints:
 
 ```text
-slug UNIQUE
+(userId, slug) UNIQUE
+one isPrimary=true row per user (partial unique database index)
 ```
 
 ---
@@ -1209,12 +1213,14 @@ Public route:
 
 ```text
 /[username]
+/[username]/[pageSlug]
 ```
 
 Example:
 
 ```text
 https://kachko.app/rohan
+https://kachko.app/rohan/portfolio
 ```
 
 Flow:
@@ -2749,9 +2755,10 @@ Main editor.
 
 ```text
 /[username]
+/[username]/[pageSlug]
 ```
 
-Public page.
+Primary and additional public pages.
 
 The public page and dashboard are the two highest-priority product experiences.
 

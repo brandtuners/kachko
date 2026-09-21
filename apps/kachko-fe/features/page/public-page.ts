@@ -32,6 +32,7 @@ export interface PublicTheme {
 export interface PublicPage {
   id: string;
   slug: string;
+  isPrimary: boolean;
   title: string | null;
   description: string | null;
   themeId: string | null;
@@ -41,10 +42,11 @@ export interface PublicPage {
   socials: PublicSocial[];
 }
 
-export async function getPublicPage(slug: string): Promise<PublicPage | null> {
+export async function getPublicPage(username: string, pageSlug?: string): Promise<PublicPage | null> {
   try {
-    const result = await serverApiFetch<ApiPublicPage>(`/public/${encodeURIComponent(slug)}`);
-    return { slug: result.profile.username, ...result.page, themeId: result.page.themeKey,
+    const path = `/public/${encodeURIComponent(username)}${pageSlug ? `/${encodeURIComponent(pageSlug)}` : ""}`;
+    const result = await serverApiFetch<ApiPublicPage>(path);
+    return { ...result.page, themeId: result.page.themeKey,
       // The public renderer reads theme tokens from the theme object itself.
       // Keep `config` for consumers that prefer the grouped shape, while also
       // exposing the API appearance fields at the renderer level.
@@ -58,8 +60,8 @@ export async function getPublicPage(slug: string): Promise<PublicPage | null> {
 }
 
 // Helper used by the route to surface 404s.
-export async function loadPublicPage(slug: string): Promise<PublicPage> {
-  const page = await getPublicPage(slug);
+export async function loadPublicPage(username: string, pageSlug?: string): Promise<PublicPage> {
+  const page = await getPublicPage(username, pageSlug);
   if (!page) notFound();
   return page;
 }

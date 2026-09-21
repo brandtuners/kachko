@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { CreateReportInput, ReportStatusUpdateInput, UserStatusUpdateInput, DeleteAccountInput } from '@kachko/validation';
+import type { AdminListQueryInput, AdminPageStatusUpdateInput, CreateReportInput, ReportStatusUpdateInput, UserStatusUpdateInput, DeleteAccountInput } from '@kachko/validation';
 import { verify } from '@node-rs/argon2';
 import { PrismaService } from '../../database/prisma.service';
 import { MediaStorage } from '../media/media.storage';
@@ -19,7 +19,7 @@ export class ModerationService {
   async reports(status: 'OPEN' | 'RESOLVED' | 'REJECTED') {
     const rows = await this.prisma.report.findMany({
       where: { status }, orderBy: { createdAt: 'desc' }, take: 50,
-      include: { page: { select: { id: true, slug: true, user: { select: { id: true, username: true, isActive: true } } } }, reporter: { select: { username: true } } },
+      include: { page: { select: { id: true, slug: true, isPrimary: true, user: { select: { id: true, username: true, isActive: true } } } }, reporter: { select: { username: true } } },
     });
     return { data: rows.map(row => ({ ...row, createdAt: row.createdAt.toISOString(), updatedAt: undefined, pageId: undefined, reporterId: undefined, handledById: undefined, handledAt: undefined })) };
   }
@@ -55,6 +55,83 @@ export class ModerationService {
   async auditLogs() {
     const rows = await this.prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 100, include: { actor: { select: { username: true } } } });
     return { data: rows.map(row => ({ ...row, createdAt: row.createdAt.toISOString() })) };
+  }
+
+  async adminUsers(input: AdminListQueryInput) {
+    const q = input.q?.trim();
+    const rows = await this.prisma.user.findMany({
+      where: q ? { OR: [
+        { email: { contains: q, mode: 'insensitive' } },
+        { username: { contains: q, mode: 'insensitive' } },
+        { displayName: { contains: q, mode: 'insensitive' } },
+      ] } : undefined,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, email: true, username: true, displayName: true, avatarUrl: true,
+        role: true, isActive: true, isVerified: true, deletedAt: true, createdAt: true,
+        pages: { orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }], select: { id: true, slug: true, isPrimary: true, isPublished: true } },
+        _count: { select: { sessions: true, reports: true } },
+      },
+    });
+    return { data: rows.map(row => ({ ...row, createdAt: row.createdAt.toISOString(), deletedAt: row.deletedAt?.toISOString() ?? null })) };
+  }
+
+  async adminPages(input: AdminListQueryInput) {
+    const q = input.q?.trim();
+    const rows = await this.prisma.page.findMany({
+      where: q ? { OR: [
+        { slug: { contains: q, mode: 'insensitive' } },
+        { title: { contains: q, mode: 'insensitive' } },
+        { user: { username: { contains: q, mode: 'insensitive' } } },
+        { user: { email: { contains: q, mode: 'insensitive' } } },
+      ] } : undefined,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, slug: true, isPrimary: true, title: true, description: true, isPublished: true,
+        publishedAt: true, createdAt: true, updatedAt: true,
+        user: { select: { id: true, username: true, email: true, isActive: true } },
+        _count: { select: { blocks: true, reports: true, analytics: true } },
+      },
+    });
+    return { data: rows.map(row => ({ ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), publishedAt: row.publishedAt?.toISOString() ?? null })) };
+  }
+
+  async updatePageStatus(actorId: string, pageId: string, input: AdminPageStatusUpdateInput) {
+    return this.prisma.$transaction(async tx => {
+      const page = await tx.page.findUnique({ where: { id: pageId }, select: { id: true, isPublished: true } });
+      if (!page) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');
+      const updated = await tx.page.update({ where: { id: pageId }, data: {
+        isPublished: input.isPublished,
+        publishedAt: input.isPublished ? undefined : null,
+        revision: { increment: 1 },
+      } });
+      await tx.auditLog.create({ data: { actorId, action: 'PAGE_UNPUBLISHED', entityType: 'Page', entityId: pageId } });
+      return { data: { id: updated.id, isPublished: updated.isPublished } };
+    });
+  }
+
+  async deleteUserAsAdmin(actorId: string, userId: string) {
+    if (actorId === userId) identityError(400, 'SELF_MODERATION_REJECTED', 'You cannot delete your own administrator account');
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true, media: { select: { storageKey: true } } } });
+    if (!user) identityError(404, 'USER_NOT_FOUND', 'User not found');
+    if (user.role === 'ADMIN') identityError(403, 'FORBIDDEN', 'Administrator accounts cannot be deleted here');
+    const storageKeys = user.media.map(item => item.storageKey);
+    await this.prisma.$transaction(async tx => {
+      await tx.auditLog.create({ data: { actorId, action: 'ACCOUNT_DELETED_BY_ADMIN', entityType: 'User', entityId: userId } });
+      await tx.user.update({ where: { id: userId }, data: { avatarMediaId: null } });
+      await tx.user.delete({ where: { id: userId } });
+    });
+    await Promise.allSettled(storageKeys.map(key => this.storage.delete(key)));
+    return { data: { deleted: true as const } };
+  }
+
+  async adminHealth() {
+    const [users, pages, publishedPages, openReports] = await this.prisma.$transaction([
+      this.prisma.user.count(), this.prisma.page.count(),
+      this.prisma.page.count({ where: { isPublished: true } }),
+      this.prisma.report.count({ where: { status: 'OPEN' } }),
+    ]);
+    return { data: { status: 'ok' as const, users, pages, publishedPages, openReports } };
   }
 
   async deleteAccount(userId: string, input: DeleteAccountInput) {

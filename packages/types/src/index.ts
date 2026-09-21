@@ -6,6 +6,7 @@ export interface IdentityUser {
   displayName: string | null;
   bio: string | null;
   avatarUrl: string | null;
+  role: 'USER' | 'MODERATOR' | 'ADMIN';
 }
 export interface ApiData<T> { data: T }
 export type IdentityResponse = ApiData<IdentityUser>;

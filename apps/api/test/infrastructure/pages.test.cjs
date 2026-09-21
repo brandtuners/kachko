@@ -13,7 +13,7 @@ const { IdentityRepository } = require('../../dist/modules/identity/identity.rep
 const exec = promisify(execFile);
 const docker = async (...args) => (await exec('docker', args, { timeout: 120000 })).stdout.trim();
 
-test('page migration enforces single-page ownership and cascades; username changes are atomic', { timeout: 120000 }, async t => {
+test('page migration enforces multi-page ownership and cascades; username changes are atomic', { timeout: 120000 }, async t => {
   const name = `kachko-pages-${randomUUID().slice(0, 8)}`;
   let created = false;
   let db;
@@ -44,12 +44,14 @@ test('page migration enforces single-page ownership and cascades; username chang
   db = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
   const owner = await db.user.create({ data: { email: 'owner@example.test', username: 'owner' } });
   const other = await db.user.create({ data: { email: 'other@example.test', username: 'other' } });
-  const page = await db.page.create({ data: { userId: owner.id, slug: owner.username } });
+  const page = await db.page.create({ data: { userId: owner.id, slug: owner.username, isPrimary: true } });
   assert.equal(page.isPublished, false);
   assert.equal(page.publishedAt, null);
   assert.equal(page.themeKey, 'minimal');
+  const secondPage = await db.page.create({ data: { userId: owner.id, slug: 'second' } });
+  const otherPage = await db.page.create({ data: { userId: other.id, slug: owner.username, isPrimary: true } });
   await assert.rejects(db.page.create({ data: { userId: owner.id, slug: 'second' } }), { code: 'P2002' });
-  await assert.rejects(db.page.create({ data: { userId: other.id, slug: owner.username } }), { code: 'P2002' });
+  await assert.rejects(db.page.create({ data: { userId: owner.id, slug: 'another-primary', isPrimary: true } }), { code: 'P2002' });
   await assert.rejects(db.page.create({ data: { userId: randomUUID(), slug: 'missing' } }), { code: 'P2003' });
   const block = await db.pageBlock.create({ data: { pageId: page.id, type: 'LINK', position: 0,
     content: { title: 'Site', url: 'https://example.com/', openInNewTab: true } } });
@@ -59,18 +61,18 @@ test('page migration enforces single-page ownership and cascades; username chang
   await assert.rejects(db.pageBlock.create({ data: { pageId: randomUUID(), type: 'LINK', position: 0, content: {} } }), { code: 'P2003' });
   const repository = new IdentityRepository(db);
   await repository.updateProfile(owner.id, { username: 'renamed', bio: 'new bio' });
-  assert.equal((await db.page.findUnique({ where: { id: page.id } })).slug, 'renamed');
+  assert.equal((await db.page.findUnique({ where: { id: page.id } })).slug, 'owner');
   assert.equal((await db.user.findUnique({ where: { id: owner.id } })).username, 'renamed');
-  // A conflicting page slug must roll back the User mutation as well.
-  const otherPage = await db.page.create({ data: { userId: other.id, slug: 'occupied' } });
-  await assert.rejects(repository.updateProfile(owner.id, { username: 'occupied', bio: 'must roll back' }), { code: 'P2002' });
+  // Username uniqueness still rolls back the entire profile mutation.
+  await assert.rejects(repository.updateProfile(owner.id, { username: 'other', bio: 'must roll back' }), { code: 'P2002' });
   const unchanged = await db.user.findUnique({ where: { id: owner.id } });
   assert.equal(unchanged.username, 'renamed');
   assert.equal(unchanged.bio, 'new bio');
-  assert.equal((await db.page.findUnique({ where: { id: page.id } })).slug, 'renamed');
+  assert.equal((await db.page.findUnique({ where: { id: page.id } })).slug, 'owner');
   await db.page.delete({ where: { id: page.id } });
   assert.equal(await db.pageBlock.count({ where: { id: block.id } }), 0);
   assert.ok(await db.user.findUnique({ where: { id: owner.id } }));
+  assert.ok(await db.page.findUnique({ where: { id: secondPage.id } }));
   await db.pageBlock.create({ data: { pageId: otherPage.id, type: 'LINK', position: 0, content: {} } });
   await db.user.delete({ where: { id: other.id } });
   assert.equal(await db.page.count({ where: { id: otherPage.id } }), 0);
@@ -138,17 +140,30 @@ test('page migration enforces single-page ownership and cascades; username chang
   assert.equal((await request('/pages', { cookie: alice.cookie })).body.data.length, 0);
   assert.equal((await request('/pages', { method: 'POST', cookie: alice.cookie, body: {}, csrf: false })).status, 403);
   assert.equal((await request('/pages', { method: 'POST', cookie: alice.cookie, body: { userId: bob.id } })).status, 400);
-  // Concurrent creates are serialized with the owner lock; only one succeeds.
+  // Concurrent first-page creates are serialized with the owner lock. The
+  // loser observes an existing page and must provide an additional-page slug.
   const createdPages = await Promise.all([1, 2].map(() => request('/pages', { method: 'POST', cookie: alice.cookie, body: { title: 'Alice links' } })));
-  assert.deepEqual(createdPages.map(r => r.status).sort(), [201, 409]);
+  assert.deepEqual(createdPages.map(r => r.status).sort(), [201, 400]);
   const alicePage = createdPages.find(r => r.status === 201).body.data;
   const root = `/pages/${alicePage.id}`;
   assert.equal(alicePage.slug, 'page_alice');
   assert.equal(alicePage.themeKey, 'minimal');
   assert.equal(alicePage.isPublished, false);
+  assert.equal(alicePage.isPrimary, true);
   assert.equal(alicePage.userId, undefined);
   assert.equal(alicePage.revision, undefined);
   assert.equal((await request('/public/page_alice')).status, 404);
+  const portfolio = await request('/pages', { method: 'POST', cookie: alice.cookie,
+    body: { slug: 'portfolio', title: 'Alice portfolio' } });
+  assert.equal(portfolio.status, 201);
+  assert.equal(portfolio.body.data.isPrimary, false);
+  assert.equal((await request('/pages', { method: 'POST', cookie: alice.cookie,
+    body: { slug: 'portfolio', title: 'Duplicate' } })).body.error.code, 'PAGE_SLUG_UNAVAILABLE');
+  const ownerPages = await request('/pages', { cookie: alice.cookie });
+  assert.equal(ownerPages.body.data.length, 2);
+  assert.equal(ownerPages.body.data.filter(page => page.isPrimary).length, 1);
+  await request(`/pages/${portfolio.body.data.id}/publish`, { method: 'POST', cookie: alice.cookie });
+  assert.equal((await request('/public/page_alice/portfolio')).body.data.page.slug, 'portfolio');
   for (const [method, path, body] of [['GET', root], ['PATCH', root, { title: 'attack' }], ['DELETE', root],
     ['POST', `${root}/publish`], ['POST', `${root}/unpublish`], ['POST', `${root}/blocks`, { type: 'LINK', content: { title: 'attack', url: 'https://example.com' } }]]) {
     assert.equal((await request(path, { method, body, cookie: bob.cookie })).status, 404, `${method} foreign ${path}`);
@@ -195,6 +210,8 @@ test('page migration enforces single-page ownership and cascades; username chang
   for (const method of ['PATCH', 'DELETE']) assert.equal((await request(`${root}/blocks/${first}`, { method, cookie: bob.cookie,
     ...(method === 'PATCH' ? { body: { isVisible: false } } : {}) })).status, 404);
   const bobPage = (await request('/pages', { method: 'POST', cookie: bob.cookie, body: {} })).body.data;
+  const bobPortfolio = await request('/pages', { method: 'POST', cookie: bob.cookie, body: { slug: 'portfolio' } });
+  assert.equal(bobPortfolio.status, 201, 'page slugs are scoped to their owner');
   assert.equal((await request(`/pages/${bobPage.id}/blocks/${first}`, { method: 'PATCH', cookie: bob.cookie, body: { isVisible: false } })).body.error.code, 'BLOCK_NOT_FOUND');
   const published = await request(`${root}/publish`, { method: 'POST', cookie: alice.cookie });
   assert.equal(published.status, 200);
@@ -241,19 +258,25 @@ test('page migration enforces single-page ownership and cascades; username chang
   assert.equal((await request('/public/page_alice_new')).body.data.blocks.length, 0);
   const swagger = await (await fetch(`${base}/api/docs-json`)).json();
   for (const path of ['/api/v1/pages', '/api/v1/pages/{id}', '/api/v1/pages/{id}/publish', '/api/v1/pages/{id}/unpublish',
-    '/api/v1/pages/{pageId}/blocks', '/api/v1/pages/{pageId}/blocks/{blockId}', '/api/v1/public/{username}']) assert.ok(swagger.paths[path], path);
+    '/api/v1/pages/{pageId}/blocks', '/api/v1/pages/{pageId}/blocks/{blockId}', '/api/v1/public/{username}',
+    '/api/v1/public/{username}/{pageSlug}']) assert.ok(swagger.paths[path], path);
   assert.ok(swagger.paths['/api/v1/pages'].post.requestBody.content['application/json'].schema);
   await request(root, { method: 'DELETE', cookie: alice.cookie });
-  assert.equal((await request('/public/page_alice_new')).status, 404);
   assert.equal(await db.pageBlock.count({ where: { pageId: alicePage.id } }), 0);
-  // Create and rename serialize on User; the final slug must equal the username.
+  const promoted = await db.page.findUnique({ where: { id: portfolio.body.data.id } });
+  assert.equal(promoted.isPrimary, true);
+  assert.equal((await request('/public/page_alice_new')).status, 200);
+  assert.equal((await request('/public/page_alice_new/portfolio')).status, 404);
+  await request(`/pages/${promoted.id}`, { method: 'DELETE', cookie: alice.cookie });
+  // First-page creation and username changes serialize on User. The primary
+  // route follows the current username even though page slugs are independent.
   const race = await Promise.all([
     request('/pages', { method: 'POST', cookie: alice.cookie, body: {} }),
     request('/users/me', { method: 'PATCH', cookie: alice.cookie, body: { username: 'page_race' } }),
   ]);
   assert.deepEqual(race.map(r => r.status), [201, 200]);
-  const lastPage = await db.page.findUnique({ where: { userId: alice.id } });
-  assert.equal(lastPage.slug, 'page_race');
+  const lastPage = await db.page.findFirst({ where: { userId: alice.id, isPrimary: true } });
+  assert.ok(lastPage);
   await request(`/pages/${lastPage.id}/publish`, { method: 'POST', cookie: alice.cookie });
   assert.equal((await request('/public/page_race')).status, 200);
   // TEXT and reorder extension: current page is published and empty.
@@ -426,9 +449,10 @@ test('page migration enforces single-page ownership and cascades; username chang
   assert.deepEqual(applied.body.data.appearanceOverrides, {});
   assert.equal((await request('/public/page_race')).body.data.page.appearance.background.type, 'gradient');
   assert.equal((await request('/public/page_race')).body.data.blocks.length, 3);
-  // Template creation is atomic with the existing one-page constraint.
+  // Template creation is atomic and also works for an additional page.
   await request(`/pages/${bobPage.id}`, { method: 'DELETE', cookie: bob.cookie });
-  const fromTemplate = await request('/pages', { method: 'POST', cookie: bob.cookie, body: { templateKey: 'professional', title: 'My portfolio' } });
+  const fromTemplate = await request('/pages', { method: 'POST', cookie: bob.cookie,
+    body: { slug: 'professional', templateKey: 'professional', title: 'My portfolio' } });
   assert.equal(fromTemplate.status, 201);
   assert.equal(fromTemplate.body.data.themeKey, 'professional');
   assert.equal(fromTemplate.body.data.blocks.length, 2);
@@ -475,15 +499,26 @@ test('page migration enforces single-page ownership and cascades; username chang
   assert.equal(reported.status, 202);
   assert.equal((await request('/moderation/reports', { cookie: alice.cookie })).status, 403);
   await db.user.update({ where: { id: bob.id }, data: { role: 'ADMIN' } });
-  const reports = await request('/moderation/reports?status=OPEN', { cookie: bob.cookie });
+  const adminUsers = await request('/admin/users?q=page_alice', { cookie: bob.cookie });
+  assert.equal(adminUsers.status, 200);
+  assert.equal(adminUsers.body.data[0].id, alice.id);
+  const adminPages = await request('/admin/pages?q=page_race', { cookie: bob.cookie });
+  assert.equal(adminPages.status, 200);
+  assert.equal(adminPages.body.data[0].id, lastPage.id);
+  assert.equal((await request('/admin/system/health', { cookie: bob.cookie })).body.data.status, 'ok');
+  assert.equal((await request('/admin/pages', { cookie: alice.cookie })).status, 403);
+  const reports = await request('/admin/reports?status=OPEN', { cookie: bob.cookie });
   assert.equal(reports.status, 200);
   assert.equal(reports.body.data[0].page.user.id, alice.id);
   const reportId = reports.body.data[0].id;
-  assert.equal((await request(`/moderation/reports/${reportId}/status`, { method: 'POST', cookie: bob.cookie, body: { status: 'RESOLVED' } })).status, 200);
-  assert.equal((await request(`/moderation/users/${alice.id}/status`, { method: 'PATCH', cookie: bob.cookie, body: { isActive: false } })).status, 200);
+  assert.equal((await request(`/admin/reports/${reportId}`, { method: 'PATCH', cookie: bob.cookie, body: { status: 'RESOLVED' } })).status, 200);
+  assert.equal((await request(`/admin/users/${alice.id}/status`, { method: 'PATCH', cookie: bob.cookie, body: { isActive: false } })).status, 200);
   assert.equal((await request('/public/page_race')).status, 404);
   assert.equal((await request('/auth/me', { cookie: alice.cookie })).status, 401);
-  const audit = await request('/moderation/audit-logs', { cookie: bob.cookie });
+  const disposable = await db.user.create({ data: { email: 'delete-by-admin@example.test', username: 'delete_by_admin' } });
+  assert.equal((await request(`/admin/users/${disposable.id}`, { method: 'DELETE', cookie: bob.cookie, body: { confirmation: 'DELETE' } })).status, 200);
+  assert.equal(await db.user.count({ where: { id: disposable.id } }), 0);
+  const audit = await request('/admin/audit-logs', { cookie: bob.cookie });
   assert.equal(audit.status, 200);
   assert.ok(audit.body.data.some(row => row.action === 'REPORT_STATUS_CHANGED'));
   assert.ok(audit.body.data.some(row => row.action === 'USER_SUSPENDED'));
@@ -503,6 +538,9 @@ test('page migration enforces single-page ownership and cascades; username chang
     '/api/v1/pages/{pageId}/analytics/top-links', '/api/v1/pages/{pageId}/analytics/top-socials', '/api/v1/pages/{pageId}/analytics/referrers',
     '/api/v1/pages/{pageId}/analytics/geo', '/api/v1/pages/{pageId}/analytics/devices', '/api/v1/moderation/reports',
     '/api/v1/moderation/reports/{id}/status', '/api/v1/moderation/users/{id}/status', '/api/v1/moderation/audit-logs',
+    '/api/v1/admin/users', '/api/v1/admin/users/{id}/status', '/api/v1/admin/users/{id}', '/api/v1/admin/pages',
+    '/api/v1/admin/pages/{id}/status', '/api/v1/admin/reports', '/api/v1/admin/reports/{id}', '/api/v1/admin/audit-logs',
+    '/api/v1/admin/system/health',
     '/api/v1/users/me', '/api/v1/auth/password-reset/request', '/api/v1/auth/password-reset/confirm']) assert.ok(checkSwagger.paths[path], path);
   await docker('stop', redisName);
   assert.equal((await request('/public/page_race')).status, 200, 'public reads fall back to PostgreSQL');

@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { googleRegistrationSchema, loginSchema, type GoogleRegistrationInput, type LoginInput } from "@kachko/validation";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { IconArrowRight } from "../../components/icons";
@@ -11,6 +12,8 @@ import { schemaResolver } from "../../lib/form-resolver";
 
 export function GoogleButton({ label }: { label: string }) {
   return (
+    // This endpoint starts an OAuth redirect and must perform a document navigation.
+    // eslint-disable-next-line @next/next/no-html-link-for-pages
     <a href="/api/v1/auth/google" className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-[#dfe2dc] bg-white px-4 text-sm font-extrabold text-[var(--k-ink)] transition hover:border-[#c9cdc6] hover:bg-[#fafbf7] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9ec31d]">
       <GoogleMark />
       {label}
@@ -93,8 +96,10 @@ export function GoogleCallback({ status }: { status: CallbackStatus }) {
     return (
       <div className="k-panel flex w-full flex-col items-center gap-4 p-6 text-center" role="alert">
         <p className="text-sm font-semibold text-[#b4322c]">{loadError}</p>
+        {/* OAuth initiation intentionally uses a full document navigation. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a href="/api/v1/auth/google" className="ob-btn-dark w-full">Try Google again</a>
-        <a href="/login" className="text-sm font-bold text-[var(--k-ink)] hover:underline">Return to login</a>
+        <Link href="/login" className="text-sm font-bold text-[var(--k-ink)] hover:underline">Return to login</Link>
       </div>
     );
   }
@@ -134,7 +139,7 @@ export function GoogleCallback({ status }: { status: CallbackStatus }) {
         <IconArrowRight className="h-4 w-4" />
       </button>
       <p className="text-center text-xs text-[var(--k-muted)]">
-        By continuing, you confirm you are at least 13 and agree to the <a href="/legal/terms" className="font-bold hover:underline">Terms</a> and <a href="/legal/privacy" className="font-bold hover:underline">Privacy Policy</a>.
+        By continuing, you confirm you are at least 13 and agree to the <Link href="/legal/terms" className="font-bold hover:underline">Terms</Link> and <Link href="/legal/privacy" className="font-bold hover:underline">Privacy Policy</Link>.
       </p>
     </form>
   );
@@ -167,6 +172,8 @@ function GoogleLinkExistingAccount() {
       <div><input className="ob-input" type="password" autoComplete="current-password" placeholder="Password" aria-label="Password" aria-invalid={!!errors.password} {...register("password")} />{errors.password?.message ? <p className="mt-1.5 text-xs text-[#b4322c]">{errors.password.message}</p> : null}</div>
       {serverError ? <p role="alert" className="text-sm text-[#b4322c]">{serverError}</p> : null}
       <button type="submit" disabled={isSubmitting} className="ob-btn-white">{isSubmitting ? "Linking…" : "Sign in and link Google"}<IconArrowRight className="h-4 w-4" /></button>
+      {/* OAuth initiation intentionally uses a full document navigation. */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
       <a href="/api/v1/auth/google" className="text-center text-sm font-bold hover:underline">Use a different Google account</a>
     </form>
   );

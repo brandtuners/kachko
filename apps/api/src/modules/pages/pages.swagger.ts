@@ -15,7 +15,7 @@ for (const variant of block.oneOf ?? block.anyOf ?? []) {
     variant.required = [...(variant.required ?? []), 'position', 'isVisible', 'createdAt', 'updatedAt'];
   }
 }
-const pageProperties = { id: { type: 'string', format: 'uuid' }, slug: text, title: nullableText, description: nullableText,
+const pageProperties = { id: { type: 'string', format: 'uuid' }, slug: text, isPrimary: { type: 'boolean' }, title: nullableText, description: nullableText,
   themeKey: { type: 'string', enum: [...themeKeySchema.options] }, isPublished: { type: 'boolean' }, publishedAt: { ...date, nullable: true }, createdAt: date, updatedAt: date } satisfies Record<string, SchemaObject>;
 export const envelope = (data: SchemaObject) => object({ data });
 export const social = object({ id: { type: 'string', format: 'uuid' }, platform: { type: 'string', enum: [...socialPlatformSchema.options] }, username: nullableText, url: { type: 'string', format: 'uri' },

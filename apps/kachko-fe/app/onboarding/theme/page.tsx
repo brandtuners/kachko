@@ -41,8 +41,8 @@ export default function OnboardingThemeStep() {
     setSaving(true);
     store.set("themeId", picked);
     try {
-      await ensurePage();
-      await setTheme(picked);
+      const page = await ensurePage();
+      await setTheme(page.id, picked);
     } catch {
       /* dashboard can re-pick */
     }

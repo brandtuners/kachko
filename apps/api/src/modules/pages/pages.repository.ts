@@ -7,11 +7,11 @@ export class PageResourceError extends Error {
   constructor(readonly code: 'PAGE_NOT_FOUND' | 'BLOCK_NOT_FOUND' | 'THEME_NOT_FOUND' | 'TEMPLATE_NOT_FOUND' | 'SOCIAL_NOT_FOUND' | 'MEDIA_NOT_FOUND') { super(code); }
 }
 export class PageInputError extends Error {
-  constructor(readonly code: 'VALIDATION_ERROR' | 'BLOCK_ORDER_CONFLICT' | 'SOCIAL_ORDER_CONFLICT' | 'TEMPLATE_REPLACE_REQUIRED', message: string) { super(message); }
+  constructor(readonly code: 'VALIDATION_ERROR' | 'PAGE_SLUG_UNAVAILABLE' | 'BLOCK_ORDER_CONFLICT' | 'SOCIAL_ORDER_CONFLICT' | 'TEMPLATE_REPLACE_REQUIRED', message: string) { super(message); }
 }
 const orderedBlocks = { orderBy: [{ position: 'asc' as const }, { id: 'asc' as const }], include: { media: true } };
 const orderedSocials = { orderBy: [{ position: 'asc' as const }, { id: 'asc' as const }] };
-const fullPage = { blocks: orderedBlocks, theme: true, socials: orderedSocials };
+const fullPage = { blocks: orderedBlocks, theme: true, socials: orderedSocials, user: { select: { username: true } } };
 export type StoredPage = Prisma.PageGetPayload<{ include: typeof fullPage }>;
 export type StoredBlock = Prisma.PageBlockGetPayload<{ include: { media: true } }>;
 
@@ -35,11 +35,14 @@ export class PagesRepository {
   create(userId: string, data: CreatePageInput) {
     return this.db.$transaction(async tx => {
       const user = await this.lockOwner(tx, userId);
-      const { templateKey, ...fields } = data;
+      const existing = await tx.page.count({ where: { userId } });
+      const { templateKey, slug: requestedSlug, ...fields } = data;
+      const slug = existing === 0 ? user.username : requestedSlug;
+      if (!slug) throw new PageInputError('VALIDATION_ERROR', 'A page slug is required for additional pages');
       const template = templateKey ? await tx.pageTemplate.findUnique({ where: { key: templateKey } }) : null;
       if (templateKey && !template) throw new PageResourceError('TEMPLATE_NOT_FOUND');
       const blocks = template ? this.templateBlocks(template.blocks) : [];
-      return tx.page.create({ data: { ...fields, userId, slug: user.username,
+      return tx.page.create({ data: { ...fields, userId, slug, isPrimary: existing === 0,
         ...(template ? { themeKey: template.themeKey } : {}), blocks: { create: blocks } }, include: fullPage });
     });
   }
@@ -55,7 +58,13 @@ export class PagesRepository {
     return this.mutate(userId, id, tx => tx.page.update({ where: { id }, data: { ...data, revision: { increment: 1 } }, include: fullPage }));
   }
   delete(userId: string, id: string) {
-    return this.mutate(userId, id, async tx => { await tx.page.delete({ where: { id } }); });
+    return this.mutate(userId, id, async (tx, page) => {
+      await tx.page.delete({ where: { id } });
+      if (page.isPrimary) {
+        const next = await tx.page.findFirst({ where: { userId }, orderBy: { createdAt: 'asc' }, select: { id: true } });
+        if (next) await tx.page.update({ where: { id: next.id }, data: { isPrimary: true, revision: { increment: 1 } } });
+      }
+    });
   }
   publish(userId: string, id: string, published: boolean) {
     return this.mutate(userId, id, (tx, page) => tx.page.update({ where: { id }, data: {
@@ -194,14 +203,15 @@ export class PagesRepository {
       return tx.page.update({ where: { id }, data: { revision: { increment: 1 } }, include: fullPage });
     });
   }
-  private publicWhere(slug: string) {
-    return { slug, isPublished: true, user: { username: slug, isActive: true, deletedAt: null } };
+  private publicWhere(username: string, pageSlug?: string) {
+    return { ...(pageSlug ? { slug: pageSlug, isPrimary: false } : { isPrimary: true }), isPublished: true,
+      user: { username, isActive: true, deletedAt: null } };
   }
-  publicGate(slug: string) {
-    return this.db.page.findFirst({ where: this.publicWhere(slug), select: { id: true, revision: true } });
+  publicGate(username: string, pageSlug?: string) {
+    return this.db.page.findFirst({ where: this.publicWhere(username, pageSlug), select: { id: true, revision: true } });
   }
-  publicSnapshot(slug: string) {
-    return this.db.$transaction(tx => tx.page.findFirst({ where: this.publicWhere(slug), include: {
+  publicSnapshot(username: string, pageSlug?: string) {
+    return this.db.$transaction(tx => tx.page.findFirst({ where: this.publicWhere(username, pageSlug), include: {
       user: { select: { username: true, displayName: true, bio: true, avatarUrl: true } },
       blocks: { ...orderedBlocks, where: { isVisible: true } },
       theme: true, socials: { ...orderedSocials, where: { isVisible: true } },

@@ -68,9 +68,7 @@ export class IdentityRepository {
     return this.prisma.$transaction(async tx => {
       const user = await tx.user.update({ where: { id }, data });
       // Every public profile edit invalidates the prior revision atomically.
-      await tx.page.updateMany({ where: { userId: id }, data: {
-        ...(data.username !== undefined ? { slug: user.username } : {}), revision: { increment: 1 },
-      } });
+      await tx.page.updateMany({ where: { userId: id }, data: { revision: { increment: 1 } } });
       return user;
     });
   }

@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Req, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { z, createPageSchema, updatePageSchema, createBlockSchema, updateBlockSchema, reorderBlocksSchema, pageIdSchema, blockIdSchema, usernameSchema,
+import { z, createPageSchema, updatePageSchema, createBlockSchema, updateBlockSchema, reorderBlocksSchema, pageIdSchema, blockIdSchema, pageSlugSchema, usernameSchema,
   type CreatePageInput, type UpdatePageInput, type CreateBlockInput, type UpdateBlockInput, type ReorderBlocksInput } from '@kachko/validation';
 import { IdentityValidationPipe } from '../identity/identity.controller';
 import { IdentityRateGuard, SessionGuard, RatePolicy, type IdentityRequest } from '../identity/identity.guards';
@@ -29,10 +29,10 @@ export class PagesController {
   list(@Req() request: IdentityRequest) { return this.pages.list(request.identity.id); }
 
   @Post()
-  @ApiOperation({ summary: 'Create your single draft page; slug derives from your username' })
+  @ApiOperation({ summary: 'Create a draft page; the first page becomes primary and additional pages require a slug' })
   @ApiBody({ schema: schema.pageCreateBody, examples: { basic: { value: { title: 'My links', description: 'Welcome to my page' } } } })
   @ApiResponse({ status: 201, schema: schema.pageResponse })
-  @ApiResponse({ status: 409, description: 'PAGE_ALREADY_EXISTS' })
+  @ApiResponse({ status: 409, description: 'PAGE_SLUG_UNAVAILABLE' })
   create(@Req() request: IdentityRequest, @Body(new IdentityValidationPipe(createPageSchema)) input: CreatePageInput) {
     return this.pages.create(request.identity.id, input);
   }
@@ -120,4 +120,13 @@ export class PublicPagesController {
   @ApiResponse({ status: 404, description: 'PAGE_NOT_FOUND: missing, unpublished or inactive/deleted owner' })
   @ApiResponse({ status: 400, description: 'VALIDATION_ERROR: malformed username' })
   get(@Param('username', new IdentityValidationPipe(usernameSchema)) username: string) { return this.pages.publicPage(username); }
+
+  @Get(':username/:pageSlug')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: 'Get an additional published page by owner username and page slug' })
+  @ApiResponse({ status: 200, schema: schema.publicResponse })
+  additional(@Param('username', new IdentityValidationPipe(usernameSchema)) username: string,
+    @Param('pageSlug', new IdentityValidationPipe(pageSlugSchema)) pageSlug: string) {
+    return this.pages.publicPage(username, pageSlug);
+  }
 }

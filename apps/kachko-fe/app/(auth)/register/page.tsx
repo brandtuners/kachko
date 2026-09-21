@@ -34,7 +34,7 @@ export default function RegisterPage() {
           in one <span className="k-accent">free</span> link.
         </h1>
         <p className="ob-sub mt-4 max-w-md !text-base">
-          Claim your Kachko, add your links, and share one page that actually looks like you.
+          Claim your Kachko, add your links, and share pages that actually look like you.
         </p>
         <div className="mt-10 w-full max-w-sm text-left">
           <RegisterForm />

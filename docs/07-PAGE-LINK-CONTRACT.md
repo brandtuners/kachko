@@ -1,17 +1,18 @@
 # kachko — Page and LINK API
 
-**Status:** page and LINK/TEXT CRUD, publish/unpublish, public lookup, shared contracts and revision-based Redis caching are implemented and available in Swagger. Girish can integrate the real endpoints. The Step 4 completion gate remains open until both verify the frontend/public renderer journey.
+**Status:** multi-page and block CRUD, publish/unpublish, both public lookup forms, shared contracts and revision-based Redis caching are implemented and available in Swagger.
 
 ## Data and scope decisions
 
-- V1 has zero or one Page per User, enforced by unique Page.userId. Creating a page derives slug from the authenticated owner's normalized username. Neither owner ID nor slug is accepted from the client.
-- Page contains id, userId, unique slug, nullable title/description, isPublished=false, publishedAt=null, themeKey="minimal", internal revision=0, and timestamps. Page deletion cascades to blocks; user deletion cascades to the page and blocks. No page is automatically created during signup.
+- V1 supports multiple Pages per User. If an owner has pages, exactly one is primary. The first page is primary and derives its internal slug from the owner's normalized username. Every later page requires a client-supplied slug. Slugs are lowercase, 2–40 characters, and unique per owner; two owners may use the same slug.
+- The primary frontend/API route is `/[username]` and `/public/:username`. Additional pages use `/[username]/[pageSlug]` and `/public/:username/:pageSlug`. A username change moves all of the owner's public URLs but does not rewrite page slugs. Deleting the primary page transactionally promotes the oldest remaining page; deleting the final page leaves the owner with no page.
+- Page contains id, userId, owner-scoped slug, isPrimary, nullable title/description, isPublished=false, publishedAt=null, themeKey="minimal", internal revision=0, and timestamps. Page deletion cascades to blocks; user deletion cascades to every owned page and its blocks. No page is automatically created during signup.
 - PageBlock contains id, pageId, type=LINK or TEXT, nonnegative position, isVisible=true, JSON content and timestamps. Ordering indexes support owner/public reads. Position uniqueness/contiguous order is maintained by owner-row locks and transactional append/delete; the DB currently checks nonnegativity, not uniqueness. JSON content is validated by the shared schema at API boundaries.
 - LINK and TEXT are allowed in the database enum and shared contracts; see [TEXT and reorder](08-TEXT-AND-REORDER.md). Other documented block types will be added with their implementations. No media IDs, icons or custom styles are accepted in this slice; thumbnails require the later verified media flow.
 - `minimal` remains the default, with six system themes now available. Page.themeKey references Theme.slug; validated appearance overrides and social profiles are implemented. See [09-APPEARANCE-AND-SOCIALS.md](09-APPEARANCE-AND-SOCIALS.md).
-- Existing profile username changes update User.username and Page.slug in one Prisma transaction. A failure rolls back both. Every page, block or profile edit increments the page revision in the same transaction. Public cache keys include username, page ID and revision, making previous entries unreachable. Unpublish, page deletion and account suspension/deletion are checked against PostgreSQL before serving cached content.
+- Existing profile username changes update User.username and increment every owned page revision in one transaction. Every page, block or profile edit increments the affected revision in the same transaction. Public cache keys include the public route, page ID and revision, making previous entries unreachable. Unpublish, page deletion and account suspension/deletion are checked against PostgreSQL before serving cached content.
 
-These are the current blueprint resolutions of the broader LLD examples: one page per user, a themeKey foreign key to the Theme catalog, and LINK/TEXT block content. They do not mark later block/media features or frontend integration complete.
+These are the current blueprint resolutions of the broader LLD examples: multiple pages with one primary page, a themeKey foreign key to the Theme catalog, and validated block content.
 
 ## Shared packages
 
@@ -19,7 +20,7 @@ These are the current blueprint resolutions of the broader LLD examples: one pag
 
 `@kachko/types` exports PageSummary, OwnerPage, LinkBlock, LinkBlockContent, PublicPage, PageResponse, PageListResponse, LinkBlockResponse, PublicPageResponse, DeleteResponse and PageErrorCode. Timestamps in JSON are ISO 8601 strings. Public data uses an explicit allowlist rather than a database-model spread.
 
-Page title: null or 1–120 trimmed characters. Description: null or at most 300 trimmed characters. Create accepts an empty object; PATCH requires at least one permitted field. Null clears a field. Slug, owner, publish state, IDs and timestamps are server-managed. Appearance is changed through the dedicated appearance endpoint; create also accepts optional templateKey.
+Page title: null or 1–120 trimmed characters. Description: null or at most 300 trimmed characters. First-page creation accepts an empty object; later creation requires `slug`. PATCH requires at least one permitted field and may change the owner-scoped slug. Null clears nullable fields. Owner, primary state, publish state, IDs and timestamps are server-managed. Appearance is changed through the dedicated appearance endpoint; create also accepts optional templateKey.
 
 LINK content: title (1–120 trimmed characters), url (absolute HTTP(S), maximum 2048 input characters), openInNewTab (boolean, default true). URL normalization uses URL.href. Reject credentials, relative URLs, other protocols, whitespace, control characters and backslashes. The API must not fetch destinations. This is scheme validation, not a promise that a destination is trustworthy. Render user text as text and links opening new tabs with `rel="noopener noreferrer"`.
 
@@ -31,10 +32,10 @@ All protected routes require the existing session; mutations require X-Kachko-CS
 
 | Method | Path under `/api/v1` | Request | Success |
 |---|---|---|---|
-| GET | `/pages` | none | 200 PageListResponse, array length 0 or 1 |
-| POST | `/pages` | `{title?,description?,templateKey?}` | 201 PageResponse, draft with blocks=[] |
+| GET | `/pages` | none | 200 PageListResponse, primary first, then creation order |
+| POST | `/pages` | `{slug?,title?,description?,templateKey?}` | 201 PageResponse; slug required after the first page |
 | GET | `/pages/:id` | none | 200 PageResponse with ordered blocks |
-| PATCH | `/pages/:id` | `{title?,description?}` | 200 PageResponse |
+| PATCH | `/pages/:id` | `{slug?,title?,description?}` | 200 PageResponse |
 | DELETE | `/pages/:id` | none | 200 `{data:{deleted:true}}` |
 | POST | `/pages/:pageId/blocks` | `{type:"LINK"|"TEXT",content,isVisible?}` | 201 BlockResponse |
 | PATCH | `/pages/:pageId/blocks/:blockId` | `{content?,isVisible?}` | 200 BlockResponse |
@@ -42,10 +43,11 @@ All protected routes require the existing session; mutations require X-Kachko-CS
 | POST | `/pages/:id/publish` | none | 200 PageResponse |
 | POST | `/pages/:id/unpublish` | none | 200 PageResponse |
 | GET | `/public/:username` | none | 200 PublicPageResponse |
+| GET | `/public/:username/:pageSlug` | none | 200 PublicPageResponse |
 
 Reorder is implemented as POST `/pages/:pageId/blocks/reorder`; see [the complete-list contract](08-TEXT-AND-REORDER.md). Publishing an empty page is allowed (profile-only page); publication sets publishedAt, repeated publish preserves it, and unpublish clears it. Owner reads include hidden blocks; public reads exclude them and exclude email/userId/roles/session data/private timestamps. Draft, missing, inactive-owner or deleted-owner pages return 404 on public lookup. Edits to published pages appear publicly after saving; this slice does not keep a separate draft snapshot of published content.
 
-Error envelope is `{error:{code,message}}`: 400 VALIDATION_ERROR, 401 UNAUTHENTICATED, 403 CSRF_REJECTED, 404 PAGE_NOT_FOUND or BLOCK_NOT_FOUND, 409 PAGE_ALREADY_EXISTS, 429 RATE_LIMITED. Protected page endpoints share a limit of 120 requests/minute/IP and fail closed with 503 DEPENDENCIES_UNAVAILABLE if Redis rate limiting is unavailable. Public GET has no application Redis rate limiter and falls back to PostgreSQL during cache outages. Database failures follow the existing sanitized 500 error envelope. A second page must fail against the DB constraint even for concurrent create requests.
+Error envelope is `{error:{code,message}}`: 400 VALIDATION_ERROR, 401 UNAUTHENTICATED, 403 CSRF_REJECTED, 404 PAGE_NOT_FOUND or BLOCK_NOT_FOUND, 409 PAGE_SLUG_UNAVAILABLE, 429 RATE_LIMITED. Protected page endpoints share a limit of 120 requests/minute/IP and fail closed with 503 DEPENDENCIES_UNAVAILABLE if Redis rate limiting is unavailable. Public GET has no application Redis rate limiter and falls back to PostgreSQL during cache outages. Database failures follow the existing sanitized 500 error envelope. Concurrent creation is serialized on the owner row so exactly one first page becomes primary.
 
 ## Example LINK request and public fixture for Girish
 
@@ -73,6 +75,8 @@ Public response fixture (all values are example data):
       "avatarUrl": null
     },
     "page": {
+      "slug": "rohan",
+      "isPrimary": true,
       "title": "Rohan's links",
       "description": null,
       "themeKey": "minimal",
@@ -134,7 +138,7 @@ Next for both: verify the real FE page/link/publish/public-renderer journey. TEX
 
 ## Cache behavior
 
-Public requests first read PostgreSQL to check the current page ID/revision, published state and active/nondeleted owner. Cache keys are `page:{username}:{pageId}:{revision}` and expire after 60 seconds. Cache misses load a repeatable-read snapshot and store only the validated public allowlist. Old in-flight reads can populate only their old revision, so they cannot overwrite current content. Old keys expire naturally instead of relying on a Redis delete succeeding during a mutation. Redis failure falls back to the database. Browser/CDN responses use `Cache-Control: no-store`; frontend public loaders must also avoid persistent caching until they have an equivalent invalidation mechanism.
+Public requests first read PostgreSQL to check the current page ID/revision, published state and active/nondeleted owner. Cache keys are `page:{username[/pageSlug]}:{pageId}:{revision}` and expire after 60 seconds. Cache misses load a repeatable-read snapshot and store only the validated public allowlist. Old in-flight reads can populate only their old revision, so they cannot overwrite current content. Old keys expire naturally instead of relying on a Redis delete succeeding during a mutation. Redis failure falls back to the database. Browser/CDN responses use `Cache-Control: no-store`; frontend public loaders must also avoid persistent caching until they have an equivalent invalidation mechanism.
 
 Profile edits (including display name and bio) increment revision, as do page/block edits and publication changes. Page recreation receives a new UUID. Future direct moderation/content writers must increment revision transactionally; active/deleted status changes are already enforced by the database gate. In-flight reads can complete using the snapshot current when they started; requests after a completed mutation see the current revision.
 

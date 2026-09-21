@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { schemaResolver } from "../../../lib/form-resolver";
 import { loginSchema } from "@kachko/validation";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 import { apiFetch, ApiClientError } from "../../../lib/api";
 import { IconArrowRight } from "../../../components/icons";
@@ -78,9 +79,9 @@ export default function LoginForm() {
 
       <p className="text-center text-sm text-[var(--k-muted)]">
         Forgot password?{" "}
-        <a href="/reset-password" className="font-bold text-[var(--k-ink)] hover:underline">
+        <Link href="/forgot-password" className="font-bold text-[var(--k-ink)] hover:underline">
           Reset it
-        </a>
+        </Link>
       </p>
     </form>
   );

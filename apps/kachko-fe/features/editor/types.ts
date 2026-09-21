@@ -51,9 +51,14 @@ export interface EditorUser {
 export interface EditorPage {
   id: string;
   slug: string;
+  isPrimary: boolean;
   title: string | null;
   description: string | null;
   isPublished: boolean;
+  publishedAt: string | null;
+  themeKey: import("@kachko/types").PageThemeKey;
+  createdAt: string;
+  updatedAt: string;
   themeId: string | null;
   // Full theme row (background/typography/buttons/cards JSON) — the API expands
   // it on /pages/me so the dashboard's live preview matches the public page.

@@ -21,8 +21,10 @@ const pageFields = {
   title: z.string().trim().min(1).max(120).nullable().optional(),
   description: z.string().trim().max(300).nullable().optional(),
 };
-export const createPageSchema = z.strictObject({ ...pageFields, templateKey: templateKeySchema.optional() });
-export const updatePageSchema = z.strictObject(pageFields)
+export const pageSlugSchema = z.string().trim().toLowerCase().min(2).max(40)
+  .regex(/^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$/, 'Use lowercase letters, numbers, hyphens or underscores');
+export const createPageSchema = z.strictObject({ ...pageFields, slug: pageSlugSchema.optional(), templateKey: templateKeySchema.optional() });
+export const updatePageSchema = z.strictObject({ ...pageFields, slug: pageSlugSchema.optional() })
   .refine(value => Object.keys(value).length > 0, 'Provide at least one page field');
 export const createLinkBlockSchema = z.strictObject({
   type: z.literal('LINK'), content: linkContentSchema, isVisible: z.boolean().default(true),
@@ -120,7 +122,7 @@ export const publicBlockSchema = z.discriminatedUnion('type', [
 /** Cache/public response allowlist; strict parsing prevents accidental private fields. */
 export const publicPageSchema = z.strictObject({
   profile: z.strictObject({ username: z.string(), displayName: z.string().nullable(), bio: z.string().nullable(), avatarUrl: z.string().nullable() }),
-  page: z.strictObject({ id: z.uuid(), title: z.string().nullable(), description: z.string().nullable(), themeKey: themeKeySchema, appearance: themeConfigSchema }),
+  page: z.strictObject({ id: z.uuid(), slug: pageSlugSchema, isPrimary: z.boolean(), title: z.string().nullable(), description: z.string().nullable(), themeKey: themeKeySchema, appearance: themeConfigSchema }),
   blocks: z.array(publicBlockSchema),
   socials: z.array(publicSocialSchema),
 });

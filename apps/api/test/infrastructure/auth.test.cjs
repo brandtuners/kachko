@@ -76,7 +76,8 @@ test('identity journey, persistence, ownership, CSRF, revocation and distributed
   assert.equal(registered.status, 201);
   assert.equal(registered.body.data.email, 'rohan@example.com');
   assert.equal(registered.body.data.username, 'rohan');
-  assert.deepEqual(Object.keys(registered.body.data).sort(), ['avatarUrl', 'bio', 'displayName', 'email', 'id', 'username']);
+  assert.deepEqual(Object.keys(registered.body.data).sort(), ['avatarUrl', 'bio', 'displayName', 'email', 'id', 'role', 'username']);
+  assert.equal(registered.body.data.role, 'USER');
   const setCookie = registered.headers.get('set-cookie');
   assert.match(setCookie, /HttpOnly/i);
   assert.match(setCookie, /SameSite=Lax/i);

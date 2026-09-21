@@ -15,7 +15,7 @@ export const tokenDigest = (token: string) => createHash('sha256').update(token)
 const passwordOptions = { algorithm: Algorithm.Argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 };
 const safeUser = (user: IdentityUser): IdentityUser => ({
   id: user.id, email: user.email, username: user.username, displayName: user.displayName,
-  bio: user.bio, avatarUrl: user.avatarUrl,
+  bio: user.bio, avatarUrl: user.avatarUrl, role: user.role,
 });
 const isUniqueError = (error: unknown) => typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
 

@@ -10,7 +10,7 @@ import { PublicPageCache } from './public-page.cache';
 import { identityError } from '../identity/identity.service';
 
 function summary(page: Page): PageSummary {
-  return { id: page.id, slug: page.slug, title: page.title, description: page.description, themeKey: themeKeySchema.parse(page.themeKey),
+  return { id: page.id, slug: page.slug, isPrimary: page.isPrimary, title: page.title, description: page.description, themeKey: themeKeySchema.parse(page.themeKey),
     isPublished: page.isPublished, publishedAt: page.publishedAt?.toISOString() ?? null,
     createdAt: page.createdAt.toISOString(), updatedAt: page.updatedAt.toISOString() };
 }
@@ -51,7 +51,7 @@ export class PagesService {
       if (error instanceof PageInputError) identityError(error.code === 'VALIDATION_ERROR' ? 400 : 409, error.code, error.message);
       if (error instanceof PageResourceError) identityError(404, error.code, error.code.replaceAll('_', ' ').toLowerCase());
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
-        identityError(409, 'PAGE_ALREADY_EXISTS', 'An account can have only one page');
+        identityError(409, 'PAGE_SLUG_UNAVAILABLE', 'That page slug is already in use for this account');
       }
       throw error;
     }
@@ -94,21 +94,23 @@ export class PagesService {
   async qr(userId: string, id: string): Promise<{ data: { url: string; png: Buffer } }> {
     const page = await this.repository.get(userId, id);
     if (!page) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');
-    const url = `${this.config.getOrThrow<string>('PUBLIC_APP_URL').replace(/\/$/, '')}/@${page.slug}`;
+    const base = this.config.getOrThrow<string>('PUBLIC_APP_URL').replace(/\/$/, '');
+    const url = `${base}/${encodeURIComponent(page.user.username)}${page.isPrimary ? '' : `/${encodeURIComponent(page.slug)}`}`;
     const png = await QRCode.toBuffer(url, { type: 'png', width: 512, margin: 2, errorCorrectionLevel: 'M' });
     return { data: { url, png } };
   }
-  async publicPage(username: string) {
+  async publicPage(username: string, pageSlug?: string) {
     // Never authorize public visibility from cache. Checking PostgreSQL first also
     // handles suspension/deletion and old usernames while Redis is unavailable.
-    const gate = await this.repository.publicGate(username);
+    const gate = await this.repository.publicGate(username, pageSlug);
     if (!gate) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');
-    const hit = await this.cache.get(this.cache.key(username, gate));
+    const routeKey = pageSlug ? `${username}/${pageSlug}` : username;
+    const hit = await this.cache.get(this.cache.key(routeKey, gate));
     if (hit) return { data: hit };
-    const page = await this.repository.publicSnapshot(username);
+    const page = await this.repository.publicSnapshot(username, pageSlug);
     if (!page) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');
     const result: PublicPage = publicPageSchema.parse({
-      profile: page.user, page: { id: page.id, title: page.title, description: page.description, themeKey: page.themeKey, appearance: resolveAppearance(themeConfig(page.theme), page.appearanceOverrides) },
+      profile: page.user, page: { id: page.id, slug: page.slug, isPrimary: page.isPrimary, title: page.title, description: page.description, themeKey: page.themeKey, appearance: resolveAppearance(themeConfig(page.theme), page.appearanceOverrides) },
       blocks: page.blocks.map(block => {
         const content = block.type === 'IMAGE' ? { ...(block.content as Record<string, unknown>), url: block.media?.url } : block.content;
         return publicBlockSchema.parse({ id: block.id, type: block.type, content });
@@ -116,7 +118,7 @@ export class PagesService {
       socials: page.socials.map(social => publicSocialSchema.parse({ id: social.id, platform: social.platform, username: social.username, url: social.url })),
     });
     // Old in-flight readers can populate only their old revision, not the new one.
-    await this.cache.set(this.cache.key(username, page), result);
+    await this.cache.set(this.cache.key(routeKey, page), result);
     return { data: result };
   }
 }

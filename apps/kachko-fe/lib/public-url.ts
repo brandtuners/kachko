@@ -1,8 +1,9 @@
 const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
-export function publicPageUrl(username: string, origin = configuredOrigin) {
+export function publicPageUrl(username: string, origin = configuredOrigin, pageSlug?: string) {
   const base = origin.endsWith('/') ? origin : `${origin}/`;
-  return new URL(`/@${encodeURIComponent(username)}`, base).toString();
+  const path = `/${encodeURIComponent(username)}${pageSlug ? `/${encodeURIComponent(pageSlug)}` : ''}`;
+  return new URL(path, base).toString();
 }
 
 export function absoluteAssetUrl(path: string, origin = configuredOrigin) {

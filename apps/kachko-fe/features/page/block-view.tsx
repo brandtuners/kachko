@@ -151,7 +151,7 @@ export function BlockView({ block }: { block: PublicBlock }) {
   }
 }
 
-export function SocialRow({ socials }: { socials: PublicSocial[] }) {
+export function SocialBar({ socials }: { socials: PublicSocial[] }) {
   const visible = socials.filter((s) => s.isVisible);
   if (visible.length === 0) return null;
   return (
@@ -174,3 +174,5 @@ export function SocialRow({ socials }: { socials: PublicSocial[] }) {
     </div>
   );
 }
+
+export const SocialRow = SocialBar;

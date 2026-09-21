@@ -53,11 +53,11 @@ test('editor uses page IDs and documented reorder, publish and appearance bodies
   const output = ts.transpileModule(fs.readFileSync('features/editor/api.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   const exports = {};
   vm.runInNewContext(output, { exports, require: () => ({ apiFetch, ApiClientError: Error }) });
-  await exports.reorderBlocks(['b2', 'b1']);
+  await exports.reorderBlocks('page-1', ['b2', 'b1']);
   assert.deepEqual(JSON.parse(calls.find(c => c.path.endsWith('/reorder')).body), { items: [{ id: 'b2', position: 0 }, { id: 'b1', position: 1 }] });
-  await exports.updatePageMeta({ isPublished: true });
+  await exports.updatePageMeta('page-1', { isPublished: true });
   assert.ok(calls.some(c => c.path === '/pages/page-1/publish' && c.method === 'POST'));
-  await exports.setTheme('dark');
+  await exports.setTheme('page-1', 'dark');
   assert.deepEqual(JSON.parse(calls.find(c => c.path.endsWith('/appearance')).body), { themeKey: 'dark' });
   assert.ok(calls.every(c => !c.path.includes('/pages/me')));
 });

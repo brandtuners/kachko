@@ -6,6 +6,8 @@
 // drag/keyboard reorder, visibility toggle, inline edit, delete — only the
 // skin follows the new cream/lime system.
 import { useState, useRef, useEffect } from "react";
+import { CSS } from "@dnd-kit/utilities";
+import { useSortable } from "@dnd-kit/sortable";
 import {
   BLOCK_LABELS,
   type BlockType,
@@ -197,14 +199,10 @@ export function KebabMenu({ items }: { items: { label: string; icon?: JSX.Elemen
   );
 }
 
-export function DashBlockRow({
+export function SortableBlock({
   block,
   index,
   count,
-  onDragStartItem,
-  onDropItem,
-  onDragEndItem,
-  isDragging,
   startEditing = false,
   onEditingChange,
   clicks,
@@ -212,10 +210,6 @@ export function DashBlockRow({
   block: EditorBlock;
   index: number;
   count: number;
-  onDragStartItem: (i: number) => void;
-  onDropItem: (to: number) => void;
-  onDragEndItem: () => void;
-  isDragging?: boolean;
   // A freshly-added row opens straight into edit mode so the user can fill it in.
   startEditing?: boolean;
   onEditingChange?: (editing: boolean) => void;
@@ -225,6 +219,7 @@ export function DashBlockRow({
   const editor = useEditor();
   const [editing, setEditing] = useState(startEditing);
   const [draft, setDraft] = useState<Record<string, unknown>>(block.content);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id, disabled: editing });
   // Social rows wear the brand chip; everything else the block-type icon.
   const c = block.content as Record<string, unknown>;
   const Icon = BLOCK_ICONS[block.type as BlockType] ?? IconLink;
@@ -247,14 +242,8 @@ export function DashBlockRow({
 
   return (
     <div
-      draggable={!editing}
-      onDragStart={() => onDragStartItem(index)}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => {
-        e.preventDefault();
-        onDropItem(index);
-      }}
-      onDragEnd={onDragEndItem}
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`transition ${isDragging ? "opacity-40" : ""} ${editing ? "rounded-[14px] border border-[#e9ebe6] bg-[#fbfaf6] p-3" : ""}`}
     >
       <div
@@ -263,9 +252,9 @@ export function DashBlockRow({
         }`}
         style={editing ? undefined : { gridTemplateColumns: "26px 46px minmax(0,1fr) auto auto auto auto" }}
       >
-        <span className="cursor-grab select-none text-[#c3c8c2]" aria-hidden title="Drag to reorder">
+        <button type="button" className="cursor-grab touch-none select-none text-[#c3c8c2] active:cursor-grabbing" aria-label={`Drag ${blockTitle(block)} to reorder`} title="Drag to reorder" {...attributes} {...listeners}>
           <IconGrip className="h-4 w-4" />
-        </span>
+        </button>
         {block.type === "SOCIAL" ? (
           <PlatformBadge platform={String(c.platform ?? "")} />
         ) : (

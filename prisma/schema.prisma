@@ -25,7 +25,7 @@ model User {
   sessions Session[]
   passwordResetTokens PasswordResetToken[]
   googleAccount GoogleAccount?
-  page Page?
+  pages Page[]
   media Media[] @relation("OwnedMedia")
   avatarMedia Media? @relation("UserAvatar", fields: [avatarMediaId], references: [id], onDelete: Restrict)
   reports Report[] @relation("ReportReporter")
@@ -84,11 +84,13 @@ model GoogleAccount {
   createdAt DateTime @default(now())
 }
 
-// V1: at most one page per owner; slug follows the owner's username.
+// V1 supports multiple pages per owner. One page is primary and resolves at
+// /username; additional pages resolve at /username/page-slug.
 model Page {
   id String @id @default(uuid())
-  userId String @unique
-  slug String @unique
+  userId String
+  slug String
+  isPrimary Boolean @default(false)
   title String?
   description String?
   isPublished Boolean @default(false)
@@ -104,6 +106,11 @@ model Page {
   reports Report[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([userId, slug])
+  @@index([userId, createdAt])
+  @@index([userId, isPrimary])
+  @@index([isPublished])
 }
 
 model Report {

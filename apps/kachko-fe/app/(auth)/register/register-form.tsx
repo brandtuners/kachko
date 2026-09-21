@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { schemaResolver } from "../../../lib/form-resolver";
 import { registerSchema } from "@kachko/validation";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 import { apiFetch, ApiClientError } from "../../../lib/api";
 import { IconArrowRight } from "../../../components/icons";
@@ -103,13 +104,13 @@ export default function RegisterForm() {
         />
         <span>
           I&apos;m at least 13 years old and I agree to the{" "}
-          <a href="/legal/terms" className="font-bold text-[var(--k-ink)] underline-offset-2 hover:underline">
+          <Link href="/legal/terms" className="font-bold text-[var(--k-ink)] underline-offset-2 hover:underline">
             Terms
-          </a>{" "}
+          </Link>{" "}
           and{" "}
-          <a href="/legal/privacy" className="font-bold text-[var(--k-ink)] underline-offset-2 hover:underline">
+          <Link href="/legal/privacy" className="font-bold text-[var(--k-ink)] underline-offset-2 hover:underline">
             Privacy Policy
-          </a>
+          </Link>
           .
         </span>
       </label>
@@ -127,9 +128,9 @@ export default function RegisterForm() {
 
       <p className="text-center text-sm text-[var(--k-muted)]">
         Already have a Kachko?{" "}
-        <a href="/login" className="font-bold text-[var(--k-ink)] hover:underline">
+        <Link href="/login" className="font-bold text-[var(--k-ink)] hover:underline">
           Log in
-        </a>
+        </Link>
       </p>
     </form>
   );

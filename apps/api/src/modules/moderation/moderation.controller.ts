@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { createReportSchema, deleteAccountSchema, pageIdSchema, reportStatusSchema, reportStatusUpdateSchema, userStatusUpdateSchema,
-  type CreateReportInput, type DeleteAccountInput, type ReportStatusUpdateInput, type UserStatusUpdateInput } from '@kachko/validation';
+import { adminListQuerySchema, adminPageStatusUpdateSchema, createReportSchema, deleteAccountSchema, pageIdSchema, reportStatusSchema, reportStatusUpdateSchema, userStatusUpdateSchema,
+  type AdminListQueryInput, type AdminPageStatusUpdateInput, type CreateReportInput, type DeleteAccountInput, type ReportStatusUpdateInput, type UserStatusUpdateInput } from '@kachko/validation';
 import { IdentityValidationPipe } from '../identity/identity.controller';
 import { IdentityRateGuard, RatePolicy, SessionGuard, type IdentityRequest } from '../identity/identity.guards';
 import { identityCookieOptions } from '../identity/identity.cookies';
@@ -49,6 +49,60 @@ export class ModerationController {
   @ApiCookieAuth()
   @UseGuards(IdentityRateGuard, SessionGuard, AdminGuard)
   auditLogs() { return this.moderation.auditLogs(); }
+}
+
+@ApiTags('Admin')
+@ApiCookieAuth()
+@Controller('admin')
+@UseGuards(IdentityRateGuard, SessionGuard, AdminGuard)
+export class AdminController {
+  constructor(private readonly moderation: ModerationService) {}
+
+  @Get('users')
+  users(@Query(new IdentityValidationPipe(adminListQuerySchema)) input: AdminListQueryInput) {
+    return this.moderation.adminUsers(input);
+  }
+
+  @Patch('users/:id/status')
+  userStatus(@Req() request: IdentityRequest, @Param('id', new IdentityValidationPipe(pageIdSchema)) id: string,
+    @Body(new IdentityValidationPipe(userStatusUpdateSchema)) input: UserStatusUpdateInput) {
+    return this.moderation.updateUserStatus(request.identity.id, id, input);
+  }
+
+  @Delete('users/:id')
+  deleteUser(@Req() request: IdentityRequest, @Param('id', new IdentityValidationPipe(pageIdSchema)) id: string,
+    @Body(new IdentityValidationPipe(deleteAccountSchema)) input: DeleteAccountInput) {
+    void input;
+    return this.moderation.deleteUserAsAdmin(request.identity.id, id);
+  }
+
+  @Get('pages')
+  pages(@Query(new IdentityValidationPipe(adminListQuerySchema)) input: AdminListQueryInput) {
+    return this.moderation.adminPages(input);
+  }
+
+  @Patch('pages/:id/status')
+  pageStatus(@Req() request: IdentityRequest, @Param('id', new IdentityValidationPipe(pageIdSchema)) id: string,
+    @Body(new IdentityValidationPipe(adminPageStatusUpdateSchema)) input: AdminPageStatusUpdateInput) {
+    return this.moderation.updatePageStatus(request.identity.id, id, input);
+  }
+
+  @Get('reports')
+  reports(@Query('status', new IdentityValidationPipe(reportStatusSchema.default('OPEN'))) status: 'OPEN' | 'RESOLVED' | 'REJECTED') {
+    return this.moderation.reports(status);
+  }
+
+  @Patch('reports/:id')
+  updateReport(@Req() request: IdentityRequest, @Param('id', new IdentityValidationPipe(pageIdSchema)) id: string,
+    @Body(new IdentityValidationPipe(reportStatusUpdateSchema)) input: ReportStatusUpdateInput) {
+    return this.moderation.updateReport(request.identity.id, id, input);
+  }
+
+  @Get('audit-logs')
+  auditLogs() { return this.moderation.auditLogs(); }
+
+  @Get('system/health')
+  health() { return this.moderation.adminHealth(); }
 }
 
 @ApiTags('Users')

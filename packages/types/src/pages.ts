@@ -20,6 +20,7 @@ export interface LinkBlock {
 export interface PageSummary {
   id: string;
   slug: string;
+  isPrimary: boolean;
   title: string | null;
   description: string | null;
   themeKey: PageThemeKey;
@@ -56,10 +57,10 @@ export type DeleteResponse = ApiData<{ deleted: true }>;
 /** Explicit public allowlist: no owner ID, email, session data or hidden blocks. */
 export interface PublicPage {
   profile: { username: string; displayName: string | null; bio: string | null; avatarUrl: string | null };
-  page: { id: string; title: string | null; description: string | null; themeKey: PageThemeKey; appearance: ThemeConfig };
+  page: { id: string; slug: string; isPrimary: boolean; title: string | null; description: string | null; themeKey: PageThemeKey; appearance: ThemeConfig };
   blocks: PublicBlock[];
   socials: PublicSocial[];
 }
 export type PublicPageResponse = ApiData<PublicPage>;
-export type PageErrorCode = 'PAGE_ALREADY_EXISTS' | 'PAGE_NOT_FOUND' | 'BLOCK_NOT_FOUND'
+export type PageErrorCode = 'PAGE_SLUG_UNAVAILABLE' | 'PAGE_NOT_FOUND' | 'BLOCK_NOT_FOUND'
   | 'THEME_NOT_FOUND' | 'TEMPLATE_NOT_FOUND' | 'SOCIAL_NOT_FOUND' | 'TEMPLATE_REPLACE_REQUIRED' | 'SOCIAL_ORDER_CONFLICT' | 'BLOCK_ORDER_CONFLICT' | 'VALIDATION_ERROR' | 'UNAUTHENTICATED' | 'CSRF_REJECTED' | 'RATE_LIMITED';

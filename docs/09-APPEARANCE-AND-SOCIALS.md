@@ -69,10 +69,10 @@ Seeded keys: `starter` (minimal theme, intro + link), `creator` (gradient, intro
 Create a draft page from a template using the existing POST `/pages`:
 
 ```json
-{"title":"My portfolio","templateKey":"professional"}
+{"slug":"portfolio","title":"My portfolio","templateKey":"professional"}
 ```
 
-This atomically creates the page, theme assignment and ordered blocks, while preserving the single-page-per-user constraint. Existing pages can apply a template:
+This atomically creates the page, theme assignment and ordered blocks. `slug` is required when the owner already has a page; it is omitted for the first, primary page. Existing pages can apply a template:
 
 ```json
 {"templateKey":"creator","replaceExistingBlocks":false}

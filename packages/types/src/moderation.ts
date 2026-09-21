@@ -8,7 +8,7 @@ export interface ModerationReport {
   status: ReportStatus;
   details: string | null;
   createdAt: string;
-  page: { id: string; slug: string; user: { id: string; username: string; isActive: boolean } };
+  page: { id: string; slug: string; isPrimary: boolean; user: { id: string; username: string; isActive: boolean } };
   reporter: { username: string } | null;
 }
 export type CreateReportResponse = ApiData<{ accepted: true }>;
