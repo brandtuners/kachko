@@ -9,6 +9,7 @@ Test Tags         v1    smoke
 
 *** Variables ***
 ${BASE_URL}       http://localhost:4000
+${PUBLIC_APP_URL}    http://localhost:3000
 ${CSRF}           1
 
 *** Test Cases ***
@@ -72,7 +73,7 @@ V1 owner journey publishes and renders a public page
 
     ${response}=    GET On Session    api    /api/v1/pages/${page_id}/qr    expected_status=200
     Should Start With    ${response.headers}[Content-Type]    image/png
-    Should Be Equal    ${response.headers}[X-Kachko-QR-URL]    http://localhost:3000/@${username}
+    Should Be Equal    ${response.headers}[X-Kachko-QR-URL]    ${PUBLIC_APP_URL}/${username}
 
     ${response}=    POST On Session    api    /api/v1/pages/${page_id}/unpublish    json=${{}}    headers=${headers}    expected_status=200
     GET On Session    public    /api/v1/public/${username}    expected_status=404

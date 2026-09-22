@@ -41,7 +41,7 @@ test('analytics ingestion is available through the shared same-origin client', a
   });
   assert.equal((await api.apiFetch('/analytics/events', { method: 'POST', body: '{"eventType":"PAGE_VIEW"}' })).accepted, true);
 });
-test('editor uses page IDs and documented reorder, publish and appearance bodies', async () => {
+test('editor uses page IDs and documented reorder, template, publish and appearance bodies', async () => {
   const calls = [];
   const page = { id: 'page-1', themeKey: 'minimal', blocks: [], socials: [], appearance: {} };
   const apiFetch = async (path, init) => {
@@ -54,7 +54,11 @@ test('editor uses page IDs and documented reorder, publish and appearance bodies
   const exports = {};
   vm.runInNewContext(output, { exports, require: () => ({ apiFetch, ApiClientError: Error }) });
   await exports.reorderBlocks('page-1', ['b2', 'b1']);
-  assert.deepEqual(JSON.parse(calls.find(c => c.path.endsWith('/reorder')).body), { items: [{ id: 'b2', position: 0 }, { id: 'b1', position: 1 }] });
+  assert.deepEqual(JSON.parse(calls.find(c => c.path.endsWith('/blocks/reorder')).body), { items: [{ id: 'b2', position: 0 }, { id: 'b1', position: 1 }] });
+  await exports.reorderSocials('page-1', ['s2', 's1']);
+  assert.deepEqual(JSON.parse(calls.find(c => c.path.endsWith('/socials/reorder')).body), { items: [{ id: 's2', position: 0 }, { id: 's1', position: 1 }] });
+  await exports.applyPageTemplate('page-1', 'creator', true);
+  assert.deepEqual(JSON.parse(calls.find(c => c.path.endsWith('/template')).body), { templateKey: 'creator', replaceExistingBlocks: true });
   await exports.updatePageMeta('page-1', { isPublished: true });
   assert.ok(calls.some(c => c.path === '/pages/page-1/publish' && c.method === 'POST'));
   await exports.setTheme('page-1', 'dark');

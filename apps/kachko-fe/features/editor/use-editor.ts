@@ -5,14 +5,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addBlock,
   addSocial,
+  applyPageTemplate,
   createMyPage,
   deleteBlock,
   deleteMyPage,
   deleteSocial,
   getMyPage,
   listMyPages,
+  listTemplates,
   listThemes,
   reorderBlocks,
+  reorderSocials,
   setTheme,
   setAppearanceConfig,
   setBackgroundImage,
@@ -23,7 +26,7 @@ import {
 import { usePageSelection } from "./page-selection";
 import type { BackgroundImageSettings } from "./api";
 import type { EditorPage } from "./types";
-import type { PageSummary, ThemeConfig } from "@kachko/types";
+import type { PageSummary, PageTemplate, ThemeConfig } from "@kachko/types";
 
 export const pagesKey = ["my-pages"] as const;
 export const pageKey = (pageId: string) => ["my-page", pageId] as const;
@@ -63,6 +66,11 @@ export function useEditor() {
   const themesQuery = useQuery({
     queryKey: ["themes"],
     queryFn: listThemes,
+  });
+
+  const templatesQuery = useQuery({
+    queryKey: ["templates"],
+    queryFn: listTemplates,
   });
 
   const setPageCache = (updater: (p: EditorPage) => EditorPage) => {
@@ -161,7 +169,7 @@ export function useEditor() {
   });
 
   const editSocial = useMutation({
-    mutationFn: (input: { id: string; data: { url?: string; username?: string; isVisible?: boolean; position?: number } }) =>
+    mutationFn: (input: { id: string; data: { platform?: string; url?: string; username?: string | null; isVisible?: boolean; position?: number } }) =>
       updateSocial(activePageId(), input.id, input.data),
     onSuccess: (s) => setPageCache((p) => ({ ...p, socials: p.socials.map((x) => (x.id === s.id ? s : x)) })),
   });
@@ -169,6 +177,27 @@ export function useEditor() {
   const removeSocial = useMutation({
     mutationFn: (id: string) => deleteSocial(activePageId(), id),
     onSuccess: (_u, id) => setPageCache((p) => ({ ...p, socials: p.socials.filter((s) => s.id !== id) })),
+  });
+
+  const moveSocial = useMutation({
+    mutationFn: (orderedIds: string[]) => reorderSocials(activePageId(), orderedIds),
+    onMutate: async (orderedIds) => {
+      if (effectivePageId) await qc.cancelQueries({ queryKey: pageKey(effectivePageId) });
+      const previous = effectivePageId ? qc.getQueryData<EditorPage>(pageKey(effectivePageId)) : undefined;
+      const positions = new Map(orderedIds.map((id, position) => [id, position]));
+      setPageCache((page) => ({
+        ...page,
+        socials: [...page.socials]
+          .map((social) => ({ ...social, position: positions.get(social.id) ?? social.position }))
+          .sort((a, b) => a.position - b.position),
+      }));
+      return { previous };
+    },
+    onSuccess: (socials) => setPageCache((page) => ({ ...page, socials })),
+    onError: (_error, _orderedIds, context) => {
+      if (context?.previous && effectivePageId) qc.setQueryData(pageKey(effectivePageId), context.previous);
+    },
+    onSettled: () => { if (effectivePageId) void qc.invalidateQueries({ queryKey: pageKey(effectivePageId) }); },
   });
 
   const pickTheme = useMutation({
@@ -189,6 +218,14 @@ export function useEditor() {
     mutationFn: (config: ThemeConfig) => setAppearanceConfig(activePageId(), config),
     onSuccess: (page) => qc.setQueryData(pageKey(page.id), page),
   });
+  const applyTemplate = useMutation({
+    mutationFn: (input: { templateKey: PageTemplate["key"]; replaceExistingBlocks: boolean }) =>
+      applyPageTemplate(activePageId(), input.templateKey, input.replaceExistingBlocks),
+    onSuccess: (page) => {
+      qc.setQueryData(pageKey(page.id), page);
+      qc.setQueryData<PageSummary[]>(pagesKey, (current = []) => current.map((item) => item.id === page.id ? pageSummary(page) : item));
+    },
+  });
 
   return {
     page: pageQuery.data,
@@ -202,6 +239,8 @@ export function useEditor() {
     error: pagesQuery.error ?? pageQuery.error,
     refetch: async () => { await pagesQuery.refetch(); return pageQuery.refetch(); },
     themes: themesQuery.data ?? [],
+    templates: templatesQuery.data ?? [],
+    templatesLoading: templatesQuery.isLoading,
     saveMeta,
     createBlock,
     editBlock,
@@ -210,9 +249,11 @@ export function useEditor() {
     createSocial,
     editSocial,
     removeSocial,
+    moveSocial,
     pickTheme,
     setBackground,
     saveAppearance,
+    applyTemplate,
   };
 }
 

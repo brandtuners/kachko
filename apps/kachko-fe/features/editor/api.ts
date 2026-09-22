@@ -1,4 +1,4 @@
-import type { OwnerPage, PageSummary, IdentityUser, SystemTheme, ThemeConfig } from "@kachko/types";
+import type { OwnerPage, PageSummary, IdentityUser, PageTemplate, SystemTheme, ThemeConfig } from "@kachko/types";
 import { apiFetch, ApiClientError } from "../../lib/api";
 import type { EditorBlock, EditorPage, EditorSocial, EditorTheme } from "./types";
 
@@ -95,11 +95,18 @@ export async function addSocial(pageId: string, platform: string, url: string, u
 export async function updateSocial(
   pageId: string,
   id: string,
-  data: { url?: string; username?: string; isVisible?: boolean; position?: number },
+  data: { platform?: string; url?: string; username?: string | null; isVisible?: boolean; position?: number },
 ): Promise<EditorSocial> {
   return apiFetch<EditorSocial>(`${pagePath(pageId)}/socials/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify(data),
+  });
+}
+
+export async function reorderSocials(pageId: string, orderedIds: string[]): Promise<EditorSocial[]> {
+  return apiFetch<EditorSocial[]>(`${pagePath(pageId)}/socials/reorder`, {
+    method: "POST",
+    body: JSON.stringify({ items: orderedIds.map((id, position) => ({ id, position })) }),
   });
 }
 
@@ -110,6 +117,17 @@ export async function deleteSocial(pageId: string, id: string): Promise<void> {
 export async function listThemes(): Promise<EditorTheme[]> {
   const themes = await apiFetch<SystemTheme[]>("/themes");
   return themes.map((theme) => ({ id: theme.key, slug: theme.key, name: theme.name, config: theme.config }));
+}
+
+export function listTemplates(): Promise<PageTemplate[]> {
+  return apiFetch<PageTemplate[]>("/templates");
+}
+
+export async function applyPageTemplate(pageId: string, templateKey: PageTemplate["key"], replaceExistingBlocks: boolean): Promise<EditorPage> {
+  return editorPage(await apiFetch<OwnerPage>(`${pagePath(pageId)}/template`, {
+    method: "POST",
+    body: JSON.stringify({ templateKey, replaceExistingBlocks }),
+  }));
 }
 
 export async function setTheme(pageId: string, themeKey: string): Promise<EditorPage> {

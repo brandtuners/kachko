@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { MediaAsset, ThemeConfig } from "@kachko/types";
+import type { MediaAsset, PageTemplate, ThemeConfig } from "@kachko/types";
 import { apiFetch, ApiClientError } from "../../lib/api";
 import { IconArrowLeft, IconCheck, IconTrash } from "../../components/icons";
 import { useEditor } from "../editor/use-editor";
 import { useMediaUpload } from "../editor/use-media-upload";
 import { PAGE_FONT_STACKS, themeBackground, themeButtonStyle, themeVars } from "../page/theme";
 
-type View = "home" | "theme" | "wallpaper" | "buttons" | "text" | "colors" | "footer";
+type View = "home" | "template" | "theme" | "wallpaper" | "buttons" | "text" | "colors" | "footer";
 
 const VIEW_TITLES: Record<Exclude<View, "home">, string> = {
-  theme: "Theme", wallpaper: "Wallpaper", buttons: "Buttons", text: "Text", colors: "Colors", footer: "Footer",
+  template: "Templates", theme: "Theme", wallpaper: "Wallpaper", buttons: "Buttons", text: "Text", colors: "Colors", footer: "Footer",
 };
 
 const FONT_OPTIONS: Array<{ value: ThemeConfig["typography"]["fontFamily"]; label: string }> = [
@@ -58,6 +58,8 @@ function ColorControl({ label, value, onChange }: { label: string; value: string
   );
 }
 
+const pageHasBlocks = (blocks: Array<unknown> | undefined) => Boolean(blocks?.length);
+
 export function DesignPanel() {
   const editor = useEditor();
   const upload = useMediaUpload();
@@ -70,6 +72,8 @@ export function DesignPanel() {
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [deletingMediaId, setDeletingMediaId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<MediaAsset | null>(null);
+  const [pendingTemplate, setPendingTemplate] = useState<PageTemplate | null>(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
 
   useEffect(() => { if (serverConfig) setDraft(serverConfig); }, [serverConfig]);
   useEffect(() => {
@@ -114,6 +118,7 @@ export function DesignPanel() {
   if (view === "home") {
     return (
       <div className="grid gap-3">
+        <CardButton title="Templates" value="Page layouts" preview={<span className="grid grid-cols-2 gap-1"><i className="h-3 w-3 rounded-sm bg-[#9fce23]" /><i className="h-3 w-3 rounded-sm bg-[#252a26]" /><i className="col-span-2 h-2 rounded-sm bg-[#dfe3d9]" /></span>} onClick={() => setView("template")} />
         <CardButton title="Theme" value={editor.themes.find((theme) => theme.id === editor.page?.themeId)?.name ?? editor.page?.themeId ?? "Custom"}
           preview={<span className="font-serif text-lg font-bold">Aa</span>} onClick={() => setView("theme")} />
         <p className="mb-0 mt-3 px-1 text-xs font-extrabold uppercase tracking-[.14em] text-[#777d76]">Customize</p>
@@ -127,6 +132,54 @@ export function DesignPanel() {
         {(editor.saveAppearance.isError || editor.pickTheme.isError) ? <p role="alert" className="mt-2 text-xs font-semibold text-[#b4322c]">Could not save that design change. Please try again.</p> : null}
       </div>
     );
+  }
+
+  if (view === "template") {
+    const apply = (template: PageTemplate, replaceExistingBlocks: boolean) => {
+      setTemplateError(null);
+      editor.applyTemplate.mutate(
+        { templateKey: template.key, replaceExistingBlocks },
+        {
+          onSuccess: (page) => {
+            if (page.theme?.config) setDraft(page.theme.config);
+            setPendingTemplate(null);
+            setView("home");
+          },
+          onError: (error) => {
+            if (error instanceof ApiClientError && error.code === "TEMPLATE_REPLACE_REQUIRED") setPendingTemplate(template);
+            else setTemplateError(error instanceof Error ? error.message : "Could not apply this template.");
+          },
+        },
+      );
+    };
+    return <div><BackHeader view={view} back={() => setView("home")} />
+      <p className="mb-4 text-sm text-[#737973]">Start from a ready-made design and block layout. You can customize everything afterward.</p>
+      {editor.templatesLoading ? <p className="py-8 text-center text-sm text-[#8b918a]">Loading templates…</p> : null}
+      <div className="grid gap-3 sm:grid-cols-3">
+        {editor.templates.map((template) => {
+          const theme = editor.themes.find((item) => item.id === template.themeKey);
+          return <button key={template.key} type="button" disabled={editor.applyTemplate.isPending} onClick={() => pageHasBlocks(editor.page?.blocks) ? setPendingTemplate(template) : apply(template, false)} className="overflow-hidden rounded-2xl border-2 border-[#e4e7df] bg-white text-left transition hover:border-[#9fce23] disabled:opacity-60">
+            <span className="relative block h-32 p-4" style={theme ? { ...themeVars(theme), background: themeBackground(theme) } : undefined}>
+              <span className="block text-lg font-extrabold text-[color:var(--page-title-color,var(--page-text,#111312))]">Aa</span>
+              <span className="mt-5 block h-7 rounded-[var(--page-button-radius,12px)] border border-[color:var(--page-button-bg,#111312)]" />
+              <span className="mt-2 block h-5 w-4/5 rounded-[var(--page-button-radius,12px)] border border-[color:var(--page-button-bg,#111312)]" />
+            </span>
+            <span className="block p-3"><span className="block text-sm font-extrabold text-[#111312]">{template.name}</span><span className="mt-1 block text-xs leading-relaxed text-[#737973]">{template.description}</span><span className="mt-2 block text-[10px] font-bold uppercase tracking-wide text-[#8c928b]">{template.blocks.length} starter blocks</span></span>
+          </button>;
+        })}
+      </div>
+      {templateError ? <p role="alert" className="mt-3 text-sm font-semibold text-[#b4322c]">{templateError}</p> : null}
+      {pendingTemplate ? <div className="fixed inset-0 z-[100] grid place-items-center bg-[#111312]/45 px-5 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget && !editor.applyTemplate.isPending) setPendingTemplate(null); }}>
+        <div role="alertdialog" aria-modal="true" aria-labelledby="replace-template-title" aria-describedby="replace-template-description" className="w-full max-w-md rounded-[24px] border border-[#dfe3d9] bg-[#fbfaf6] p-6 shadow-[0_24px_80px_rgba(17,19,18,.28)]">
+          <h4 id="replace-template-title" className="text-lg font-extrabold tracking-[-.3px] text-[#111312]">Apply {pendingTemplate.name}?</h4>
+          <p id="replace-template-description" className="mt-2 text-sm leading-relaxed text-[#697069]">This replaces every existing block on this page and applies the template theme. This action cannot be undone.</p>
+          <div className="mt-6 flex justify-end gap-2">
+            <button type="button" autoFocus disabled={editor.applyTemplate.isPending} onClick={() => setPendingTemplate(null)} className="k-btn-line !rounded-full disabled:opacity-50">Cancel</button>
+            <button type="button" disabled={editor.applyTemplate.isPending} onClick={() => apply(pendingTemplate, true)} className="rounded-full bg-[#111312] px-5 py-2.5 text-sm font-extrabold text-white disabled:opacity-60">{editor.applyTemplate.isPending ? "Applying…" : "Replace and apply"}</button>
+          </div>
+        </div>
+      </div> : null}
+    </div>;
   }
 
   if (view === "theme") return (

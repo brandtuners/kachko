@@ -32,7 +32,7 @@ export default function PrivacyPage() {
           <p>
             You can export or delete your account at any time from settings. Deletion cascades to
             your page and blocks. Analytics are retained 12 months then purged. To exercise your
-            rights, email privacy@kachko.app.
+            rights, email privacy@kachko.in.
           </p>
           <h2 className="text-lg font-extrabold text-[var(--k-ink)]">Cookies</h2>
           <p>
@@ -42,7 +42,7 @@ export default function PrivacyPage() {
           </p>
           <h2 className="text-lg font-extrabold text-[var(--k-ink)]">Contact</h2>
           <p>
-            Questions? Reach us at privacy@kachko.app or via the abuse contact on any public page.
+            Questions? Reach us at privacy@kachko.in or via the abuse contact on any public page.
           </p>
         </div>
 

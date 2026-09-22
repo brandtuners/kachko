@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { AnalyticsRange } from "@kachko/types";
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -8,12 +8,12 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import { apiFetch } from "../../lib/api";
 import { useEditor } from "../editor/use-editor";
 import { useMediaUpload } from "../editor/use-media-upload";
-import { BLOCK_LABELS, BLOCK_TYPES, SOCIAL_PLATFORMS, type BlockType, type EditorBlock } from "../editor/types";
+import { BLOCK_LABELS, BLOCK_TYPES, SOCIAL_PLATFORMS, type BlockType, type EditorBlock, type EditorSocial } from "../editor/types";
 import { Avatar } from "./dash-chrome";
 import { BLOCK_ICONS, SortableBlock } from "./block-row";
 import { DesignPanel } from "./design-panel";
 import { useClicksByBlock, useStats } from "./home-panels";
-import { IconArrowUpRight, IconCheck, IconChart, IconEye, IconLink, IconPlus, IconQr, IconTrash, SOCIAL_ICONS } from "../../components/icons";
+import { IconArrowUpRight, IconCheck, IconChart, IconEye, IconLink, IconPencil, IconPlus, IconQr, IconTrash, SOCIAL_ICONS } from "../../components/icons";
 import { PageQr } from "../share/page-qr";
 import { publicPageUrl } from "../../lib/public-url";
 
@@ -312,7 +312,7 @@ export function AnalyticsPanel() {
             <IconEye className="h-6 w-6" />
           </span>
           <p className="text-sm text-[var(--k-muted)]">
-            No visits yet. Share <code className="font-bold text-[var(--k-ink)]">/{page.user.username}</code> to start collecting stats.
+            No visits yet. Share <code className="font-bold text-[var(--k-ink)]">/{page.user.username}{page.isPrimary ? "" : `/${page.slug}`}</code> to start collecting stats.
           </p>
           <p className="max-w-sm text-xs text-[#9a9f9b]">
             Analytics starts when visitors open your published page and interact with its links.
@@ -451,6 +451,14 @@ export function LinksPanel() {
   const [platform, setPlatform] = useState<string>(SOCIAL_PLATFORMS[0]!);
   const [socialUrl, setSocialUrl] = useState("");
 
+  useEffect(() => {
+    setName(page.user.displayName ?? "");
+    setTagline(page.title ?? "");
+    setBio(page.description ?? "");
+    setPlatform(SOCIAL_PLATFORMS[0]!);
+    setSocialUrl("");
+  }, [page.id, page.user.displayName, page.title, page.description]);
+
   const saveProfile = () => {
     editor.saveMeta.mutate({ title: tagline, description: bio });
     apiFetch("/users/me", { method: "PATCH", body: JSON.stringify({ displayName: name }) }).then(
@@ -500,7 +508,8 @@ export function LinksPanel() {
             </div>
             <div>
               <label className="k-label" htmlFor="dash-bio">Bio</label>
-              <textarea id="dash-bio" className="k-input min-h-24 resize-y" value={bio} maxLength={500} onChange={(e) => setBio(e.target.value)} placeholder="A few words about you…" />
+              <textarea id="dash-bio" className="k-input min-h-24 resize-y" value={bio} maxLength={300} onChange={(e) => setBio(e.target.value)} placeholder="A few words about you…" />
+              <p className="mt-1 text-right text-[11px] text-[#9a9f9b]">{bio.length}/300</p>
             </div>
             <div className="flex items-center justify-between">
               <button
@@ -524,28 +533,26 @@ export function LinksPanel() {
           <p className="k-label">Social links</p>
           <div className="flex flex-col gap-2">
             {page.socials.length === 0 ? <p className="text-sm text-[#9a9f9b]">No social links yet.</p> : null}
-            {page.socials.map((soc) => {
-              const Icon = SOCIAL_ICONS[soc.platform] ?? IconLink;
-              return (
-                <div key={soc.id} className="flex items-center gap-3 rounded-[14px] border border-[#eceee9] bg-white px-3 py-2.5">
-                  <span className="k-tile-icon">
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-extrabold text-[var(--k-ink)]">{soc.platform}</p>
-                    <p className="truncate text-xs text-[var(--k-muted)]">{soc.url}</p>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label={`Delete ${soc.platform} link`}
-                    className="k-icon-btn !h-8 !w-8 hover:!text-[#b4322c]"
-                    onClick={() => editor.removeSocial.mutate(soc.id)}
-                  >
-                    <IconTrash className="h-4 w-4" />
-                  </button>
-                </div>
-              );
-            })}
+            {[...page.socials].sort((a, b) => a.position - b.position).map((soc, index, socials) => (
+              <SocialEditorRow
+                key={soc.id}
+                social={soc}
+                index={index}
+                count={socials.length}
+                busy={editor.editSocial.isPending || editor.moveSocial.isPending || editor.removeSocial.isPending}
+                onSave={(data) => editor.editSocial.mutate({ id: soc.id, data })}
+                onToggle={() => editor.editSocial.mutate({ id: soc.id, data: { isVisible: !soc.isVisible } })}
+                onMove={(offset) => {
+                  const target = index + offset;
+                  if (target < 0 || target >= socials.length) return;
+                  editor.moveSocial.mutate(arrayMove(socials.map((item) => item.id), index, target));
+                }}
+                onDelete={() => editor.removeSocial.mutate(soc.id)}
+              />
+            ))}
+            {(editor.createSocial.isError || editor.editSocial.isError || editor.moveSocial.isError || editor.removeSocial.isError) ? (
+              <p role="alert" className="text-xs font-semibold text-[#b4322c]">Could not save that social-link change. Check the platform URL and try again.</p>
+            ) : null}
           </div>
 
           <div className="mt-5 grid gap-3 border-t border-[#eceee9] pt-5 sm:grid-cols-[auto_1fr_auto]">
@@ -584,7 +591,7 @@ export function LinksPanel() {
               : "Publish your page to make it visible to anyone with the link."}
           </p>
           <Link
-            href={`/${page.user.username}`}
+            href={`/${page.user.username}${page.isPrimary ? "" : `/${page.slug}`}`}
             target="_blank"
             rel="noreferrer"
             className={`k-btn-line shrink-0 !rounded-full ${page.isPublished ? "" : "pointer-events-none opacity-50"}`}
@@ -596,6 +603,65 @@ export function LinksPanel() {
         <DeleteAccount />
       </div>
     </Panel>
+  );
+}
+
+function SocialEditorRow({ social, index, count, busy, onSave, onToggle, onMove, onDelete }: {
+  social: EditorSocial;
+  index: number;
+  count: number;
+  busy: boolean;
+  onSave: (data: { platform: string; url: string; username: string | null }) => void;
+  onToggle: () => void;
+  onMove: (offset: -1 | 1) => void;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [platform, setPlatform] = useState(social.platform);
+  const [url, setUrl] = useState(social.url);
+  const [username, setUsername] = useState(social.username ?? "");
+  const Icon = SOCIAL_ICONS[social.platform] ?? IconLink;
+
+  useEffect(() => {
+    setPlatform(social.platform);
+    setUrl(social.url);
+    setUsername(social.username ?? "");
+  }, [social.id, social.platform, social.url, social.username]);
+
+  if (editing) return (
+    <div className="grid gap-2 rounded-[14px] border border-[#dfe2dc] bg-white p-3">
+      <div className="grid gap-2 sm:grid-cols-[auto_1fr]">
+        <select aria-label="Edit platform" className="k-input !w-auto" value={platform} onChange={(event) => setPlatform(event.target.value)}>
+          {SOCIAL_PLATFORMS.map((value) => <option key={value} value={value}>{value.charAt(0) + value.slice(1).toLowerCase()}</option>)}
+        </select>
+        <input aria-label="Edit profile URL" className="k-input" value={url} onChange={(event) => setUrl(event.target.value)} />
+      </div>
+      <input aria-label="Edit social username" className="k-input" placeholder="Username (optional)" value={username} onChange={(event) => setUsername(event.target.value)} />
+      <div className="flex justify-end gap-2">
+        <button type="button" className="k-btn-line !h-9" onClick={() => setEditing(false)}>Cancel</button>
+        <button type="button" className="k-btn-ink !h-9" disabled={busy || !url.trim()} onClick={() => { onSave({ platform, url: url.trim(), username: username.trim() || null }); setEditing(false); }}>Save</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={`flex items-center gap-2 rounded-[14px] border border-[#eceee9] bg-white px-3 py-2.5 ${social.isVisible ? "" : "opacity-55"}`}>
+      <span className="k-tile-icon"><Icon className="h-4 w-4" /></span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-extrabold text-[var(--k-ink)]">{social.platform}</p>
+        <p className="truncate text-xs text-[var(--k-muted)]">{social.url}</p>
+      </div>
+      <button type="button" role="switch" aria-checked={social.isVisible} aria-label={`${social.isVisible ? "Hide" : "Show"} ${social.platform} link`} disabled={busy} onClick={onToggle}
+        className={`relative h-6 w-11 shrink-0 rounded-full transition ${social.isVisible ? "bg-[var(--k-lime)]" : "bg-[#c7cbc4]"}`}>
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${social.isVisible ? "left-[22px]" : "left-0.5"}`} />
+      </button>
+      <div className="flex flex-col">
+        <button type="button" className="h-5 px-1 text-xs disabled:opacity-25" aria-label={`Move ${social.platform} up`} disabled={busy || index === 0} onClick={() => onMove(-1)}>↑</button>
+        <button type="button" className="h-5 px-1 text-xs disabled:opacity-25" aria-label={`Move ${social.platform} down`} disabled={busy || index === count - 1} onClick={() => onMove(1)}>↓</button>
+      </div>
+      <button type="button" aria-label={`Edit ${social.platform} link`} className="k-icon-btn !h-8 !w-8" onClick={() => setEditing(true)}><IconPencil className="h-4 w-4" /></button>
+      <button type="button" aria-label={`Delete ${social.platform} link`} className="k-icon-btn !h-8 !w-8 hover:!text-[#b4322c]" disabled={busy} onClick={onDelete}><IconTrash className="h-4 w-4" /></button>
+    </div>
   );
 }
 

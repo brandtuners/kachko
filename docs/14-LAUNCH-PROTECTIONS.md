@@ -7,12 +7,12 @@ Password recovery, public abuse reporting, role-protected moderation, audit logs
 The API logs password-reset links locally when `RESEND_API_KEY` is empty. Production startup requires all three values:
 
 ```env
-PUBLIC_APP_URL=https://kachko.app
+PUBLIC_APP_URL=https://kachko.in
 RESEND_API_KEY=re_...
-EMAIL_FROM=KACHKO <no-reply@kachko.app>
+EMAIL_FROM=KACHKO <no-reply@kachko.in>
 ```
 
-`PASSWORD_RESET_TTL_SECONDS` defaults to one hour and is bounded to 5 minutes–24 hours. The frontend also requires `NEXT_PUBLIC_APP_URL=https://kachko.app` so canonical, Open Graph, share, and QR destinations use the same `/@username` URL.
+`PASSWORD_RESET_TTL_SECONDS` defaults to one hour and is bounded to 5 minutes–24 hours. The frontend also requires `NEXT_PUBLIC_APP_URL=https://kachko.in` so canonical, Open Graph, share, and QR destinations use the same `/username` URL.
 
 Apply the new database migration before deployment:
 

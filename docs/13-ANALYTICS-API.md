@@ -18,7 +18,10 @@ Apply the migration:
 pnpm db:deploy
 ```
 
-V1 retains raw analytics events for 12 months. Schedule this command daily in the deployment environment:
+V1 retains raw analytics events for 12 months. The repository schedules this
+command daily through `.github/workflows/analytics-retention.yml`; configure its
+protected production environment and `DATABASE_URL` secret before release. It
+can also be run manually from a trusted environment:
 
 ```bash
 pnpm db:analytics:prune

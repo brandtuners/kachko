@@ -35,7 +35,7 @@ integrated. The block selector now offers all ten types; see
 3. In browser Network, verify POST `/api/v1/auth/login` includes `X-Kachko-CSRF: 1`,
    succeeds and establishes the session cookie.
 4. Open the dashboard, create/edit LINK or TEXT blocks, reorder, and change theme.
-5. Publish, then open `/@yourusername` in a separate browser session.
+5. Publish, then open `/yourusername` in a separate browser session.
 6. Unpublish and verify the public route returns not found; log out and confirm
    protected API calls return UNAUTHENTICATED.
 

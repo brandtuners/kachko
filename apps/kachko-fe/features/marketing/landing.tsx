@@ -246,12 +246,6 @@ const YoutubeIcon: IconType = (p) => (
     <path d="m10.5 9.5 5 2.5-5 2.5v-5Z" />
   </svg>
 );
-const XIcon: IconType = (p) => (
-  <svg {...iconBase} {...p}>
-    <path d="m4.5 4.5 15 15" />
-    <path d="m19.5 4.5-15 15" />
-  </svg>
-);
 const FolderIcon: IconType = (p) => (
   <svg {...iconBase} {...p}>
     <path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h3.2a2 2 0 0 1 1.5.7l1 1.3h7.3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-9Z" />
@@ -575,7 +569,7 @@ function Hero() {
               </div>
             </Reveal>
             <Reveal delay={300}>
-              <p className="mt-6 text-[13px] font-medium text-muted">Free to start. No credit card required.</p>
+              <p className="mt-6 text-[13px] font-medium text-muted">Kachko is currently free. No credit card required.</p>
             </Reveal>
           </div>
           <div className="lg:col-span-6 xl:col-span-6">
@@ -704,7 +698,7 @@ function LinkRow({
 }
 
 function Handle({ className }: { className?: string }) {
-  return <div className={cn("mt-auto pt-3 text-center text-[8.5px] font-bold tracking-[0.14em]", className)}>KACHKO.COM/@GIRISH</div>;
+  return <div className={cn("mt-auto pt-3 text-center text-[8.5px] font-bold tracking-[0.14em]", className)}>KACHKO.IN/GIRISH</div>;
 }
 
 const MOCK_LINKS: { label: string; icon: IconType }[] = [
@@ -960,7 +954,7 @@ function ProductSection() {
         </div>
         <Reveal>
           <p className="mt-10 text-center text-[13px] font-semibold tracking-[0.02em] text-muted">
-            kachko.com/@girish — live in under two minutes.
+            kachko.in/girish — one page for everything you share.
           </p>
         </Reveal>
       </Container>
@@ -1002,7 +996,7 @@ function EditorPanel({ compact = false, className }: { compact?: boolean; classN
   return (
     <div className={cn("overflow-hidden rounded-[18px] border border-line bg-cream shadow-[0_30px_60px_-45px_rgba(17,19,18,0.4)]", className)}>
       <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
-        <span className="truncate text-[12px] font-semibold text-muted">kachko.com/@girish</span>
+        <span className="truncate text-[12px] font-semibold text-muted">kachko.in/girish</span>
         <span className="flex items-center gap-2">
           <span className="hidden rounded-[9px] border border-line px-2.5 py-1 text-[11px] font-bold text-ink/70 sm:inline-block">Preview</span>
           <span className="inline-flex items-center gap-1.5 rounded-[9px] bg-ink px-2.5 py-1 text-[11px] font-bold text-ivory">
@@ -1305,7 +1299,7 @@ function FastVisual() {
           </span>
           <span className="flex flex-1 items-center gap-2 rounded-[8px] border border-line bg-ivory/80 px-3 py-1 text-[11px] font-semibold text-muted">
             <GlobeIcon className="h-3 w-3" />
-            kachko.com/@girish
+            kachko.in/girish
           </span>
         </div>
         <div className="relative flex min-h-[230px] flex-col items-center justify-center px-6 py-10">
@@ -1337,7 +1331,7 @@ function FastVisual() {
       <div className="mt-8 flex flex-wrap gap-2 sm:absolute sm:bottom-10 sm:left-0 sm:mt-0 sm:flex-col">
         <span className="inline-flex items-center gap-2 rounded-[11px] border border-line bg-cream px-3 py-1.5 text-[11.5px] font-bold shadow-[0_10px_24px_-18px_rgba(17,19,18,0.5)]">
           <BoltIcon className="h-3.5 w-3.5 text-olive" />
-          0.4s first load
+          Fast public pages
         </span>
         <span className="inline-flex items-center gap-2 rounded-[11px] border border-line bg-cream px-3 py-1.5 text-[11.5px] font-bold shadow-[0_10px_24px_-18px_rgba(17,19,18,0.5)]">
           <PhoneIcon className="h-3.5 w-3.5 text-olive" />
@@ -1381,7 +1375,7 @@ function FeaturesSection() {
             flip
             title="Make it yours."
             copy="Choose your colors, fonts, layouts and personality. Your page should feel like you."
-            points={["Themes that don't look templated", "Type, color and layout control", "Custom domains"]}
+            points={["Curated themes and starter templates", "Fonts, colors and button control", "Wallpaper images with focal positioning"]}
             visual={<EditorPhoneVisual />}
           />
           <Hairline />
@@ -1398,7 +1392,7 @@ function FeaturesSection() {
             flip
             title="Fast everywhere."
             copy="Beautiful on desktop. Effortless on mobile. Built to load quickly wherever your audience finds you."
-            points={["Lightweight by default", "Looks right on every screen", "Global delivery"]}
+            points={["Server-rendered public pages", "Looks right on every screen", "Responsive live preview"]}
             visual={<FastVisual />}
           />
         </div>
@@ -1468,9 +1462,9 @@ function EditorSection() {
 
 const THEMES: { key: ThemeKey; name: string; note: string }[] = [
   { key: "minimal", name: "Minimal", note: "Quiet type, nothing extra." },
-  { key: "bold", name: "Bold", note: "High contrast, full presence." },
-  { key: "editorial", name: "Editorial", note: "Typographic and considered." },
-  { key: "playful", name: "Playful", note: "Round, warm and friendly." },
+  { key: "editorial", name: "Professional", note: "Structured, clear and considered." },
+  { key: "playful", name: "Nature", note: "Warm, organic and welcoming." },
+  { key: "bold", name: "Neon Pop", note: "High contrast, full presence." },
 ];
 
 function TemplatesSection() {
@@ -1492,7 +1486,7 @@ function TemplatesSection() {
           </div>
           <div className="lg:col-span-4 lg:col-start-9 lg:self-end">
             <Reveal delay={120}>
-              <p className="text-[15.5px] leading-relaxed text-muted">Start from a theme, then make it unrecognisable. Colour, type, shape and rhythm are all yours.</p>
+              <p className="text-[15.5px] leading-relaxed text-muted">Choose a curated theme or apply a starter template, then adjust the wallpaper, colors, fonts and buttons to make it yours.</p>
             </Reveal>
           </div>
         </div>
@@ -1709,8 +1703,8 @@ function StepsSection() {
         <Reveal delay={120}>
           <div className="mt-14 flex flex-wrap items-center gap-4 lg:mt-16">
             <span className="inline-flex items-center rounded-[13px] border border-line bg-cream px-5 py-3.5 text-[15px] font-bold tracking-tight">
-              kachko.com/
-              <span className="text-olive">@yourname</span>
+              kachko.in/
+              <span className="text-olive">yourname</span>
             </span>
             <span className="text-[13px] font-medium text-muted">Yours the moment you claim it.</span>
           </div>
@@ -1724,23 +1718,13 @@ function StepsSection() {
 
 const PLANS = [
   {
-    name: "Free",
+    name: "Kachko",
     price: "$0",
-    note: "forever",
-    copy: "Everything you need to put your world online.",
-    features: ["Unlimited links", "All core themes", "Basic analytics"],
+    note: "currently free",
+    copy: "Everything currently available, with no paid upgrade required.",
+    features: ["Multiple pages and content blocks", "Themes, templates and design controls", "Privacy-safe basic analytics"],
     cta: "Create your Kachko",
     variant: "primary" as const,
-    href: "/register",
-  },
-  {
-    name: "Kachko Pro",
-    price: "$6",
-    note: "per month",
-    copy: "For people who want the page to work harder.",
-    features: ["Custom domain", "Advanced analytics", "Full design control"],
-    cta: "Go Pro",
-    variant: "ghost" as const,
     href: "/register",
   },
 ];
@@ -1753,23 +1737,23 @@ function PricingSection() {
           <div className="lg:col-span-4">
             <Reveal>
               <h2 className="heading text-[clamp(2rem,4.6vw,3rem)]">
-                Start free.
+                Start building.
                 <br />
-                Grow when ready.
+                Everything is included.
               </h2>
               <p className="mt-6 max-w-sm text-[15.5px] leading-relaxed text-muted">
-                No credit card, no trial countdown. Kachko is free to start and stays free for as long as you like.
+                Kachko is currently free. No credit card, trial countdown or unavailable paid tier.
               </p>
             </Reveal>
           </div>
-          <div className="grid gap-10 sm:grid-cols-2 lg:col-span-7 lg:col-start-6 lg:gap-12">
+          <div className="grid gap-10 lg:col-span-7 lg:col-start-6 lg:gap-12">
             {PLANS.map((plan, i) => (
               <Reveal key={plan.name} delay={i * 110}>
                 <div className="flex h-full flex-col border-t border-line pt-7">
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="text-[13px] font-extrabold uppercase tracking-[0.16em]">{plan.name}</p>
                     {i === 0 && (
-                      <span className="rounded-full bg-lime px-2.5 py-1 text-[10.5px] font-extrabold uppercase tracking-[0.12em] text-ink">Popular</span>
+                      <span className="rounded-full bg-lime px-2.5 py-1 text-[10.5px] font-extrabold uppercase tracking-[0.12em] text-ink">Included</span>
                     )}
                   </div>
                   <p className="mt-6 flex items-baseline gap-2">
@@ -1834,7 +1818,7 @@ function FinalCta() {
             </div>
           </Reveal>
           <Reveal delay={260}>
-            <p className="mt-7 text-[13px] font-medium text-ivory/40">Free to start. No credit card required.</p>
+            <p className="mt-7 text-[13px] font-medium text-ivory/40">Kachko is currently free. No credit card required.</p>
           </Reveal>
         </div>
       </Container>
@@ -1855,30 +1839,20 @@ const FOOTER_COLS: { title: string; links: { label: string; href: string }[] }[]
     ],
   },
   {
-    title: "Resources",
+    title: "Account",
     links: [
-      { label: "Help", href: "#top" },
-      { label: "Blog", href: "#top" },
-      { label: "Guides", href: "#top" },
-      { label: "Community", href: "#top" },
+      { label: "Create account", href: "/register" },
+      { label: "Log in", href: "/login" },
+      { label: "Reset password", href: "/forgot-password" },
     ],
   },
   {
     title: "Company",
     links: [
-      { label: "About", href: "#top" },
-      { label: "Contact", href: "#top" },
       { label: "Privacy", href: "/legal/privacy" },
       { label: "Terms", href: "/legal/terms" },
     ],
   },
-];
-
-const SOCIALS: { name: string; Icon: IconType }[] = [
-  { name: "Instagram", Icon: InstagramIcon },
-  { name: "X", Icon: XIcon },
-  { name: "LinkedIn", Icon: LinkedinIcon },
-  { name: "YouTube", Icon: YoutubeIcon },
 ];
 
 function Footer() {
@@ -1910,21 +1884,8 @@ function Footer() {
             ))}
           </div>
         </div>
-        <div className="mt-16 flex flex-col gap-6 border-t border-line pt-8 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-16 border-t border-line pt-8">
           <p className="text-[13px] font-medium text-muted">© {new Date().getFullYear()} Kachko. All rights reserved.</p>
-          <ul className="flex items-center gap-3">
-            {SOCIALS.map(({ name, Icon }) => (
-              <li key={name}>
-                <a
-                  href="#top"
-                  aria-label={name}
-                  className="flex h-10 w-10 items-center justify-center rounded-[12px] border border-line text-ink/70 transition-all duration-300 hover:-translate-y-[2px] hover:border-ink/25 hover:text-ink"
-                >
-                  <Icon className="h-[18px] w-[18px]" />
-                </a>
-              </li>
-            ))}
-          </ul>
         </div>
       </Container>
     </footer>

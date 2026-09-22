@@ -108,7 +108,7 @@ export function LivePreview({ page, isPublished }: { page: EditorPage; isPublish
             <span className="h-2.5 w-2.5 rounded-full bg-[#e5e7e0]" />
             <span className="h-2.5 w-2.5 rounded-full bg-[#e5e7e0]" />
             <span className="ml-2 truncate rounded-md bg-white px-2 py-0.5 text-[10px] text-[#9a9f9b]">
-              kachko.app/{page.user.username}{page.isPrimary ? "" : `/${page.slug}`}
+              kachko.in/{page.user.username}{page.isPrimary ? "" : `/${page.slug}`}
             </span>
           </div>
           <div

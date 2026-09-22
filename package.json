@@ -11,6 +11,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo test",
     "test:e2e": "turbo test:e2e",
+    "test:smoke": "robot --outputdir apps/api/test/robot/results apps/api/test/robot/v1_smoke.robot",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:generate": "prisma generate",
@@ -19,6 +20,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
     "db:analytics:prune": "prisma db execute --file prisma/analytics-retention.sql",
+    "db:backup": "bash scripts/db-backup.sh",
+    "db:restore": "bash scripts/db-restore.sh",
     "db:studio": "prisma studio",
     "db:test": "pnpm --filter api test:db"
   },
@@ -35,6 +38,7 @@
   "packageManager": "pnpm@12.4.1",
   "type": "module",
   "devDependencies": {
+    "prettier": "^3.6.2",
     "turbo": "^2.10.12",
     "prisma": "7.10.0",
     "dotenv": "^17.0.0"

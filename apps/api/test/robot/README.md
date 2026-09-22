@@ -31,11 +31,13 @@ Use another API origin when needed:
 
 ```sh
 robot --variable BASE_URL:https://api-staging.kachko.in \
+  --variable PUBLIC_APP_URL:https://staging.kachko.in \
   --outputdir apps/api/test/robot/results apps/api/test/robot/v1_smoke.robot
 ```
 
 The suite expects `PUBLIC_APP_URL=http://localhost:3000` for the QR URL
-assertion. Override the assertion when running against another environment.
+assertion. Set the Robot `PUBLIC_APP_URL` variable to the deployed frontend
+origin when running against another environment.
 The test intentionally uses a disposable `example.com` address and does not
 test Resend delivery; password-reset provider verification remains an
 operator check.

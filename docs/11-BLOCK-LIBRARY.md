@@ -25,4 +25,4 @@ accepts track/playlist/album/episode/show/artist URLs. Social blocks use a
 platform and handle; separate social profiles retain their URL-based contract.
 
 Run `pnpm db:deploy` before starting the updated API, then `pnpm dev`.
-Open Links → Blocks library to add each type, edit content and save. Image creation asks for URL and alt text. Publish and check `/@username`; verify hidden blocks disappear and reorder persists. Swagger at `/api/docs` describes all ten request variants. Mutation requests require `X-Kachko-CSRF: 1` and an authenticated session.
+Open Links → Blocks library to add each type, edit content and save. Image creation asks for URL and alt text. Publish and check `/username`; verify hidden blocks disappear and reorder persists. Swagger at `/api/docs` describes all ten request variants. Mutation requests require `X-Kachko-CSRF: 1` and an authenticated session.

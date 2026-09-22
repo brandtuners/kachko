@@ -4,8 +4,8 @@ KACHKO deploys as two Vercel projects from this pnpm/Turborepo monorepo:
 
 | Project | Root Directory | Framework | Domain |
 |---|---|---|---|
-| `kachko-fe` | `apps/kachko-fe` | Next.js | `kachko.app` / `staging.kachko.app` |
-| `kachko-api` | `apps/api` | NestJS | `api.kachko.app` / `api-staging.kachko.app` |
+| `kachko-fe` | `apps/kachko-fe` | Next.js | `kachko.in` / `staging.kachko.in` |
+| `kachko-api` | `apps/api` | NestJS | `api.kachko.in` / `api-staging.kachko.in` |
 
 The repository currently has a `dev` branch. Either create/protect `main` as the production branch, or set both Vercel projects’ Production Branch to `dev` until that branch is introduced; use a separate `staging` branch for Preview deployments.
 
@@ -99,27 +99,27 @@ MEDIA_LOCAL_DIR=./tmp/media
 
 ```env
 NODE_ENV=production
-CORS_ORIGINS=https://staging.kachko.app
+CORS_ORIGINS=https://staging.kachko.in
 DATABASE_URL=<staging pooled PostgreSQL URL>
 REDIS_URL=<staging Redis URL>
 DEPENDENCY_TIMEOUT_MS=2000
 SESSION_COOKIE_NAME=kachko_session
 SESSION_TTL_SECONDS=604800
 PASSWORD_RESET_TTL_SECONDS=3600
-PUBLIC_APP_URL=https://staging.kachko.app
+PUBLIC_APP_URL=https://staging.kachko.in
 RESEND_API_KEY=<staging Resend key>
-EMAIL_FROM=KACHKO Staging <no-reply@staging.kachko.app>
+EMAIL_FROM=KACHKO Staging <no-reply@staging.kachko.in>
 ANALYTICS_HASH_SALT=<different staging salt, 32+ characters>
 GOOGLE_CLIENT_ID=<staging client id>
 GOOGLE_CLIENT_SECRET=<staging secret>
-GOOGLE_REDIRECT_URI=https://api-staging.kachko.app/api/v1/auth/google/callback
-GOOGLE_LOGIN_REDIRECT_URL=https://staging.kachko.app/auth/google/callback
+GOOGLE_REDIRECT_URI=https://api-staging.kachko.in/api/v1/auth/google/callback
+GOOGLE_LOGIN_REDIRECT_URL=https://staging.kachko.in/auth/google/callback
 MEDIA_STORAGE=r2
 R2_ACCOUNT_ID=<account id>
 R2_ACCESS_KEY_ID=<staging key>
 R2_SECRET_ACCESS_KEY=<staging secret>
 R2_BUCKET=<staging bucket>
-R2_PUBLIC_URL=https://cdn-staging.kachko.app
+R2_PUBLIC_URL=https://cdn-staging.kachko.in
 ```
 
 ### Production
@@ -128,18 +128,18 @@ Use production resources and domains for the staging set:
 
 ```env
 NODE_ENV=production
-CORS_ORIGINS=https://kachko.app
+CORS_ORIGINS=https://kachko.in
 DATABASE_URL=<production pooled PostgreSQL URL>
 REDIS_URL=<production Redis URL>
-PUBLIC_APP_URL=https://kachko.app
+PUBLIC_APP_URL=https://kachko.in
 RESEND_API_KEY=<production Resend key>
-EMAIL_FROM=KACHKO <no-reply@kachko.app>
+EMAIL_FROM=KACHKO <no-reply@kachko.in>
 ANALYTICS_HASH_SALT=<different production salt, 32+ characters>
-GOOGLE_REDIRECT_URI=https://api.kachko.app/api/v1/auth/google/callback
-GOOGLE_LOGIN_REDIRECT_URL=https://kachko.app/auth/google/callback
+GOOGLE_REDIRECT_URI=https://api.kachko.in/api/v1/auth/google/callback
+GOOGLE_LOGIN_REDIRECT_URL=https://kachko.in/auth/google/callback
 MEDIA_STORAGE=r2
 R2_BUCKET=<production bucket>
-R2_PUBLIC_URL=https://cdn.kachko.app
+R2_PUBLIC_URL=https://cdn.kachko.in
 ```
 
 Keep all credentials server-only. `PUBLIC_APP_URL` must be an exact HTTPS origin in production and must not have a trailing slash.
@@ -173,14 +173,14 @@ NEXT_PUBLIC_CDN_URL=
 NEXT_PUBLIC_SENTRY_DSN=
 
 # Staging / Preview
-NEXT_PUBLIC_APP_URL=https://staging.kachko.app
-API_URL=https://api-staging.kachko.app
-NEXT_PUBLIC_CDN_URL=https://cdn-staging.kachko.app
+NEXT_PUBLIC_APP_URL=https://staging.kachko.in
+API_URL=https://api-staging.kachko.in
+NEXT_PUBLIC_CDN_URL=https://cdn-staging.kachko.in
 
 # Production
-NEXT_PUBLIC_APP_URL=https://kachko.app
-API_URL=https://api.kachko.app
-NEXT_PUBLIC_CDN_URL=https://cdn.kachko.app
+NEXT_PUBLIC_APP_URL=https://kachko.in
+API_URL=https://api.kachko.in
+NEXT_PUBLIC_CDN_URL=https://cdn.kachko.in
 ```
 
 The Next.js rewrite sends browser `/api/v1/*` calls to the API while keeping cookies and CSRF requests same-origin from the browser.
@@ -190,8 +190,8 @@ The Next.js rewrite sends browser `/api/v1/*` calls to the API while keeping coo
 Add these domains in Vercel and configure DNS/TLS:
 
 ```text
-FE:  kachko.app, staging.kachko.app
-API: api.kachko.app, api-staging.kachko.app
+FE:  kachko.in, staging.kachko.in
+API: api.kachko.in, api-staging.kachko.in
 ```
 
 Assign the staging hostnames to the `staging` branch (or your custom staging environment) in Vercel’s Domains settings. Otherwise a Preview deployment may receive a generated URL while `API_URL` still points at the previous deployment.
@@ -200,8 +200,8 @@ In Google Cloud Console, add these exact authorized redirect URIs:
 
 ```text
 http://localhost:4000/api/v1/auth/google/callback
-https://api-staging.kachko.app/api/v1/auth/google/callback
-https://api.kachko.app/api/v1/auth/google/callback
+https://api-staging.kachko.in/api/v1/auth/google/callback
+https://api.kachko.in/api/v1/auth/google/callback
 ```
 
 Use matching `GOOGLE_LOGIN_REDIRECT_URL` values for each environment.
@@ -219,13 +219,13 @@ Never run `prisma migrate dev` or accept a reset against staging/production. The
 
 ## 8. Deploy and verify staging
 
-Push a `staging` branch. Vercel creates Preview deployments. Verify the FE Preview points to `api-staging.kachko.app`.
+Push a `staging` branch. Vercel creates Preview deployments. Verify the FE Preview points to `api-staging.kachko.in`.
 
 Run this checklist against staging:
 
 1. `/api/v1/health/live` returns 200.
 2. `/api/v1/health/ready` returns 200.
-3. Register → create page → add link → publish → open `/@username`.
+3. Register → create page → add link → publish → open `/username`.
 4. Edit profile, theme and social links; reload and confirm persistence.
 5. Upload avatar/IMAGE through R2.
 6. Generate/download QR and open it on a phone.
@@ -248,9 +248,18 @@ vercel deploy --prod
 
 Run the health and smoke checklist again. Use Vercel Instant Rollback if the deployment is faulty. Database changes are forward-only; maintain a tested restore plan and do not roll back application code across an incompatible migration.
 
-## 10. Analytics retention
+## 10. Analytics retention and backups
 
-`prisma/analytics-retention.sql` is currently a CLI SQL command. Vercel Cron invokes an HTTP route, not a shell command. Before production, either schedule the SQL from a trusted database/CI scheduler or add a protected API cron route using `CRON_SECRET`, then register it in `vercel.json`. Never expose an unauthenticated prune endpoint. Vercel Cron runs only on production deployments; see [Vercel Cron documentation](https://vercel.com/docs/cron-jobs).
+`.github/workflows/analytics-retention.yml` runs the 12-month pruning SQL daily
+through a protected GitHub production environment. Configure a least-privileged
+`DATABASE_URL` environment secret, require reviewers for manual dispatches, and
+monitor failed scheduled runs. The job may also be replaced by a trusted
+database-provider scheduler; never expose an unauthenticated prune endpoint.
+
+Enable the PostgreSQL provider's automated point-in-time recovery and perform
+the portable backup/restore drill in `docs/16-DATABASE-OPERATIONS.md` at least
+quarterly. A backup is not considered verified until it has restored
+successfully into an isolated database and passed schema and smoke checks.
 
 ## CLI environment helpers
 
@@ -276,3 +285,4 @@ Environment changes affect new deployments, so redeploy after changing variables
 - [ ] All staging browser journeys pass.
 - [ ] Production health, smoke tests and rollback procedure are ready.
 - [ ] Analytics retention is scheduled through a protected job.
+- [ ] Provider backups are enabled and a dated restore drill has passed.

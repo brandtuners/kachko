@@ -42,7 +42,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       <Header tab={tab} go={go} isPublished={page.isPublished} />
       <EditorWorkspace preview={<LivePreview page={page} isPublished={page.isPublished} />}>
         {children}
-        <footer className="pb-4 pt-12 text-center text-xs text-[#9a9f9b] lg:text-left">{displayName} · kachko.app/{page.user.username}{page.isPrimary ? "" : `/${page.slug}`} — Powered by <span className="font-extrabold text-[#718c1b]">Kachko</span></footer>
+        <footer className="pb-4 pt-12 text-center text-xs text-[#9a9f9b] lg:text-left">{displayName} · kachko.in/{page.user.username}{page.isPrimary ? "" : `/${page.slug}`} — Powered by <span className="font-extrabold text-[#718c1b]">Kachko</span></footer>
       </EditorWorkspace>
       <Sidebar tab={tab} go={go} />
     </div>
