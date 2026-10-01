@@ -48,7 +48,7 @@ jobs:
       GOOGLE_CLIENT_SECRET: ""
       GOOGLE_LOGIN_REDIRECT_URL: ""
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 12.4.1
