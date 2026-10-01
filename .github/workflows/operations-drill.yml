@@ -1,0 +1,97 @@
+name: operations drill
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 3 1 */3 *"
+
+permissions:
+  contents: read
+
+jobs:
+  restore-and-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: kachko
+          POSTGRES_PASSWORD: kachko
+          POSTGRES_DB: kachko_drill
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kachko -d kachko_drill"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://kachko:kachko@127.0.0.1:5432/kachko_drill
+      REDIS_URL: redis://127.0.0.1:6379/14
+      PORT: "4100"
+      CORS_ORIGINS: http://127.0.0.1:3100
+      PUBLIC_APP_URL: http://127.0.0.1:3100
+      ANALYTICS_HASH_SALT: kachko-operations-drill-salt-at-least-32-characters
+      MEDIA_STORAGE: local
+      MEDIA_LOCAL_DIR: ./tmp/drill-media
+      GOOGLE_CLIENT_ID: ""
+      GOOGLE_CLIENT_SECRET: ""
+      GOOGLE_LOGIN_REDIRECT_URL: ""
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:deploy
+      - name: Create and validate logical backup
+        env:
+          BACKUP_DIR: ${{ runner.temp }}/backups
+        run: pnpm db:backup
+      - name: Restore into a disposable database
+        env:
+          BACKUP_DIR: ${{ runner.temp }}/backups
+          TARGET_DATABASE_URL: postgresql://kachko:kachko@127.0.0.1:5432/kachko_restore_drill
+          CONFIRM_RESTORE: RESTORE
+          PGPASSWORD: kachko
+        run: |
+          createdb --host=127.0.0.1 --username=kachko kachko_restore_drill
+          BACKUP_FILE="$(find "$BACKUP_DIR" -type f -name '*.dump' -print -quit)" pnpm db:restore
+          psql "$TARGET_DATABASE_URL" --set ON_ERROR_STOP=1 --command 'SELECT count(*) FROM "_prisma_migrations";'
+      - name: Build and start API
+        run: |
+          pnpm --filter api build
+          pnpm --filter api start >"${RUNNER_TEMP}/kachko-api.log" 2>&1 &
+          echo $! >"${RUNNER_TEMP}/kachko-api.pid"
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:4100/api/v1/health/ready && exit 0
+            sleep 1
+          done
+          cat "${RUNNER_TEMP}/kachko-api.log"
+          exit 1
+      - name: Run bounded load smoke
+        env:
+          LOAD_TEST_URL: http://127.0.0.1:4100/api/v1/health
+          LOAD_TEST_REQUESTS: "300"
+          LOAD_TEST_CONCURRENCY: "30"
+          LOAD_TEST_MAX_P95_MS: "500"
+        run: pnpm test:load
+      - name: Stop API
+        if: always()
+        run: |
+          if test -f "${RUNNER_TEMP}/kachko-api.pid"; then kill "$(cat "${RUNNER_TEMP}/kachko-api.pid")" || true; fi
+          if test -f "${RUNNER_TEMP}/kachko-api.log"; then tail -100 "${RUNNER_TEMP}/kachko-api.log"; fi

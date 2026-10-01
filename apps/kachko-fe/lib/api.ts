@@ -5,6 +5,7 @@ export class ApiClientError extends Error {
     public readonly code: string,
     message: string,
     public readonly details: Record<string, unknown> = {},
+    public readonly requestId?: string,
   ) {
     super(message);
     this.name = "ApiClientError";
@@ -17,7 +18,7 @@ async function parse<T>(res: Response): Promise<T> {
   if (res.status === 204) return undefined as T;
   const json = await res.json().catch(() => null);
   if (json?.error) {
-    throw new ApiClientError(json.error.code, String(json.error.message), json.error.details);
+    throw new ApiClientError(json.error.code, String(json.error.message), json.error.details, json.error.requestId);
   }
   if (!res.ok) throw new ApiClientError(`HTTP_${res.status}`, `Request failed (${res.status})`);
   if (!json || !("data" in json)) throw new ApiClientError("INVALID_RESPONSE", "The API returned an unexpected response");

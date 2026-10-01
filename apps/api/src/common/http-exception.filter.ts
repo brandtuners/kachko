@@ -1,5 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import type { Response } from 'express';
+import type { RequestWithId } from './request-context';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -10,11 +11,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const body = exception instanceof HttpException ? exception.getResponse() : undefined;
     const details = typeof body === 'object' && body !== null ? body as Record<string, unknown> : {};
     const message = status >= 500 ? 'Internal server error' : details.message ?? body ?? 'Request failed';
-    if (status >= 500) this.logger.error('Unhandled server error', exception instanceof Error ? exception.stack : undefined);
+    const request = host.switchToHttp().getRequest<RequestWithId>();
+    const requestId = request.requestId ?? 'unknown';
+    if (status >= 500) this.logger.error(JSON.stringify({ event: 'unhandled_error', requestId, method: request.method, path: request.path, statusCode: status }), exception instanceof Error ? exception.stack : undefined);
     host.switchToHttp().getResponse<Response>().status(status).json({
       error: {
         code: typeof details.code === 'string' ? details.code : status >= 500 ? 'INTERNAL_ERROR' : HttpStatus[status] ?? 'REQUEST_FAILED',
         message,
+        requestId,
       },
     });
   }

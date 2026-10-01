@@ -35,6 +35,13 @@ smoke suite against the restored database. Record the date, dump identifier,
 restore duration, row-count checks, and operator. Run this drill at least once
 per quarter and before relying on a new provider or backup policy.
 
+The scheduled `operations drill` GitHub workflow performs a quarterly backup,
+restores it into a separate disposable database, verifies the migration ledger,
+starts the real API, and runs a bounded concurrent load smoke. A production
+provider restore must still be performed and recorded separately because the CI
+drill cannot verify provider permissions, point-in-time recovery, or production
+networking.
+
 ## Analytics retention
 
 `.github/workflows/analytics-retention.yml` executes the 12-month pruning SQL

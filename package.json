@@ -11,6 +11,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo test",
     "test:e2e": "turbo test:e2e",
+    "test:load": "node scripts/load-smoke.mjs",
     "test:smoke": "robot --outputdir apps/api/test/robot/results apps/api/test/robot/v1_smoke.robot",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

@@ -5,13 +5,15 @@ import helmet from 'helmet';
 import { raw } from 'express';
 import { MEDIA_MAX_BYTES, MEDIA_MIME_TYPES } from '@kachko/validation';
 import { HttpExceptionFilter } from './common/http-exception.filter';
+import { REQUEST_ID_HEADER, requestContext } from './common/request-context';
 
 export function configureApp(app: INestApplication) {
   const config = app.get(ConfigService);
   app.setGlobalPrefix('api/v1');
+  app.use(requestContext);
   app.use('/api/v1/media/uploads', raw({ type: [...MEDIA_MIME_TYPES], limit: MEDIA_MAX_BYTES }));
   app.use(helmet());
-  app.enableCors({ origin: config.getOrThrow<string[]>('CORS_ORIGINS'), credentials: true, allowedHeaders: ['Content-Type', 'X-Kachko-CSRF'], exposedHeaders: ['Retry-After'] });
+  app.enableCors({ origin: config.getOrThrow<string[]>('CORS_ORIGINS'), credentials: true, allowedHeaders: ['Content-Type', 'X-Kachko-CSRF'], exposedHeaders: ['Retry-After', REQUEST_ID_HEADER] });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
   if (config.get<string>('NODE_ENV') !== 'production') {

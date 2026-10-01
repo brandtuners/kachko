@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PublicPageRoute, publicPageMetadata } from "../../u/[username]/page";
+import { PublicPageRoute, publicPageMetadata } from "../../../features/page/public-page-route";
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string; pageSlug: string }> }): Promise<Metadata> {
   const { username, pageSlug } = await params;

@@ -30,6 +30,7 @@ import type { PageSummary, PageTemplate, ThemeConfig } from "@kachko/types";
 
 export const pagesKey = ["my-pages"] as const;
 export const pageKey = (pageId: string) => ["my-page", pageId] as const;
+export const editorMutationKey = ["editor-save"] as const;
 const pageSummary = (page: EditorPage): PageSummary => ({
   id: page.id, slug: page.slug, isPrimary: page.isPrimary, title: page.title,
   description: page.description, themeKey: page.themeKey, isPublished: page.isPublished,
@@ -83,6 +84,7 @@ export function useEditor() {
   };
 
   const createPage = useMutation({
+    mutationKey: [...editorMutationKey, "create-page"],
     mutationFn: async (input: { title?: string; description?: string; slug: string }) => {
       const created = await createMyPage(input);
       return getMyPage(created.id);
@@ -96,6 +98,7 @@ export function useEditor() {
   });
 
   const removePage = useMutation({
+    mutationKey: [...editorMutationKey, "remove-page"],
     mutationFn: (pageId: string) => deleteMyPage(pageId),
     onSuccess: (_result, pageId) => {
       qc.removeQueries({ queryKey: pageKey(pageId) });
@@ -112,6 +115,7 @@ export function useEditor() {
   });
 
   const saveMeta = useMutation({
+    mutationKey: [...editorMutationKey, "page-meta"],
     mutationFn: (data: { title?: string; description?: string; isPublished?: boolean }) =>
       updatePageMeta(activePageId(), data),
     onSuccess: (page) => {
@@ -121,27 +125,39 @@ export function useEditor() {
   });
 
   const createBlock = useMutation({
+    mutationKey: [...editorMutationKey, "create-block"],
     mutationFn: (input: { type: string; content: Record<string, unknown> }) => addBlock(activePageId(), input.type, input.content),
     onSuccess: (block) => setPageCache((p) => ({ ...p, blocks: [...p.blocks, block] })),
   });
 
   const editBlock = useMutation({
-    onSettled: () => effectivePageId && qc.invalidateQueries({ queryKey: pageKey(effectivePageId) }),
+    mutationKey: [...editorMutationKey, "edit-block"],
     mutationFn: (input: { id: string; data: { content?: Record<string, unknown>; isVisible?: boolean; position?: number } }) =>
       updateBlock(activePageId(), input.id, input.data),
-    onMutate: ({ id, data }) =>
+    onMutate: async ({ id, data }) => {
+      if (effectivePageId) await qc.cancelQueries({ queryKey: pageKey(effectivePageId) });
+      const previous = effectivePageId ? qc.getQueryData<EditorPage>(pageKey(effectivePageId)) : undefined;
       setPageCache((p) => ({
         ...p,
         blocks: p.blocks.map((b) => (b.id === id ? { ...b, ...data } : b)),
-      })),
+      }));
+      return { previous };
+    },
+    onSuccess: (saved) => setPageCache((page) => ({ ...page, blocks: page.blocks.map((block) => block.id === saved.id ? saved : block) })),
+    onError: (_error, _input, context) => {
+      if (context?.previous && effectivePageId) qc.setQueryData(pageKey(effectivePageId), context.previous);
+    },
+    onSettled: () => { if (effectivePageId) void qc.invalidateQueries({ queryKey: pageKey(effectivePageId) }); },
   });
 
   const removeBlock = useMutation({
+    mutationKey: [...editorMutationKey, "remove-block"],
     mutationFn: (id: string) => deleteBlock(activePageId(), id),
     onSuccess: (_u, id) => setPageCache((p) => ({ ...p, blocks: p.blocks.filter((b) => b.id !== id) })),
   });
 
   const moveBlock = useMutation({
+    mutationKey: [...editorMutationKey, "move-block"],
     mutationFn: (orderedIds: string[]) => reorderBlocks(activePageId(), orderedIds),
     onMutate: async (orderedIds) => {
       if (effectivePageId) await qc.cancelQueries({ queryKey: pageKey(effectivePageId) });
@@ -163,23 +179,27 @@ export function useEditor() {
   });
 
   const createSocial = useMutation({
+    mutationKey: [...editorMutationKey, "create-social"],
     mutationFn: (input: { platform: string; url: string; username?: string }) =>
       addSocial(activePageId(), input.platform, input.url, input.username),
     onSuccess: (s) => setPageCache((p) => ({ ...p, socials: [...p.socials, s] })),
   });
 
   const editSocial = useMutation({
+    mutationKey: [...editorMutationKey, "edit-social"],
     mutationFn: (input: { id: string; data: { platform?: string; url?: string; username?: string | null; isVisible?: boolean; position?: number } }) =>
       updateSocial(activePageId(), input.id, input.data),
     onSuccess: (s) => setPageCache((p) => ({ ...p, socials: p.socials.map((x) => (x.id === s.id ? s : x)) })),
   });
 
   const removeSocial = useMutation({
+    mutationKey: [...editorMutationKey, "remove-social"],
     mutationFn: (id: string) => deleteSocial(activePageId(), id),
     onSuccess: (_u, id) => setPageCache((p) => ({ ...p, socials: p.socials.filter((s) => s.id !== id) })),
   });
 
   const moveSocial = useMutation({
+    mutationKey: [...editorMutationKey, "move-social"],
     mutationFn: (orderedIds: string[]) => reorderSocials(activePageId(), orderedIds),
     onMutate: async (orderedIds) => {
       if (effectivePageId) await qc.cancelQueries({ queryKey: pageKey(effectivePageId) });
@@ -201,6 +221,7 @@ export function useEditor() {
   });
 
   const pickTheme = useMutation({
+    mutationKey: [...editorMutationKey, "theme"],
     mutationFn: (themeId: string) => setTheme(activePageId(), themeId),
     // The PATCH response carries themeId only; merge the full theme row from the
     // themes list so the fixed phone preview restyles instantly.
@@ -211,14 +232,17 @@ export function useEditor() {
       }),
   });
   const setBackground = useMutation({
+    mutationKey: [...editorMutationKey, "background"],
     mutationFn: (settings: BackgroundImageSettings) => setBackgroundImage(activePageId(), settings),
     onSuccess: (page) => qc.setQueryData(pageKey(page.id), page),
   });
   const saveAppearance = useMutation({
+    mutationKey: [...editorMutationKey, "appearance"],
     mutationFn: (config: ThemeConfig) => setAppearanceConfig(activePageId(), config),
     onSuccess: (page) => qc.setQueryData(pageKey(page.id), page),
   });
   const applyTemplate = useMutation({
+    mutationKey: [...editorMutationKey, "template"],
     mutationFn: (input: { templateKey: PageTemplate["key"]; replaceExistingBlocks: boolean }) =>
       applyPageTemplate(activePageId(), input.templateKey, input.replaceExistingBlocks),
     onSuccess: (page) => {

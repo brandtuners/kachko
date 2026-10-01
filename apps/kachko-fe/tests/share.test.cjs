@@ -19,8 +19,8 @@ test('canonical public and QR destination use the /username address', () => {
 });
 
 test('public metadata uses the shared canonical URL and absolute assets', () => {
-  const source = fs.readFileSync('app/u/[username]/page.tsx', 'utf8');
-  assert.match(source, /publicPageUrl\(page\.user\.username, undefined, page\.isPrimary/);
+  const source = fs.readFileSync('features/page/public-page-route.tsx', 'utf8');
+  assert.match(source, /publicPageUrl\(\s*page\.user\.username,\s*undefined,\s*page\.isPrimary/);
   assert.match(source, /absoluteAssetUrl\(page\.user\.avatarUrl\)/);
   assert.match(source, /alternates: \{ canonical: shareUrl \}/);
 });

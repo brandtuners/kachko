@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- editor previews owner-managed local or R2 media */
+
 import { useState } from "react";
 import { SOCIAL_PLATFORMS, type BlockType } from "./types";
 import { useMediaUpload } from "./use-media-upload";
@@ -23,6 +25,13 @@ export function BlockContentForm({
     if (type === "IMAGE") delete next.url;
     setContent(next);
     onChange(next);
+  };
+  const applyUploadedImage = (asset: { id: string; url: string }, fallbackAlt: string) => {
+    const next = { ...content, mediaId: asset.id, url: asset.url, alt: String(content.alt || fallbackAlt) };
+    setContent(next);
+    const { url: _url, ...payload } = next;
+    void _url;
+    onChange(payload);
   };
 
   const field = (key: string, label: string, placeholder = "", kind: string = "text") => (
@@ -79,7 +88,6 @@ export function BlockContentForm({
     case "IMAGE":
       return (
         <div className="grid gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element -- user-managed media can be local or R2-backed */}
           {content.url ? <img src={String(content.url)} alt="" className="max-h-44 rounded-xl object-cover" /> : null}
           <label className="dash-label cursor-pointer">
             {media.isUploading ? "Uploading replacement…" : "Replace image"}
@@ -89,14 +97,11 @@ export function BlockContentForm({
                 if (!file) return;
                 const asset = await media.uploadImage(file);
                 if (!asset) return;
-                const next = { ...content, mediaId: asset.id, url: asset.url, alt: String(content.alt || file.name) };
-                setContent(next);
-                const { url: _url, ...payload } = next;
-                void _url;
-                onChange(payload);
+                applyUploadedImage(asset, file.name);
               }} />
           </label>
-          {media.error ? <p role="alert" className="text-sm text-red-700">{media.error}</p> : null}
+          {media.progress !== null && !media.error ? <div role="status" aria-label={`Image upload ${media.progress}%`}><div className="mb-1 flex justify-between text-xs font-semibold text-[#718c1b]"><span>{media.progress === 100 ? "Upload complete" : "Uploading replacement"}</span><span>{media.progress}%</span></div><div className="h-2 overflow-hidden rounded-full bg-[#e8ebdf]"><div className="h-full bg-[var(--k-lime)] transition-[width]" style={{ width: `${media.progress}%` }} /></div></div> : null}
+          {media.error ? <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"><span>{media.error}</span>{media.canRetry ? <button type="button" disabled={media.isUploading} className="rounded-full border border-red-300 bg-white px-3 py-1 text-xs font-extrabold" onClick={async () => { const asset = await media.retryLast(); if (asset) applyUploadedImage(asset, media.lastFileName ?? "Image"); }}>Retry upload</button> : null}</div> : null}
           {field("alt", "Alt text", "Describe the image")}
           {field("href", "Link (optional)", "https://…")}
         </div>

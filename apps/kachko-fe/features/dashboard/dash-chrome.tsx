@@ -9,8 +9,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useIsMutating, useMutationState } from "@tanstack/react-query";
 import { apiFetch } from "../../lib/api";
-import { useEditor } from "../editor/use-editor";
+import { editorMutationKey, useEditor } from "../editor/use-editor";
 import {
   IconArrowUpRight,
   IconChart,
@@ -73,11 +74,9 @@ export function Header({ tab, go, isPublished }: { tab: DashTab; go: (t: DashTab
 export const TopNav = Header;
 
 export function SaveStatus() {
-  const editor = useEditor();
-  const mutations = [editor.createPage, editor.removePage, editor.saveMeta, editor.createBlock, editor.editBlock, editor.removeBlock, editor.moveBlock,
-    editor.createSocial, editor.editSocial, editor.removeSocial, editor.pickTheme, editor.setBackground, editor.saveAppearance];
-  const saving = mutations.some((mutation) => mutation.isPending);
-  const failed = mutations.some((mutation) => mutation.isError);
+  const saving = useIsMutating({ mutationKey: editorMutationKey }) > 0;
+  const statuses = useMutationState({ filters: { mutationKey: editorMutationKey }, select: (mutation) => mutation.state.status });
+  const failed = !saving && statuses.some((status) => status === "error");
   return <span role="status" className={`hidden text-xs font-bold sm:inline ${failed ? "text-[#b4322c]" : saving ? "text-[#718c1b]" : "text-[#8b908c]"}`}>{failed ? "Save error" : saving ? "Saving…" : "Saved"}</span>;
 }
 

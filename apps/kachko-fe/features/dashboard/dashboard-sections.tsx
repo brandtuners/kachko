@@ -95,8 +95,18 @@ export function BlockEditor({ focusId = null, clearFocus = () => undefined }: { 
           justAddedId={justAddedId}
           onImageSelected={async (file) => {
             const media = await upload.uploadImage(file);
-            if (!media) { setAddError(upload.error ?? "Image upload failed"); return; }
+            if (!media) return;
             editor.createBlock.mutate({ type: "IMAGE", content: { mediaId: media.id, alt: file.name } }, {
+              onSuccess: block => setJustAddedId(block.id), onError: error => setAddError(error.message),
+            });
+          }}
+          uploadProgress={upload.progress}
+          uploadError={upload.error}
+          canRetryUpload={upload.canRetry}
+          onRetryUpload={async () => {
+            const media = await upload.retryLast();
+            if (!media) return;
+            editor.createBlock.mutate({ type: "IMAGE", content: { mediaId: media.id, alt: upload.lastFileName ?? "Uploaded image" } }, {
               onSuccess: block => setJustAddedId(block.id), onError: error => setAddError(error.message),
             });
           }}
@@ -136,12 +146,16 @@ export function BlockList({ blocks, clicks, editingId, onEditingDone }: { blocks
   );
 }
 
-export function AddBlockMenu({ imageInput, addBlock, addError, justAddedId, onImageSelected, disabled }: {
+export function AddBlockMenu({ imageInput, addBlock, addError, justAddedId, onImageSelected, uploadProgress, uploadError, canRetryUpload, onRetryUpload, disabled }: {
   imageInput: React.RefObject<HTMLInputElement>;
   addBlock: (type: BlockType) => void;
   addError: string | null;
   justAddedId: string | null;
   onImageSelected: (file: File) => Promise<void>;
+  uploadProgress: number | null;
+  uploadError: string | null;
+  canRetryUpload: boolean;
+  onRetryUpload: () => Promise<void>;
   disabled: boolean;
 }) {
   return (
@@ -162,6 +176,8 @@ export function AddBlockMenu({ imageInput, addBlock, addError, justAddedId, onIm
           </button>;
         })}
       </div>
+      {uploadProgress !== null && !uploadError ? <div className="mt-3" role="status" aria-label={`Image upload ${uploadProgress}%`}><div className="mb-1 flex justify-between text-xs font-semibold text-[#718c1b]"><span>{uploadProgress === 100 ? "Upload complete" : "Uploading image"}</span><span>{uploadProgress}%</span></div><div className="h-2 overflow-hidden rounded-full bg-[#e8ebdf]"><div className="h-full rounded-full bg-[var(--k-lime)] transition-[width]" style={{ width: `${uploadProgress}%` }} /></div></div> : null}
+      {uploadError ? <div role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800"><span>{uploadError}</span>{canRetryUpload ? <button type="button" disabled={disabled} onClick={() => void onRetryUpload()} className="rounded-full border border-red-300 bg-white px-3 py-1 font-extrabold">Retry upload</button> : null}</div> : null}
       {addError ? <p className="mt-3 text-xs font-semibold text-[#b4322c]">{addError}</p> : null}
       {justAddedId ? <p className="mt-3 text-xs text-[#9a9f9b]">New block added above — fill in its details and Save.</p> : null}
     </div>

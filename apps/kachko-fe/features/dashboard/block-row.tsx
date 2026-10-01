@@ -5,7 +5,7 @@
 // flow through useEditor (optimistic). Functionally identical to before —
 // drag/keyboard reorder, visibility toggle, inline edit, delete — only the
 // skin follows the new cream/lime system.
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import {
@@ -219,15 +219,62 @@ export function SortableBlock({
   const editor = useEditor();
   const [editing, setEditing] = useState(startEditing);
   const [draft, setDraft] = useState<Record<string, unknown>>(block.content);
+  const [dirty, setDirty] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedAutomatically, setSavedAutomatically] = useState(false);
+  const committedRef = useRef(JSON.stringify(block.content));
+  const latestDraftRef = useRef(draft);
+  const saveBlock = editor.editBlock.mutate;
+  const blockSavePending = editor.editBlock.isPending;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id, disabled: editing });
   // Social rows wear the brand chip; everything else the block-type icon.
   const c = block.content as Record<string, unknown>;
   const Icon = BLOCK_ICONS[block.type as BlockType] ?? IconLink;
 
-  const setEdit = (v: boolean) => {
+  const setEdit = useCallback((v: boolean) => {
     setEditing(v);
     onEditingChange?.(v);
-  };
+  }, [onEditingChange]);
+
+  useEffect(() => {
+    if (editing) return;
+    setDraft(block.content);
+    latestDraftRef.current = block.content;
+    committedRef.current = JSON.stringify(block.content);
+    setDirty(false);
+    setSaveError(null);
+  }, [block.content, editing]);
+
+  const changeDraft = useCallback((content: Record<string, unknown>) => {
+    latestDraftRef.current = content;
+    setDraft(content);
+    setDirty(JSON.stringify(content) !== committedRef.current);
+    setSaveError(null);
+    setSavedAutomatically(false);
+  }, []);
+
+  const saveDraft = useCallback((closeAfterSave = false) => {
+    const content = latestDraftRef.current;
+    saveBlock({ id: block.id, data: { content } }, {
+      onSuccess: (saved) => {
+        committedRef.current = JSON.stringify(saved.content);
+        setDirty(JSON.stringify(latestDraftRef.current) !== committedRef.current);
+        setSaveError(null);
+        setSavedAutomatically(!closeAfterSave);
+        if (closeAfterSave) setEdit(false);
+      },
+      onError: (error) => {
+        setDirty(true);
+        setSaveError(error.message || "Could not save this block.");
+      },
+    });
+  }, [block.id, saveBlock, setEdit]);
+
+  useEffect(() => {
+    if (!editing || !dirty || blockSavePending || saveError) return;
+    const timer = window.setTimeout(() => saveDraft(false), 800);
+    return () => window.clearTimeout(timer);
+  }, [blockSavePending, dirty, draft, editing, saveDraft, saveError]);
 
   const move = (delta: number) => {
     if (!editor.page) return;
@@ -305,8 +352,8 @@ export function SortableBlock({
               label: editing ? "Close" : "Edit",
               icon: <IconPencil className="h-4 w-4" />,
               run: () => {
-                setDraft(block.content);
-                setEdit(!editing);
+                if (editing && dirty) saveDraft(true);
+                else setEdit(!editing);
               },
             },
             {
@@ -322,22 +369,28 @@ export function SortableBlock({
       {editing ? (
         <div className="mt-3 grid gap-3">
           <div className="[&_input]:!bg-white [&_label]:!text-[#737975] [&_select]:!bg-white [&_textarea]:!bg-white [&_.input-bright]:!border-[#dfe2dc] [&_.input-bright]:!text-[var(--k-ink)] [&_.input-bright]:!placeholder:text-[#9a9f9b]">
-            <BlockContentForm type={block.type as BlockType} initial={block.content} onChange={setDraft} />
+            <BlockContentForm type={block.type as BlockType} initial={block.content} onChange={changeDraft} />
           </div>
+          {saveError ? (
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">
+              <span>{saveError} Your changes are still here.</span>
+              <button type="button" className="rounded-full border border-red-300 bg-white px-3 py-1 font-extrabold" disabled={blockSavePending} onClick={() => saveDraft(false)}>Retry</button>
+            </div>
+          ) : savedAutomatically && !dirty && !blockSavePending ? <p role="status" className="text-xs font-semibold text-[#718c1b]">Saved automatically</p> : null}
           <div className="flex gap-2">
             <button
               type="button"
               className="k-btn-ink"
-              disabled={editor.editBlock.isPending}
+              disabled={blockSavePending || (!dirty && !saveError)}
               onClick={() => {
-                editor.editBlock.mutate({ id: block.id, data: { content: draft } });
-                setEdit(false);
+                if (dirty || saveError) saveDraft(true);
+                else setEdit(false);
               }}
             >
-              {editor.editBlock.isPending ? "Saving…" : "Save changes"}
+              {blockSavePending ? "Saving…" : dirty || saveError ? "Save now" : "Saved"}
             </button>
-            <button type="button" className="k-btn-line" onClick={() => setEdit(false)}>
-              Cancel
+            <button type="button" className="k-btn-line" disabled={blockSavePending} onClick={() => dirty ? saveDraft(true) : setEdit(false)}>
+              Done
             </button>
           </div>
         </div>

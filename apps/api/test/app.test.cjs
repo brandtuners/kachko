@@ -48,6 +48,8 @@ test('Nest HTTP foundation serves health, errors, CORS and OpenAPI', async (t) =
   assert.deepEqual(await health.json(), { data: { status: 'ok' } });
   assert.equal(health.headers.get('access-control-allow-origin'), 'http://localhost:3000');
   assert.equal(health.headers.get('access-control-allow-credentials'), 'true');
+  assert.match(health.headers.get('x-request-id'), /^[0-9a-f-]{36}$/);
+  assert.match(health.headers.get('access-control-expose-headers'), /X-Request-ID/i);
   assert.equal(health.headers.get('x-content-type-options'), 'nosniff');
   const denied = await fetch(`${base}/api/v1/health`, { headers: { Origin: 'https://untrusted.example' } });
   assert.equal(denied.headers.get('access-control-allow-origin'), null);
@@ -55,6 +57,7 @@ test('Nest HTTP foundation serves health, errors, CORS and OpenAPI', async (t) =
   assert.equal(missing.status, 404);
   const error = await missing.json();
   assert.equal(error.error.code, 'NOT_FOUND');
+  assert.equal(error.error.requestId, missing.headers.get('x-request-id'));
   assert.equal(error.stack, undefined);
   assert.equal((await fetch(`${base}/api/v1/health/live`)).status, 200);
   const schema = await (await fetch(`${base}/api/docs-json`)).json();
