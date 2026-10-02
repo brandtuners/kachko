@@ -82,3 +82,11 @@ export class AnalyticsQueryController {
   @rangeQuery()
   devices(@Req() req: IdentityRequest, @Param('pageId', pageId) id: string, @Query(range) input: AnalyticsRangeInput) { return this.query(req, id, input, 'devices'); }
 }
+
+@ApiTags('Analytics') @ApiCookieAuth() @Controller('analytics/pages/:pageId')
+@RatePolicy('analytics-query', 120, 60) @UseGuards(IdentityRateGuard, SessionGuard)
+export class ConversionAnalyticsController {
+  constructor(private readonly analytics: AnalyticsService) {}
+  @Get('conversion-funnel')
+  funnel(@Req() req: IdentityRequest, @Param('pageId', pageId) id: string) { return this.analytics.conversionFunnel(req.identity.id, id); }
+}

@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- editor previews owner-managed local or R2 media */
 
 import { useState } from "react";
+import Link from "next/link";
 import { SOCIAL_PLATFORMS, type BlockType } from "./types";
 import { useMediaUpload } from "./use-media-upload";
 
@@ -116,6 +117,11 @@ export function BlockContentForm({
       return field("number", "Phone", "+1 555 0100", "tel");
     case "LOCATION":
       return field("query", "Location", "Paris, France");
+    case "WHATSAPP":
+      return <div className="grid gap-3">{field("label", "Button label", "Chat on WhatsApp")}{field("phoneNumber", "Phone number", "+919999999999", "tel")}{field("messageTemplate", "Prefilled message", "Hi, I found your Kachko page.")}{field("service", "Service (optional)", "website design")}{field("campaign", "Campaign (optional)", "instagram")}<a className="truncate rounded-xl bg-[#f7f8f3] px-3 py-2 text-xs font-bold text-[#718c1b] underline" href={whatsappUrl(content)} target="_blank" rel="noopener noreferrer">Preview WhatsApp link ↗</a><p className="text-[11px] text-[#9a9f9b]">Supported message placeholders: {"{{page}}"}, {"{{service}}"}, and {"{{campaign}}"}.</p></div>;
+    case "FORM":
+    case "SUBSCRIBE":
+      return <div className="rounded-xl border border-[#dfe2dc] bg-[#f7f8f3] p-3 text-sm text-[#646a66]">Manage the form title, fields, consent, and success message from <Link href="/dashboard/forms" className="font-extrabold text-[#718c1b] underline">Forms</Link>.</div>;
     case "SOCIAL":
       return (
         <div className="grid gap-3">
@@ -141,4 +147,13 @@ export function BlockContentForm({
     default:
       return null;
   }
+}
+
+function whatsappUrl(content: Record<string, unknown>) {
+  const phone = String(content.phoneNumber ?? "").replace(/\D/g, "");
+  const message = String(content.messageTemplate ?? "")
+    .replaceAll("{{page}}", "your Kachko page")
+    .replaceAll("{{service}}", String(content.service ?? ""))
+    .replaceAll("{{campaign}}", String(content.campaign ?? ""));
+  return `https://wa.me/${phone}${message ? `?text=${encodeURIComponent(message)}` : ""}`;
 }

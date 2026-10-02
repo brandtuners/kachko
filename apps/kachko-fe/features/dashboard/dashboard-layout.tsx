@@ -13,12 +13,15 @@ import { Header, Sidebar, type DashTab } from "./dash-chrome";
 const ROUTES: Record<Exclude<DashTab, "qr">, string> = {
   home: "/dashboard", blocks: "/dashboard/links", appearance: "/dashboard/appearance",
   analytics: "/dashboard/analytics", links: "/dashboard/settings",
+  forms: "/dashboard/forms", audience: "/dashboard/audience",
 };
 
 function tabFor(pathname: string): DashTab {
   if (pathname === "/dashboard/links") return "blocks";
   if (pathname === "/dashboard/appearance") return "appearance";
   if (pathname === "/dashboard/analytics") return "analytics";
+  if (pathname === "/dashboard/forms") return "forms";
+  if (pathname.startsWith("/dashboard/audience")) return "audience";
   if (pathname === "/dashboard/settings") return "links";
   if (pathname === "/dashboard/qr") return "qr";
   return "home";

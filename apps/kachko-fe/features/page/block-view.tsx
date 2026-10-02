@@ -1,6 +1,8 @@
 import { themeButtonStyle } from "./theme";
 import type { PublicBlock, PublicSocial } from "./public-page";
 import { SOCIAL_ICONS } from "../../components/icons";
+import type { CreatorForm } from "@kachko/types";
+import { PublicForm } from "../conversion/public-form";
 
 // Profile URL per platform for SOCIAL blocks (username → full link).
 const SOCIAL_BASE_URLS: Record<string, string> = {
@@ -34,7 +36,7 @@ const blockAccentText = "text-[color:var(--blk-accent)]";
 const blockAccentBorder = "hover:border-[color:var(--blk-accent)]/60";
 
 // Renders a single PageBlock based on its type (§6.3). Bright, tappable cards.
-export function BlockView({ block }: { block: PublicBlock }) {
+export function BlockView({ block, pageId, pageName = "this page", preview = false }: { block: PublicBlock; pageId?: string; pageName?: string; preview?: boolean }) {
   if (!block.isVisible) return null;
   const c = block.content as Record<string, unknown>;
 
@@ -145,6 +147,16 @@ export function BlockView({ block }: { block: PublicBlock }) {
       ) : (
         img
       );
+    }
+    case "WHATSAPP": {
+      const phone = String(c.phoneNumber ?? "").replace(/\D/g, "");
+      const message = String(c.messageTemplate ?? "").replaceAll("{{page}}", pageName).replaceAll("{{campaign}}", String(c.campaign ?? "")).replaceAll("{{service}}", String(c.service ?? ""));
+      return <a href={`https://wa.me/${phone}${message ? `?text=${encodeURIComponent(message)}` : ""}`} target="_blank" rel="noopener noreferrer" data-event="WHATSAPP_CLICK" data-block-id={block.id} style={themeButtonStyle()} className={`${blockBase} ${blockNeutral} ${blockAccentBorder}`}><span className="font-semibold">{String(c.label ?? "Chat on WhatsApp")}</span><span className={blockAccentText}>↗</span></a>;
+    }
+    case "FORM":
+    case "SUBSCRIBE": {
+      const form = c.form as CreatorForm | undefined;
+      return form && pageId ? <PublicForm form={form} blockId={block.id} pageId={pageId} preview={preview} /> : <p className="rounded-xl border border-dashed border-white/20 p-4 text-center text-sm opacity-70">Form unavailable</p>;
     }
     default:
       return null;

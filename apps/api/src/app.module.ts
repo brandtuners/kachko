@@ -7,6 +7,7 @@ import { HealthModule } from './modules/health/health.module';
 import { MediaModule } from './modules/media/media.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
+import { ConversionModule } from './modules/conversion/conversion.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ModerationModule } from './modules/moderation/moderation.module';
     MediaModule,
     AnalyticsModule,
     ModerationModule,
+    ConversionModule,
   ],
 })
 export class AppModule {}

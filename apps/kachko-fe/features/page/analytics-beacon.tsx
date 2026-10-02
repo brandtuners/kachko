@@ -21,7 +21,7 @@ export function AnalyticsBeacon({ pageId }: { pageId: string }) {
         "[data-event]",
       ) as HTMLElement | null;
       const kind = element?.dataset.event;
-      if (element && (kind === "LINK_CLICK" || kind === "SOCIAL_CLICK")) {
+      if (element && (kind === "LINK_CLICK" || kind === "SOCIAL_CLICK" || kind === "WHATSAPP_CLICK")) {
         const socialId = element.dataset.socialProfileId;
         trackClick(
           socialId ?? element.dataset.blockId,

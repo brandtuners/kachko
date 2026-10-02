@@ -9,28 +9,31 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  username     String    @unique
-  passwordHash String?
-  displayName  String?
-  avatarUrl    String?
-  avatarMediaId String? @unique
-  bio          String?
-  role         UserRole  @default(USER)
-  isVerified   Boolean   @default(false)
-  isActive     Boolean   @default(true)
-  deletedAt    DateTime?
+  id            String    @id @default(uuid())
+  email         String    @unique
+  username      String    @unique
+  passwordHash  String?
+  displayName   String?
+  avatarUrl     String?
+  avatarMediaId String?   @unique
+  bio           String?
+  role          UserRole  @default(USER)
+  isVerified    Boolean   @default(false)
+  isActive      Boolean   @default(true)
+  deletedAt     DateTime?
 
-  sessions Session[]
+  sessions            Session[]
   passwordResetTokens PasswordResetToken[]
-  googleAccount GoogleAccount?
-  pages Page[]
-  media Media[] @relation("OwnedMedia")
-  avatarMedia Media? @relation("UserAvatar", fields: [avatarMediaId], references: [id], onDelete: Restrict)
-  reports Report[] @relation("ReportReporter")
-  handledReports Report[] @relation("ReportHandler")
-  auditLogs AuditLog[] @relation("AuditActor")
+  googleAccount       GoogleAccount?
+  pages               Page[]
+  media               Media[]              @relation("OwnedMedia")
+  avatarMedia         Media?               @relation("UserAvatar", fields: [avatarMediaId], references: [id], onDelete: Restrict)
+  reports             Report[]             @relation("ReportReporter")
+  handledReports      Report[]             @relation("ReportHandler")
+  auditLogs           AuditLog[]           @relation("AuditActor")
+  contacts            Contact[]            @relation("ContactOwner")
+  contactNotes        ContactNote[]        @relation("ContactNoteAuthor")
+  contactTags         Tag[]                @relation("TagOwner")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -40,13 +43,13 @@ model User {
 }
 
 model PasswordResetToken {
-  id String @id @default(uuid())
-  userId String
-  tokenHash String @unique
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
   expiresAt DateTime
-  usedAt DateTime?
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  usedAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
 
   @@index([userId, createdAt])
   @@index([expiresAt])
@@ -78,34 +81,35 @@ model Session {
 
 // Google subject is stable; email alone must never link an existing account.
 model GoogleAccount {
-  subject String @id
-  userId String @unique
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   String   @id
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 }
 
 // V1 supports multiple pages per owner. One page is primary and resolves at
 // /username; additional pages resolve at /username/page-slug.
 model Page {
-  id String @id @default(uuid())
-  userId String
-  slug String
-  isPrimary Boolean @default(false)
-  title String?
-  description String?
-  isPublished Boolean @default(false)
-  publishedAt DateTime?
-  themeKey String @default("minimal")
-  theme Theme @relation(fields: [themeKey], references: [slug], onDelete: Restrict)
-  appearanceOverrides Json @default("{}")
-  socials SocialProfile[]
-  revision Int @default(0)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  blocks PageBlock[]
-  analytics AnalyticsEvent[]
-  reports Report[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String           @id @default(uuid())
+  userId              String
+  slug                String
+  isPrimary           Boolean          @default(false)
+  title               String?
+  description         String?
+  isPublished         Boolean          @default(false)
+  publishedAt         DateTime?
+  themeKey            String           @default("minimal")
+  theme               Theme            @relation(fields: [themeKey], references: [slug], onDelete: Restrict)
+  appearanceOverrides Json             @default("{}")
+  socials             SocialProfile[]
+  revision            Int              @default(0)
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blocks              PageBlock[]
+  analytics           AnalyticsEvent[]
+  reports             Report[]
+  forms               Form[]
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
   @@unique([userId, slug])
   @@index([userId, createdAt])
@@ -114,19 +118,19 @@ model Page {
 }
 
 model Report {
-  id String @id @default(uuid())
-  pageId String
-  reporterId String?
-  reason ReportReason
-  details String?
-  status ReportStatus @default(OPEN)
+  id          String       @id @default(uuid())
+  pageId      String
+  reporterId  String?
+  reason      ReportReason
+  details     String?
+  status      ReportStatus @default(OPEN)
   handledById String?
-  handledAt DateTime?
-  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  reporter User? @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: SetNull)
-  handledBy User? @relation("ReportHandler", fields: [handledById], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  handledAt   DateTime?
+  page        Page         @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  reporter    User?        @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  handledBy   User?        @relation("ReportHandler", fields: [handledById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@index([status, createdAt])
   @@index([pageId, createdAt])
@@ -148,14 +152,14 @@ enum ReportStatus {
 }
 
 model AuditLog {
-  id String @id @default(uuid())
-  actorId String?
-  action String
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String
   entityType String
-  entityId String?
-  metadata Json @default("{}")
-  actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
+  entityId   String?
+  metadata   Json     @default("{}")
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
 
   @@index([actorId, createdAt])
   @@index([entityType, entityId, createdAt])
@@ -163,18 +167,18 @@ model AuditLog {
 }
 
 model PageBlock {
-  id String @id @default(uuid())
-  pageId String
-  type BlockType
-  position Int
-  isVisible Boolean @default(true)
-  content Json
-  mediaId String?
-  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  media Media? @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+  id        String           @id @default(uuid())
+  pageId    String
+  type      BlockType
+  position  Int
+  isVisible Boolean          @default(true)
+  content   Json
+  mediaId   String?
+  page      Page             @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  media     Media?           @relation(fields: [mediaId], references: [id], onDelete: Restrict)
   analytics AnalyticsEvent[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
   @@index([pageId, position])
   @@index([pageId, isVisible, position])
@@ -182,18 +186,18 @@ model PageBlock {
 }
 
 model Media {
-  id String @id @default(uuid())
-  userId String
-  storageKey String @unique
-  url String
-  mimeType String
-  size BigInt
-  width Int
-  height Int
-  user User @relation("OwnedMedia", fields: [userId], references: [id], onDelete: Cascade)
-  avatarFor User[] @relation("UserAvatar")
-  blocks PageBlock[]
-  createdAt DateTime @default(now())
+  id         String      @id @default(uuid())
+  userId     String
+  storageKey String      @unique
+  url        String
+  mimeType   String
+  size       BigInt
+  width      Int
+  height     Int
+  user       User        @relation("OwnedMedia", fields: [userId], references: [id], onDelete: Cascade)
+  avatarFor  User[]      @relation("UserAvatar")
+  blocks     PageBlock[]
+  createdAt  DateTime    @default(now())
 
   @@index([userId, createdAt])
 }
@@ -210,44 +214,48 @@ enum BlockType {
   EMAIL
   PHONE
   LOCATION
+  WHATSAPP
+  FORM
+  SUBSCRIBE
 }
 
 model Theme {
-  id String @id @default(uuid())
-  name String
-  slug String @unique
-  isSystem Boolean @default(true)
+  id         String         @id @default(uuid())
+  name       String
+  slug       String         @unique
+  isSystem   Boolean        @default(true)
   background Json
   typography Json
-  buttons Json
-  cards Json
-  pages Page[]
-  templates PageTemplate[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  buttons    Json
+  cards      Json
+  pages      Page[]
+  templates  PageTemplate[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 }
 
 model PageTemplate {
-  key String @id
-  name String
+  key         String @id
+  name        String
   description String
-  themeKey String
-  theme Theme @relation(fields: [themeKey], references: [slug], onDelete: Restrict)
-  blocks Json
+  themeKey    String
+  theme       Theme  @relation(fields: [themeKey], references: [slug], onDelete: Restrict)
+  blocks      Json
 }
 
 model SocialProfile {
-  id String @id @default(uuid())
-  pageId String
-  platform SocialPlatform
-  username String?
-  url String
-  position Int
-  isVisible Boolean @default(true)
-  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  id        String           @id @default(uuid())
+  pageId    String
+  platform  SocialPlatform
+  username  String?
+  url       String
+  position  Int
+  isVisible Boolean          @default(true)
+  page      Page             @relation(fields: [pageId], references: [id], onDelete: Cascade)
   analytics AnalyticsEvent[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
   @@index([pageId, position])
 }
 
@@ -265,22 +273,22 @@ enum SocialPlatform {
 }
 
 model AnalyticsEvent {
-  id String @id @default(uuid())
-  pageId String
-  blockId String?
+  id              String             @id @default(uuid())
+  pageId          String
+  blockId         String?
   socialProfileId String?
-  eventType AnalyticsEventType
-  ipHash String?
-  country String?
-  city String?
-  device String?
-  browser String?
-  os String?
-  referrer String?
-  createdAt DateTime @default(now())
-  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  block PageBlock? @relation(fields: [blockId], references: [id], onDelete: SetNull)
-  socialProfile SocialProfile? @relation(fields: [socialProfileId], references: [id], onDelete: SetNull)
+  eventType       AnalyticsEventType
+  ipHash          String?
+  country         String?
+  city            String?
+  device          String?
+  browser         String?
+  os              String?
+  referrer        String?
+  createdAt       DateTime           @default(now())
+  page            Page               @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  block           PageBlock?         @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  socialProfile   SocialProfile?     @relation(fields: [socialProfileId], references: [id], onDelete: SetNull)
 
   @@index([pageId, createdAt])
   @@index([pageId, eventType, createdAt])
@@ -292,4 +300,139 @@ enum AnalyticsEventType {
   PAGE_VIEW
   LINK_CLICK
   SOCIAL_CLICK
+  FORM_VIEW
+  FORM_SUBMIT
+  LEAD_CREATED
+  WHATSAPP_CLICK
+  SUBSCRIBE
+}
+
+enum ContactStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  WON
+  LOST
+}
+
+enum FormSuccessType {
+  MESSAGE
+  REDIRECT
+}
+
+enum FormFieldType {
+  TEXT
+  EMAIL
+  PHONE
+  TEXTAREA
+  SELECT
+  CHECKBOX
+}
+
+model Contact {
+  id             String           @id @default(uuid())
+  ownerUserId    String
+  name           String?
+  email          String?
+  phone          String?
+  status         ContactStatus    @default(NEW)
+  source         String?
+  sourceDetails  Json?
+  marketingOptIn Boolean          @default(false)
+  lastActivityAt DateTime?
+  owner          User             @relation("ContactOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  submissions    FormSubmission[]
+  notes          ContactNote[]
+  tags           ContactTag[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([ownerUserId, createdAt])
+  @@index([ownerUserId, email])
+  @@index([ownerUserId, phone])
+  @@index([ownerUserId, status])
+}
+
+model Form {
+  id            String           @id @default(uuid())
+  pageId        String
+  name          String
+  title         String?
+  description   String?
+  submitLabel   String           @default("Submit")
+  successType   FormSuccessType  @default(MESSAGE)
+  successConfig Json?
+  isActive      Boolean          @default(true)
+  page          Page             @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  fields        FormField[]
+  submissions   FormSubmission[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([pageId])
+}
+
+model FormField {
+  id          String        @id @default(uuid())
+  formId      String
+  type        FormFieldType
+  label       String
+  name        String
+  placeholder String?
+  required    Boolean       @default(false)
+  position    Int
+  config      Json?
+  form        Form          @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@unique([formId, name])
+  @@index([formId, position])
+}
+
+model FormSubmission {
+  id          String   @id @default(uuid())
+  formId      String
+  contactId   String?
+  payload     Json
+  attribution Json?
+  ipHash      String?
+  createdAt   DateTime @default(now())
+  form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@index([formId, createdAt])
+  @@index([contactId, createdAt])
+  @@index([ipHash, createdAt])
+}
+
+model ContactNote {
+  id        String   @id @default(uuid())
+  contactId String
+  authorId  String
+  note      String
+  createdAt DateTime @default(now())
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  author    User     @relation("ContactNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, createdAt])
+}
+
+model Tag {
+  id          String       @id @default(uuid())
+  ownerUserId String
+  name        String
+  owner       User         @relation("TagOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  contacts    ContactTag[]
+  createdAt   DateTime     @default(now())
+
+  @@unique([ownerUserId, name])
+}
+
+model ContactTag {
+  contactId String
+  tagId     String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+  @@index([tagId])
 }

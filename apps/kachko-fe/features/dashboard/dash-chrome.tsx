@@ -23,7 +23,7 @@ import {
   IconSettings,
 } from "../../components/icons";
 
-export type DashTab = "home" | "blocks" | "qr" | "appearance" | "analytics" | "links";
+export type DashTab = "home" | "blocks" | "qr" | "appearance" | "analytics" | "forms" | "audience" | "links";
 
 function KachkoMark() {
   return (
@@ -237,6 +237,8 @@ export function Sidebar({ tab, go }: { tab: DashTab; go: (t: DashTab) => void })
     { key: "home", label: "Home", icon: IconEye },
     { key: "blocks", label: "Links", icon: IconLink },
     { key: "appearance", label: "Design", icon: IconPalette },
+    { key: "forms", label: "Forms", icon: IconLink },
+    { key: "audience", label: "Audience", icon: IconEye },
     { key: "analytics", label: "Analytics", icon: IconChart },
     { key: "links", label: "Settings", icon: IconSettings },
   ];

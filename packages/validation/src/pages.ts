@@ -67,10 +67,27 @@ export const spotifyContentSchema = z.strictObject({ url: linkUrlSchema.refine(v
 export const emailContentSchema = z.strictObject({ email: z.email().max(254) });
 export const phoneContentSchema = z.strictObject({ number: z.string().trim().regex(/^\+?[0-9][0-9 ()-]{5,24}$/, 'Use a phone number with an optional country code') });
 export const locationContentSchema = z.strictObject({ query: z.string().trim().min(1).max(300) });
+export const whatsappContentSchema = z.strictObject({
+  label: z.string().trim().min(1).max(80), phoneNumber: z.string().trim().regex(/^\+[1-9]\d{6,14}$/, 'Use an E.164 phone number'),
+  messageTemplate: z.string().trim().max(1000).refine(value => !/\{\{(?!page\}\}|service\}\}|campaign\}\})/.test(value), 'Unsupported placeholder').optional(),
+  campaign: z.string().trim().max(100).optional(), service: z.string().trim().max(100).optional(),
+});
+export const formBlockContentSchema = z.strictObject({ formId: z.uuid(), variant: z.enum(['CARD', 'INLINE']).default('CARD') });
+export const subscribeBlockContentSchema = z.strictObject({ formId: z.uuid(), title: z.string().trim().min(1).max(120).optional(), description: z.string().trim().max(300).optional() });
+const embeddedFormSchema = z.strictObject({
+  id: z.uuid(), pageId: z.uuid(), name: z.string(), title: z.string().nullable(), description: z.string().nullable(),
+  submitLabel: z.string(), successType: z.enum(['MESSAGE', 'REDIRECT']),
+  successConfig: z.strictObject({ message: z.string().optional(), url: z.string().optional() }).nullable(), isActive: z.boolean(),
+  fields: z.array(z.strictObject({ id: z.uuid(), type: z.enum(['TEXT', 'EMAIL', 'PHONE', 'TEXTAREA', 'SELECT', 'CHECKBOX']),
+    label: z.string(), name: z.string(), placeholder: z.string().nullable(), required: z.boolean(), position: z.number().int(),
+    config: z.strictObject({ options: z.array(z.string()).optional() }).nullable() })),
+  createdAt: z.string(), updatedAt: z.string(),
+});
 export const blockContentSchemas = {
   LINK: linkContentSchema, TEXT: textContentSchema, IMAGE: imageContentSchema,
   SOCIAL: socialBlockContentSchema, DIVIDER: dividerContentSchema, YOUTUBE: youtubeContentSchema,
   SPOTIFY: spotifyContentSchema, EMAIL: emailContentSchema, PHONE: phoneContentSchema, LOCATION: locationContentSchema,
+  WHATSAPP: whatsappContentSchema, FORM: formBlockContentSchema, SUBSCRIBE: subscribeBlockContentSchema,
 };
 const extraBlocks = [
   z.strictObject({ type: z.literal('IMAGE'), content: blockContentSchemas.IMAGE, isVisible: z.boolean().default(true) }),
@@ -81,6 +98,9 @@ const extraBlocks = [
   z.strictObject({ type: z.literal('EMAIL'), content: blockContentSchemas.EMAIL, isVisible: z.boolean().default(true) }),
   z.strictObject({ type: z.literal('PHONE'), content: blockContentSchemas.PHONE, isVisible: z.boolean().default(true) }),
   z.strictObject({ type: z.literal('LOCATION'), content: blockContentSchemas.LOCATION, isVisible: z.boolean().default(true) }),
+  z.strictObject({ type: z.literal('WHATSAPP'), content: blockContentSchemas.WHATSAPP, isVisible: z.boolean().default(true) }),
+  z.strictObject({ type: z.literal('FORM'), content: blockContentSchemas.FORM, isVisible: z.boolean().default(true) }),
+  z.strictObject({ type: z.literal('SUBSCRIBE'), content: blockContentSchemas.SUBSCRIBE, isVisible: z.boolean().default(true) }),
 ] as const;
 export const createBlockSchema = z.discriminatedUnion('type', [createLinkBlockSchema, createTextBlockSchema, ...extraBlocks]);
 export const updateTextBlockSchema = z.strictObject({
@@ -88,7 +108,7 @@ export const updateTextBlockSchema = z.strictObject({
 }).refine(value => Object.keys(value).length > 0, 'Provide content or visibility');
 // The API additionally validates content against the stored block type under lock.
 export const updateBlockSchema = z.strictObject({
-  content: z.union([linkContentSchema, textContentSchema, imageContentSchema, socialBlockContentSchema, dividerContentSchema, youtubeContentSchema, spotifyContentSchema, emailContentSchema, phoneContentSchema, locationContentSchema]).optional(), isVisible: z.boolean().optional(),
+  content: z.union([linkContentSchema, textContentSchema, imageContentSchema, socialBlockContentSchema, dividerContentSchema, youtubeContentSchema, spotifyContentSchema, emailContentSchema, phoneContentSchema, locationContentSchema, whatsappContentSchema, formBlockContentSchema, subscribeBlockContentSchema]).optional(), isVisible: z.boolean().optional(),
 }).refine(value => Object.keys(value).length > 0, 'Provide content or visibility');
 export const reorderBlocksSchema = z.strictObject({
   items: z.array(z.strictObject({ id: z.uuid(), position: z.number().int().nonnegative() })),
@@ -118,6 +138,9 @@ export const publicBlockSchema = z.discriminatedUnion('type', [
   z.strictObject({ id: z.uuid(), type: z.literal('EMAIL'), content: blockContentSchemas.EMAIL }),
   z.strictObject({ id: z.uuid(), type: z.literal('PHONE'), content: blockContentSchemas.PHONE }),
   z.strictObject({ id: z.uuid(), type: z.literal('LOCATION'), content: blockContentSchemas.LOCATION }),
+  z.strictObject({ id: z.uuid(), type: z.literal('WHATSAPP'), content: blockContentSchemas.WHATSAPP }),
+  z.strictObject({ id: z.uuid(), type: z.literal('FORM'), content: blockContentSchemas.FORM.extend({ form: embeddedFormSchema.optional() }) }),
+  z.strictObject({ id: z.uuid(), type: z.literal('SUBSCRIBE'), content: blockContentSchemas.SUBSCRIBE.extend({ form: embeddedFormSchema.optional() }) }),
 ]);
 /** Cache/public response allowlist; strict parsing prevents accidental private fields. */
 export const publicPageSchema = z.strictObject({

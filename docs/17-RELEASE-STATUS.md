@@ -33,6 +33,13 @@ The CI restore drill validates the repository's logical backup tooling. It does 
 
 ## Post-V1 status
 
-The post-V1 roadmap is not implemented by the current V1 block catalog or data model. In particular, V1.1 still requires the `WHATSAPP`, `FORM`, and `SUBSCRIBE` blocks, contacts/submissions storage, audience APIs and UI, CSV export, conversion events, security controls, and end-to-end tests.
+V1.1 Conversion Basics is implemented in the repository. It includes:
 
-Implementation should begin with V1.1 Conversion Basics only after the external V1 staging gates above are accepted. V1.2 and later releases remain roadmap scope.
+- intent-first conversion choices while retaining the complete block library;
+- `WHATSAPP`, `FORM`, and `SUBSCRIBE` editor and public-renderer support;
+- creator-owned forms and fields, public submissions, contact deduplication, consent, notes, tags, filters, and CSV export;
+- conversion events and a creator-scoped funnel;
+- rate limiting, honeypot handling, payload limits, field validation, normalization, HTML removal, spam heuristics, and CSV formula-injection protection;
+- browser coverage for contact and subscriber capture, deduplication, tag filtering, export, analytics, and cross-creator isolation.
+
+See [V1.1 Conversion Basics](18-V1.1-CONVERSION-BASICS.md) for endpoints, behavior, and verification. Staged percentage rollout remains an operational deployment decision; V1.2 and later releases remain roadmap scope.

@@ -28,8 +28,9 @@ export class AnalyticsRepository {
       const social = await this.db.socialProfile.findFirst({ where: { id: socialProfileId, pageId, isVisible: true }, select: { id: true } });
       return social ? { socialProfileId: social.id } : null;
     }
-    const type = eventType === 'LINK_CLICK' ? 'LINK' as const : 'SOCIAL' as const;
-    const block = await this.db.pageBlock.findFirst({ where: { id: blockId, pageId, type, isVisible: true }, select: { id: true } });
+    const types = eventType === 'LINK_CLICK' ? ['LINK'] as const : eventType === 'SOCIAL_CLICK' ? ['SOCIAL'] as const
+      : eventType === 'WHATSAPP_CLICK' ? ['WHATSAPP'] as const : eventType === 'SUBSCRIBE' ? ['SUBSCRIBE'] as const : ['FORM', 'SUBSCRIBE'] as const;
+    const block = await this.db.pageBlock.findFirst({ where: { id: blockId, pageId, type: { in: [...types] }, isVisible: true }, select: { id: true } });
     return block ? { blockId: block.id } : null;
   }
 
@@ -123,5 +124,11 @@ export class AnalyticsRepository {
       WHERE "pageId" = ${pageId} AND "eventType" = 'PAGE_VIEW'::"AnalyticsEventType"
         AND "createdAt" >= ${from} AND "createdAt" <= ${to}
       GROUP BY "device" ORDER BY "visits" DESC, "device" ASC`;
+  }
+
+  async conversionFunnel(pageId: string) {
+    const rows = await this.db.analyticsEvent.groupBy({ by: ['eventType'], where: { pageId }, _count: { _all: true } });
+    const count = (types: string[]) => rows.filter(row => types.includes(row.eventType)).reduce((total, row) => total + row._count._all, 0);
+    return { visitors: count(['PAGE_VIEW']), actions: count(['LINK_CLICK', 'SOCIAL_CLICK', 'WHATSAPP_CLICK', 'FORM_SUBMIT', 'SUBSCRIBE']), leads: count(['LEAD_CREATED']) };
   }
 }

@@ -44,6 +44,9 @@ export const BLOCK_ICONS: Record<BlockType, (p: { className?: string }) => JSX.E
   EMAIL: IconSend,
   PHONE: IconPhone,
   LOCATION: IconPin,
+  WHATSAPP: IconPhone,
+  FORM: IconSend,
+  SUBSCRIBE: IconUsers,
 };
 
 export function blockTitle(block: EditorBlock): string {
@@ -56,6 +59,9 @@ export function blockTitle(block: EditorBlock): string {
   if (block.type === "EMAIL") return String(c.email ?? "Email");
   if (block.type === "PHONE") return String(c.number ?? "Phone");
   if (block.type === "LOCATION") return String(c.query ?? "Location");
+  if (block.type === "WHATSAPP") return String(c.label ?? "Chat on WhatsApp");
+  if (block.type === "FORM") return "Contact form";
+  if (block.type === "SUBSCRIBE") return String(c.title ?? "Email signup");
   if (block.type === "SOCIAL") {
     const u = String(c.username ?? "").replace(/^@/, "");
     return u ? `${String(c.platform ?? "Social")} · @${u}` : String(c.platform ?? "Social");
@@ -91,6 +97,11 @@ export function blockSub(block: EditorBlock): string {
       return "Opens Google Maps";
     case "DIVIDER":
       return "Visual break";
+    case "WHATSAPP":
+      return String(c.phoneNumber ?? "WhatsApp CTA");
+    case "FORM":
+    case "SUBSCRIBE":
+      return "Manage fields in Forms";
     default:
       return "";
   }

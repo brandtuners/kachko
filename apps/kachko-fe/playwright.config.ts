@@ -5,6 +5,7 @@ const e2eRedisUrl = process.env.E2E_REDIS_URL ?? "redis://127.0.0.1:6379/15";
 
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "../api/test/e2e-global-setup.mjs",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,

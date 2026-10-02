@@ -1,10 +1,10 @@
-import type { Page, Theme, SocialProfile as StoredSocial, PageTemplate as StoredTemplate } from '../../generated/prisma/client';
+import type { Page, Theme, SocialProfile as StoredSocial, PageTemplate as StoredTemplate, Form, FormField } from '../../generated/prisma/client';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import QRCode from 'qrcode';
 import { resolveAppearance, appearanceOverridesSchema, themeKeySchema, templateKeySchema, createBlockSchema, publicSocialSchema, type UpdateAppearanceInput, type ApplyTemplateInput, type CreateSocialInput, type UpdateSocialInput,  publicPageSchema, publicBlockSchema, type CreatePageInput, type UpdatePageInput,
   type CreateBlockInput, type UpdateBlockInput, type ReorderBlocksInput } from '@kachko/validation';
-import type { OwnerPage, PageSummary, PageBlock, PublicPage, SocialProfile, SystemTheme, PageTemplate } from '@kachko/types';
+import type { OwnerPage, PageSummary, PageBlock, PublicPage, SocialProfile, SystemTheme, PageTemplate, CreatorForm } from '@kachko/types';
 import { PagesRepository, PageResourceError, PageInputError, type StoredBlock, type StoredPage } from './pages.repository';
 import { PublicPageCache } from './public-page.cache';
 import { identityError } from '../identity/identity.service';
@@ -14,12 +14,13 @@ function summary(page: Page): PageSummary {
     isPublished: page.isPublished, publishedAt: page.publishedAt?.toISOString() ?? null,
     createdAt: page.createdAt.toISOString(), updatedAt: page.updatedAt.toISOString() };
 }
-function blockDto(block: StoredBlock): PageBlock {
+function blockDto(block: StoredBlock, form?: CreatorForm): PageBlock {
   const common = { id: block.id, position: block.position, isVisible: block.isVisible,
     createdAt: block.createdAt.toISOString(), updatedAt: block.updatedAt.toISOString() };
-  const content = block.type === 'IMAGE'
+  let content: unknown = block.type === 'IMAGE'
     ? { ...(block.content as Record<string, unknown>), url: block.media?.url }
     : block.content;
+  if (form && (block.type === 'FORM' || block.type === 'SUBSCRIBE')) content = { ...(content as Record<string, unknown>), form };
   return { ...common, ...publicBlockSchema.parse({ id: block.id, type: block.type, content }) };
 }
 function themeConfig(theme: Theme) { return { background: theme.background, typography: theme.typography, buttons: theme.buttons, cards: theme.cards }; }
@@ -27,7 +28,10 @@ function socialDto(social: StoredSocial): SocialProfile {
   return { ...publicSocialSchema.parse({ id: social.id, platform: social.platform, username: social.username, url: social.url }),
     position: social.position, isVisible: social.isVisible, createdAt: social.createdAt.toISOString(), updatedAt: social.updatedAt.toISOString() };
 }
-function ownerDto(page: StoredPage): OwnerPage { return { ...summary(page), blocks: page.blocks.map(blockDto),
+function ownerDto(page: StoredPage): OwnerPage { const forms = new Map(page.forms.map(form => [form.id, publicFormDto(form)])); return { ...summary(page), blocks: page.blocks.map(block => {
+  const formId = block.type === 'FORM' || block.type === 'SUBSCRIBE' ? (block.content as { formId?: string }).formId : undefined;
+  return blockDto(block, formId ? forms.get(formId) : undefined);
+}),
   appearance: resolveAppearance(themeConfig(page.theme), page.appearanceOverrides),
   appearanceOverrides: appearanceOverridesSchema.parse(page.appearanceOverrides), socials: page.socials.map(socialDto) }; }
 function themeDto(theme: Theme): SystemTheme {
@@ -39,6 +43,13 @@ function templateDto(template: StoredTemplate): PageTemplate {
   if (blocks.some(block => block.type !== 'LINK' && block.type !== 'TEXT')) throw new Error('System templates may contain only LINK and TEXT blocks');
   return { key: templateKeySchema.parse(template.key), name: template.name, description: template.description,
     themeKey: themeKeySchema.parse(template.themeKey), blocks: blocks as PageTemplate['blocks'] };
+}
+function publicFormDto(form: Form & { fields: FormField[] }): CreatorForm {
+  return { id: form.id, pageId: form.pageId, name: form.name, title: form.title, description: form.description,
+    submitLabel: form.submitLabel, successType: form.successType, successConfig: form.successConfig,
+    isActive: form.isActive, fields: form.fields.map(field => ({ id: field.id, type: field.type, label: field.label,
+      name: field.name, placeholder: field.placeholder, required: field.required, position: field.position, config: field.config })),
+    createdAt: form.createdAt.toISOString(), updatedAt: form.updatedAt.toISOString() } as CreatorForm;
 }
 
 @Injectable()
@@ -109,11 +120,13 @@ export class PagesService {
     if (hit) return { data: hit };
     const page = await this.repository.publicSnapshot(username, pageSlug);
     if (!page) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');
+    const forms = new Map(page.forms.map(form => [form.id, publicFormDto(form)]));
     const result: PublicPage = publicPageSchema.parse({
       profile: page.user, page: { id: page.id, slug: page.slug, isPrimary: page.isPrimary, title: page.title, description: page.description, themeKey: page.themeKey, appearance: resolveAppearance(themeConfig(page.theme), page.appearanceOverrides) },
       blocks: page.blocks.map(block => {
         const content = block.type === 'IMAGE' ? { ...(block.content as Record<string, unknown>), url: block.media?.url } : block.content;
-        return publicBlockSchema.parse({ id: block.id, type: block.type, content });
+        const formId = block.type === 'FORM' || block.type === 'SUBSCRIBE' ? (content as { formId?: string }).formId : undefined;
+        return publicBlockSchema.parse({ id: block.id, type: block.type, content: formId ? { ...(content as Record<string, unknown>), form: forms.get(formId) } : content });
       }),
       socials: page.socials.map(social => publicSocialSchema.parse({ id: social.id, platform: social.platform, username: social.username, url: social.url })),
     });

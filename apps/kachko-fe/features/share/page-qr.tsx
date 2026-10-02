@@ -4,7 +4,7 @@ import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { IconDownload } from "../../components/icons";
 
-export function PageQr({ url, username, size = 224 }: { url: string; username: string; size?: number }) {
+export function PageQr({ url, username, size = 224, showDownload = true }: { url: string; username: string; size?: number; showDownload?: boolean }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -41,10 +41,10 @@ export function PageQr({ url, username, size = 224 }: { url: string; username: s
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={dataUrl} width={size} height={size} alt={`QR code for @${username}`} className="block h-auto max-w-full" />
       </div>
-      <a href={dataUrl} download={`kachko-${username}-qr.png`} className="k-btn-line !rounded-full">
+      {showDownload ? <a href={dataUrl} download={`kachko-${username}-qr.png`} className="k-btn-line !rounded-full">
         <IconDownload className="h-4 w-4" />
         Download QR
-      </a>
+      </a> : null}
     </div>
   );
 }

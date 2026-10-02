@@ -6,6 +6,7 @@ A personal link-page platform built with Next.js and NestJS.
 - Backend: `apps/api` — Rohan
 - [Development plan](docs/03-DEVELOPMENT-BLUEPRINT.md)
 - [V1 release and post-V1 status](docs/17-RELEASE-STATUS.md)
+- [V1.1 Conversion Basics](docs/18-V1.1-CONVERSION-BASICS.md)
 - [Vercel deployment runbook](docs/15-VERCEL-DEPLOYMENT.md)
 - [Automatic PR review setup](docs/04-PR-REVIEW-AGENT.md)
 
@@ -79,7 +80,7 @@ pnpm --filter kachko-fe dev
 
 Frontend: `http://localhost:3000`. API health: `http://localhost:4000/api/v1/health`.
 
-**Current scope:** the full product path through share/SEO/QR and launch protections is implemented, including password recovery, public reports, role-protected moderation, audit logs, suspension, and permanent account deletion. Apply all migrations and configure the deployment environment before browser verification. `/api/v1/health/ready` returns `200` when PostgreSQL and Redis respond and `503` on failure; `/api/v1/health/live` remains independent of dependency availability. See the [API README](apps/api/README.md) and [launch-protection guide](docs/14-LAUNCH-PROTECTIONS.md).
+**Current scope:** the V1 product path and V1.1 Conversion Basics are implemented, including forms, subscriptions, WhatsApp CTAs, creator-owned contacts, audience export, and conversion analytics. Apply all migrations and configure the deployment environment before browser verification. `/api/v1/health/ready` returns `200` when PostgreSQL and Redis respond and `503` on failure; `/api/v1/health/live` remains independent of dependency availability. See the [API README](apps/api/README.md), [launch-protection guide](docs/14-LAUNCH-PROTECTIONS.md), and [V1.1 guide](docs/18-V1.1-CONVERSION-BASICS.md).
 
 ## Prisma and identity database
 

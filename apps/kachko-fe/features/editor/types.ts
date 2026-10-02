@@ -11,7 +11,23 @@ export type BlockType =
   | "SPOTIFY"
   | "EMAIL"
   | "PHONE"
-  | "LOCATION";
+  | "LOCATION"
+  | "WHATSAPP"
+  | "FORM"
+  | "SUBSCRIBE";
+
+export type BlockCategory = "CONTENT" | "CONVERSION" | "DYNAMIC";
+export type BlockIntent = "VISIT" | "CONTACT" | "SUBSCRIBE" | "WATCH" | "FOLLOW";
+
+export interface BlockDefinition {
+  type: BlockType;
+  category: BlockCategory;
+  intent: BlockIntent;
+  editorKey: string;
+  rendererKey: string;
+  analyticsEvents: string[];
+  supportsVisibilityRules: boolean;
+}
 
 export interface EditorBlock {
   id: string;
@@ -79,9 +95,32 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
   EMAIL: "Email",
   PHONE: "Phone",
   LOCATION: "Location",
+  WHATSAPP: "WhatsApp",
+  FORM: "Contact form",
+  SUBSCRIBE: "Email signup",
 };
 
-export const BLOCK_TYPES: BlockType[] = ["LINK", "TEXT", "IMAGE", "SOCIAL", "DIVIDER", "YOUTUBE", "SPOTIFY", "EMAIL", "PHONE", "LOCATION"];
+export const BLOCK_TYPES: BlockType[] = ["LINK", "TEXT", "IMAGE", "SOCIAL", "DIVIDER", "YOUTUBE", "SPOTIFY", "EMAIL", "PHONE", "LOCATION", "WHATSAPP", "FORM", "SUBSCRIBE"];
+
+const definition = (type: BlockType, category: BlockCategory, intent: BlockIntent, analyticsEvents: string[] = []): BlockDefinition => ({
+  type, category, intent, editorKey: type, rendererKey: type, analyticsEvents, supportsVisibilityRules: false,
+});
+
+export const BLOCK_DEFINITIONS: Record<BlockType, BlockDefinition> = {
+  LINK: definition("LINK", "CONTENT", "VISIT", ["LINK_CLICK"]),
+  TEXT: definition("TEXT", "CONTENT", "VISIT"),
+  IMAGE: definition("IMAGE", "CONTENT", "VISIT"),
+  SOCIAL: definition("SOCIAL", "CONTENT", "FOLLOW", ["SOCIAL_CLICK"]),
+  DIVIDER: definition("DIVIDER", "CONTENT", "VISIT"),
+  YOUTUBE: definition("YOUTUBE", "DYNAMIC", "WATCH", ["LINK_CLICK"]),
+  SPOTIFY: definition("SPOTIFY", "DYNAMIC", "WATCH", ["LINK_CLICK"]),
+  EMAIL: definition("EMAIL", "CONVERSION", "CONTACT", ["LINK_CLICK"]),
+  PHONE: definition("PHONE", "CONVERSION", "CONTACT", ["LINK_CLICK"]),
+  LOCATION: definition("LOCATION", "CONTENT", "VISIT", ["LINK_CLICK"]),
+  WHATSAPP: definition("WHATSAPP", "CONVERSION", "CONTACT", ["WHATSAPP_CLICK"]),
+  FORM: definition("FORM", "CONVERSION", "CONTACT", ["FORM_VIEW", "FORM_SUBMIT", "LEAD_CREATED"]),
+  SUBSCRIBE: definition("SUBSCRIBE", "CONVERSION", "SUBSCRIBE", ["FORM_VIEW", "SUBSCRIBE", "LEAD_CREATED"]),
+};
 
 export const SOCIAL_PLATFORMS = [
   "INSTAGRAM",

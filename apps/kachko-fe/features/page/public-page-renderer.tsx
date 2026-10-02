@@ -31,7 +31,7 @@ export function BlockRenderer({ page, compact = false }: { page: RenderablePage;
   const blocks = [...page.blocks].sort((a, b) => a.position - b.position);
   return (
     <div className={`${compact ? "mt-5 gap-2.5" : "mt-8 max-w-md gap-3"} flex w-full flex-col`}>
-      {blocks.length ? blocks.map((block) => <BlockView key={block.id} block={block} />) : (
+      {blocks.length ? blocks.map((block) => <BlockView key={block.id} block={block} pageId={page.id} pageName={page.title ?? page.user.displayName ?? page.user.username} preview={compact} />) : (
         <p className="rounded-xl border border-dashed border-white/20 px-3 py-6 text-[11px] text-[color:var(--page-text,white)] opacity-70">Your blocks will appear here</p>
       )}
     </div>

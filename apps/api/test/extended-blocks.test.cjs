@@ -7,6 +7,9 @@ const examples = {
   YOUTUBE: { videoId: 'dQw4w9WgXcQ' },
   SPOTIFY: { url: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC' },
   EMAIL: { email: 'hello@example.com' }, PHONE: { number: '+91 9876543210' }, LOCATION: { query: 'Mumbai, India' },
+  WHATSAPP: { label: 'Chat', phoneNumber: '+919876543210' },
+  FORM: { formId: '00000000-0000-4000-8000-000000000003', variant: 'CARD' },
+  SUBSCRIBE: { formId: '00000000-0000-4000-8000-000000000004', title: 'Join' },
 };
 test('all additional blocks validate for creation and public output', () => {
   for (const [type, content] of Object.entries(examples)) {

@@ -4,14 +4,14 @@ import { Prisma } from '../../generated/prisma/client';
 import { blockContentSchemas, createBlockSchema, socialDataSchema, resolveAppearance, appearanceOverridesSchema, type UpdateAppearanceInput, type ApplyTemplateInput, type CreateSocialInput, type UpdateSocialInput, type CreatePageInput, type UpdatePageInput, type CreateBlockInput, type UpdateBlockInput, type ReorderBlocksInput } from '@kachko/validation';
 
 export class PageResourceError extends Error {
-  constructor(readonly code: 'PAGE_NOT_FOUND' | 'BLOCK_NOT_FOUND' | 'THEME_NOT_FOUND' | 'TEMPLATE_NOT_FOUND' | 'SOCIAL_NOT_FOUND' | 'MEDIA_NOT_FOUND') { super(code); }
+  constructor(readonly code: 'PAGE_NOT_FOUND' | 'BLOCK_NOT_FOUND' | 'THEME_NOT_FOUND' | 'TEMPLATE_NOT_FOUND' | 'SOCIAL_NOT_FOUND' | 'MEDIA_NOT_FOUND' | 'FORM_NOT_FOUND') { super(code); }
 }
 export class PageInputError extends Error {
   constructor(readonly code: 'VALIDATION_ERROR' | 'PAGE_SLUG_UNAVAILABLE' | 'BLOCK_ORDER_CONFLICT' | 'SOCIAL_ORDER_CONFLICT' | 'TEMPLATE_REPLACE_REQUIRED', message: string) { super(message); }
 }
 const orderedBlocks = { orderBy: [{ position: 'asc' as const }, { id: 'asc' as const }], include: { media: true } };
 const orderedSocials = { orderBy: [{ position: 'asc' as const }, { id: 'asc' as const }] };
-const fullPage = { blocks: orderedBlocks, theme: true, socials: orderedSocials, user: { select: { username: true } } };
+const fullPage = { blocks: orderedBlocks, forms: { include: { fields: { orderBy: [{ position: 'asc' as const }, { id: 'asc' as const }] } } }, theme: true, socials: orderedSocials, user: { select: { username: true } } };
 export type StoredPage = Prisma.PageGetPayload<{ include: typeof fullPage }>;
 export type StoredBlock = Prisma.PageBlockGetPayload<{ include: { media: true } }>;
 
@@ -77,6 +77,8 @@ export class PagesRepository {
       const position = page.blocks.length ? Math.max(...page.blocks.map(block => block.position)) + 1 : 0;
       const mediaId = data.type === 'IMAGE' ? data.content.mediaId : undefined;
       if (mediaId && !await tx.media.findFirst({ where: { id: mediaId, userId } })) throw new PageResourceError('MEDIA_NOT_FOUND');
+      const formId = data.type === 'FORM' || data.type === 'SUBSCRIBE' ? data.content.formId : undefined;
+      if (formId && !await tx.form.findFirst({ where: { id: formId, pageId: id } })) throw new PageResourceError('FORM_NOT_FOUND');
       const block = await tx.pageBlock.create({ data: { pageId: id, type: data.type, position,
         content: data.content as Prisma.InputJsonObject, mediaId, isVisible: data.isVisible ?? true }, include: { media: true } });
       await tx.page.update({ where: { id }, data: { revision: { increment: 1 } } });
@@ -94,6 +96,8 @@ export class PagesRepository {
       }
       const mediaId = stored.type === 'IMAGE' && data.content ? (data.content as { mediaId: string }).mediaId : undefined;
       if (mediaId && !await tx.media.findFirst({ where: { id: mediaId, userId } })) throw new PageResourceError('MEDIA_NOT_FOUND');
+      const formId = (stored.type === 'FORM' || stored.type === 'SUBSCRIBE') && data.content ? (data.content as { formId: string }).formId : undefined;
+      if (formId && !await tx.form.findFirst({ where: { id: formId, pageId: id } })) throw new PageResourceError('FORM_NOT_FOUND');
       const block = await tx.pageBlock.update({ where: { id: blockId }, data: {
         ...(data.content ? { content: data.content as Prisma.InputJsonObject } : {}),
         ...(mediaId ? { mediaId } : {}),
@@ -214,6 +218,7 @@ export class PagesRepository {
     return this.db.$transaction(tx => tx.page.findFirst({ where: this.publicWhere(username, pageSlug), include: {
       user: { select: { username: true, displayName: true, bio: true, avatarUrl: true } },
       blocks: { ...orderedBlocks, where: { isVisible: true } },
+      forms: { where: { isActive: true }, include: { fields: { orderBy: [{ position: 'asc' }, { id: 'asc' }] } } },
       theme: true, socials: { ...orderedSocials, where: { isVisible: true } },
     } }), { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }

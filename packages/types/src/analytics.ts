@@ -1,6 +1,6 @@
 import type { ApiData } from './index';
 
-export type AnalyticsEventType = 'PAGE_VIEW' | 'LINK_CLICK' | 'SOCIAL_CLICK';
+export type AnalyticsEventType = 'PAGE_VIEW' | 'LINK_CLICK' | 'SOCIAL_CLICK' | 'FORM_VIEW' | 'FORM_SUBMIT' | 'LEAD_CREATED' | 'WHATSAPP_CLICK' | 'SUBSCRIBE';
 export type AnalyticsRange = 'today' | '7d' | '30d';
 export interface AnalyticsPeriod { range: AnalyticsRange; from: string; to: string }
 export interface AnalyticsSummary extends AnalyticsPeriod {

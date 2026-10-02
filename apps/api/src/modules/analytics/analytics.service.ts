@@ -117,4 +117,9 @@ export class AnalyticsService {
   devices(userId: string, pageId: string, query: AnalyticsRangeInput) {
     return this.breakdown(userId, pageId, query, (from, to) => this.repository.devices(pageId, from, to));
   }
+  async conversionFunnel(userId: string, pageId: string) {
+    if (!await this.repository.ownedPage(userId, pageId)) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');
+    const result = await this.repository.conversionFunnel(pageId);
+    return { data: { ...result, conversionRate: result.visitors ? Number(((result.leads / result.visitors) * 100).toFixed(2)) : 0 } };
+  }
 }

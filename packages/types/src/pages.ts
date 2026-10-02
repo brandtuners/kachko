@@ -42,6 +42,9 @@ export interface ExtraBlockContents {
   EMAIL: { email: string };
   PHONE: { number: string };
   LOCATION: { query: string };
+  WHATSAPP: { label: string; phoneNumber: string; messageTemplate?: string; campaign?: string; service?: string };
+  FORM: { formId: string; variant: 'CARD' | 'INLINE'; form?: import('./conversion').CreatorForm };
+  SUBSCRIBE: { formId: string; title?: string; description?: string; form?: import('./conversion').CreatorForm };
 }
 export type ExtraBlock = { [K in keyof ExtraBlockContents]: Omit<LinkBlock, 'type' | 'content'> & { type: K; content: ExtraBlockContents[K] } }[keyof ExtraBlockContents];
 export type PageBlock = LinkBlock | TextBlock | ExtraBlock;

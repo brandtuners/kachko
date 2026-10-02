@@ -111,11 +111,8 @@ export function LivePreview({ page, isPublished }: { page: EditorPage; isPublish
               kachko.in/{page.user.username}{page.isPrimary ? "" : `/${page.slug}`}
             </span>
           </div>
-          <div
-            className="h-[520px] overflow-y-auto overscroll-contain px-6 py-8 text-center"
-            style={{ ...vars, color: "var(--page-text, white)", fontFamily: "var(--page-font, inherit)", background, scrollbarWidth: "thin" }}
-          >
-            <div className="mx-auto max-w-[560px]">
+          <div className="h-[520px] overflow-y-auto overscroll-contain bg-[#d8ddcd] p-4 text-center" style={{ ...vars, color: "var(--page-text, white)", fontFamily: "var(--page-font, inherit)", scrollbarWidth: "thin" }}>
+            <div className="mx-auto min-h-full max-w-[340px] rounded-[22px] px-5 py-8 shadow-[0_12px_36px_rgba(17,19,18,.2)]" style={{ background }}>
               <PublicPageRenderer page={page} compact reportAction={<p className={`${page.theme?.config?.footer.visible ? "mt-3" : "mt-8"} text-[9px] text-[color:var(--page-text,white)] underline opacity-60`}>Report this page</p>} />
             </div>
           </div>

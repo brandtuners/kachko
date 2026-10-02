@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import type { AnalyticsRange } from "@kachko/types";
+import type { AnalyticsRange, ConversionFunnel } from "@kachko/types";
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { apiFetch } from "../../lib/api";
 import { useEditor } from "../editor/use-editor";
 import { useMediaUpload } from "../editor/use-media-upload";
-import { BLOCK_LABELS, BLOCK_TYPES, SOCIAL_PLATFORMS, type BlockType, type EditorBlock, type EditorSocial } from "../editor/types";
+import { BLOCK_DEFINITIONS, BLOCK_LABELS, BLOCK_TYPES, SOCIAL_PLATFORMS, type BlockType, type EditorBlock, type EditorSocial } from "../editor/types";
 import { Avatar } from "./dash-chrome";
 import { BLOCK_ICONS, SortableBlock } from "./block-row";
 import { DesignPanel } from "./design-panel";
@@ -16,6 +17,7 @@ import { useClicksByBlock, useStats } from "./home-panels";
 import { IconArrowUpRight, IconCheck, IconChart, IconEye, IconLink, IconPencil, IconPlus, IconQr, IconTrash, SOCIAL_ICONS } from "../../components/icons";
 import { PageQr } from "../share/page-qr";
 import { publicPageUrl } from "../../lib/public-url";
+import { createTemplateForm } from "../conversion/api";
 
 function Panel({ title, sub, action, children }: { title: string; sub?: string; action?: JSX.Element; children: React.ReactNode }) {
   return (
@@ -40,6 +42,7 @@ export function BlockEditor({ focusId = null, clearFocus = () => undefined }: { 
   const imageInput = useRef<HTMLInputElement>(null);
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
+  const [preparingConversion, setPreparingConversion] = useState(false);
   const page = editor.page!;
   const clicks = useClicksByBlock(page.id);
   const sorted = [...page.blocks].sort((a, b) => a.position - b.position);
@@ -47,17 +50,21 @@ export function BlockEditor({ focusId = null, clearFocus = () => undefined }: { 
 
   // Adding a block: the API validates content per type, so every new block is
   // created with schema-valid defaults and dropped straight into edit mode.
-  const addBlock = (t: BlockType) => {
+  const addBlock = async (t: BlockType) => {
     setAddError(null);
-    const content = libraryDefaults(t);
     if (t === "IMAGE") { imageInput.current?.click(); return; }
-    editor.createBlock.mutate(
-      { type: t, content },
-      {
-        onSuccess: (b) => setJustAddedId(b.id),
-        onError: (e) => setAddError(e.message || "Couldn't add that block."),
-      },
-    );
+    try {
+      let content = libraryDefaults(t);
+      if (t === "FORM" || t === "SUBSCRIBE") {
+        setPreparingConversion(true);
+        const form = await createTemplateForm(page.id, t);
+        content = t === "FORM" ? { formId: form.id, variant: "CARD" } : { formId: form.id, title: form.title ?? "Join my newsletter" };
+      }
+      const block = await editor.createBlock.mutateAsync({ type: t, content });
+      setJustAddedId(block.id);
+    } catch (error) {
+      setAddError(error instanceof Error ? error.message : "Couldn't add that block.");
+    } finally { setPreparingConversion(false); }
   };
 
   return (
@@ -110,7 +117,7 @@ export function BlockEditor({ focusId = null, clearFocus = () => undefined }: { 
               onSuccess: block => setJustAddedId(block.id), onError: error => setAddError(error.message),
             });
           }}
-          disabled={editor.createBlock.isPending || upload.isUploading}
+          disabled={editor.createBlock.isPending || upload.isUploading || preparingConversion}
         />
       </div>
     </Panel>
@@ -160,18 +167,29 @@ export function AddBlockMenu({ imageInput, addBlock, addError, justAddedId, onIm
 }) {
   return (
     <div className="k-panel p-5">
-      <p className="k-label">Blocks library</p>
+      <p className="k-label">What do you want visitors to do?</p>
       <input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={async event => {
         const file = event.target.files?.[0]; event.target.value = "";
         if (file) await onImageSelected(file);
       }} />
+      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        {INTENT_CHOICES.map(choice => {
+          const Icon = BLOCK_ICONS[choice.type] ?? IconLink;
+          return <button key={choice.type} type="button" onClick={() => addBlock(choice.type)} disabled={disabled}
+            className="group flex items-center gap-3 rounded-[14px] border border-[#dfe2dc] bg-[#f7f8f3] p-3.5 text-left transition hover:border-[#91bd10] hover:bg-[#eff8d4] disabled:opacity-50">
+            <span className="k-tile-icon shrink-0"><Icon className="h-4 w-4" /></span>
+            <span><span className="block text-sm font-extrabold text-[var(--k-ink)]">{choice.label}</span><span className="block text-[11px] text-[#777d78]">{choice.hint}</span></span>
+          </button>;
+        })}
+      </div>
+      <div className="mb-3 flex items-center gap-3"><span className="h-px flex-1 bg-[#eceee9]" /><span className="text-[10px] font-extrabold uppercase tracking-[.16em] text-[#9a9f9b]">All blocks</span><span className="h-px flex-1 bg-[#eceee9]" /></div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {BLOCK_TYPES.map((type) => {
           const Icon = BLOCK_ICONS[type] ?? IconLink;
           return <button key={type} type="button" onClick={() => addBlock(type)} disabled={disabled}
             className="group flex flex-col items-start gap-2 rounded-[14px] border border-[#eceee9] bg-white p-3.5 text-left transition hover:border-[#b5d936] hover:shadow-[0_8px_24px_rgba(22,27,22,.06)] disabled:opacity-50">
             <span className="k-tile-icon transition group-hover:bg-[var(--k-ink)] group-hover:text-white"><Icon className="h-4 w-4" /></span>
-            <span className="text-sm font-extrabold text-[var(--k-ink)]">{BLOCK_LABELS[type]}</span>
+            <span className="flex w-full items-center justify-between gap-2 text-sm font-extrabold text-[var(--k-ink)]"><span>{BLOCK_LABELS[type]}</span><span className="text-[9px] uppercase tracking-wide text-[#9a9f9b]">{BLOCK_DEFINITIONS[type].category.toLowerCase()}</span></span>
             <span className="text-[11px] leading-snug text-[#9a9f9b]">{LIBRARY_HINTS[type]}</span>
           </button>;
         })}
@@ -184,6 +202,12 @@ export function AddBlockMenu({ imageInput, addBlock, addError, justAddedId, onIm
   );
 }
 
+const INTENT_CHOICES: { type: BlockType; label: string; hint: string }[] = [
+  { type: "FORM", label: "Get enquiries", hint: "Create a contact form" },
+  { type: "WHATSAPP", label: "Start chats", hint: "Open WhatsApp" },
+  { type: "SUBSCRIBE", label: "Grow my list", hint: "Collect subscribers" },
+];
+
 const LIBRARY_HINTS: Record<BlockType, string> = {
   LINK: "A button to any URL",
   TEXT: "A line or two of copy",
@@ -195,6 +219,9 @@ const LIBRARY_HINTS: Record<BlockType, string> = {
   EMAIL: "One-tap email button",
   PHONE: "One-tap call button",
   LOCATION: "Map pin",
+  WHATSAPP: "Turn visitors into chats",
+  FORM: "Capture enquiries",
+  SUBSCRIBE: "Grow your email list",
 };
 
 function libraryDefaults(t: BlockType): Record<string, unknown> {
@@ -222,6 +249,11 @@ function libraryDefaults(t: BlockType): Record<string, unknown> {
       return { number: "+1 555 0100" };
     case "LOCATION":
       return { query: "Your city" };
+    case "WHATSAPP":
+      return { label: "Chat on WhatsApp", phoneNumber: "+919999999999", messageTemplate: "Hi, I found your Kachko page." };
+    case "FORM":
+    case "SUBSCRIBE":
+      return {};
   }
 }
 
@@ -281,6 +313,7 @@ export function AnalyticsPanel() {
   const page = editor.page!;
   const [range, setRange] = useState<AnalyticsRange>("7d");
   const stats = useStats(page.id, range);
+  const funnel = useQuery({ queryKey: ["conversion-funnel", page.id], queryFn: () => apiFetch<ConversionFunnel>(`/analytics/pages/${page.id}/conversion-funnel`) });
   const { summary, series, top, topSocials, referrers, geo, devices } = stats;
   const queries = [summary, series, top, topSocials, referrers, geo, devices];
 
@@ -342,6 +375,7 @@ export function AnalyticsPanel() {
             <StatCard value={s!.uniqueVisitors} label="Visitors" />
             <StatCard value={`${s!.clickThroughRate}%`} label="Link CTR" />
           </div>
+          <div className="k-panel p-5"><p className="k-label">Conversion funnel</p><div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><StatCard value={funnel.data?.visitors ?? 0} label="Visitors" /><StatCard value={funnel.data?.actions ?? 0} label="Actions" /><StatCard value={funnel.data?.leads ?? 0} label="Leads" /><StatCard value={`${funnel.data?.conversionRate ?? 0}%`} label="Conversion" /></div></div>
 
           <div className="k-panel p-5">
             <p className="k-label">Activity</p>

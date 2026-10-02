@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const analyticsEventTypeSchema = z.enum(['PAGE_VIEW', 'LINK_CLICK', 'SOCIAL_CLICK']);
+export const analyticsEventTypeSchema = z.enum(['PAGE_VIEW', 'LINK_CLICK', 'SOCIAL_CLICK', 'FORM_VIEW', 'FORM_SUBMIT', 'WHATSAPP_CLICK', 'SUBSCRIBE']);
 export const analyticsEventSchema = z.strictObject({
   pageId: z.uuid(),
   blockId: z.uuid().optional(),
@@ -15,6 +15,9 @@ export const analyticsEventSchema = z.strictObject({
   }
   if (value.eventType === 'SOCIAL_CLICK' && Number(Boolean(value.blockId)) + Number(Boolean(value.socialProfileId)) !== 1) {
     ctx.addIssue({ code: 'custom', path: ['socialProfileId'], message: 'SOCIAL_CLICK requires exactly one blockId or socialProfileId' });
+  }
+  if (['FORM_VIEW', 'FORM_SUBMIT', 'WHATSAPP_CLICK', 'SUBSCRIBE'].includes(value.eventType) && (!value.blockId || value.socialProfileId)) {
+    ctx.addIssue({ code: 'custom', path: ['blockId'], message: `${value.eventType} requires only blockId` });
   }
 });
 export const analyticsRangeSchema = z.strictObject({
