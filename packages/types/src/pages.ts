@@ -1,8 +1,8 @@
 import type { ThemeConfig, AppearanceOverrides, SocialProfile, PublicSocial } from './appearance';
 import type { ApiData } from './index';
 
-export const DEFAULT_PAGE_THEME_KEY = 'minimal' as const;
-export type PageThemeKey = 'minimal' | 'dark' | 'gradient' | 'professional' | 'elegant' | 'nature' | 'aurora' | 'neon-pop' | 'cyan-pulse' | 'sunset-lime' | 'coral-drift';
+export const DEFAULT_PAGE_THEME_KEY = 'default' as const;
+export type PageThemeKey = 'default' | 'minimal' | 'dark' | 'gradient' | 'professional' | 'elegant' | 'nature' | 'aurora' | 'neon-pop' | 'cyan-pulse' | 'sunset-lime' | 'coral-drift';
 export interface LinkBlockContent {
   title: string;
   url: string;

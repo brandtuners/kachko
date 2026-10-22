@@ -54,7 +54,10 @@ export function LivePreview({ page }: { page: EditorPage }) {
 
       <div className="mx-auto w-[305px] max-w-full">
         {/* phone chrome — reference `.phone` */}
-        <div className="relative h-[600px] overflow-hidden rounded-[44px] border-[8px] border-[#111312] shadow-[0_19px_42px_rgba(16,20,16,.16)] lg:h-[clamp(360px,calc(100dvh-245px),600px)]">
+        <div
+          className="relative h-[600px] overflow-hidden rounded-[44px] border-[8px] border-[#111312] shadow-[0_19px_42px_rgba(16,20,16,.16)] lg:h-[clamp(360px,calc(100dvh-245px),600px)]"
+          style={{ ...vars, color: "var(--page-text, white)", fontFamily: "var(--page-font, inherit)" }}
+        >
           {/* notch */}
           <span aria-hidden className="absolute left-1/2 top-[10px] z-20 h-6 w-[96px] -translate-x-1/2 rounded-[20px] bg-[#111312]" />
           {/* share */}
@@ -68,11 +71,15 @@ export function LivePreview({ page }: { page: EditorPage }) {
           </button>
 
           <div
-            className="h-full overflow-y-auto overscroll-contain px-4 pb-8 pt-14 text-center"
-            style={{ ...vars, color: "var(--page-text, white)", fontFamily: "var(--page-font, inherit)", background, scrollbarWidth: "thin" }}
+            className="h-full overflow-y-auto overscroll-contain px-4 pb-16 pt-14 text-center"
+            style={{ background, scrollbarWidth: "thin" }}
           >
-            <PublicPageRenderer page={page} compact forceBrandFooter />
+            <PublicPageRenderer page={page} compact brandFooterVisible={false} />
           </div>
+          {(page.theme?.config?.footer.visible ?? true) ? <div aria-label="Kachko watermark" className="pointer-events-none absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/15 px-2.5 py-1 text-[8px] font-bold tracking-[.08em] text-[color:var(--page-text,white)] backdrop-blur-sm">
+            <svg viewBox="0 0 48 48" className="h-2.5 w-2.5" aria-hidden><path d="M8 40V18c0-8.3 6.7-15 15-15s15 6.7 15 15v22h-7V18c0-4.4-3.6-8-8-8s-8 3.6-8 8v22H8Z" fill="currentColor" /></svg>
+            KACHKO
+          </div> : null}
         </div>
       </div>
 

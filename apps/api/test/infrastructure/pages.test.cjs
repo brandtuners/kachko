@@ -47,7 +47,7 @@ test('page migration enforces multi-page ownership and cascades; username change
   const page = await db.page.create({ data: { userId: owner.id, slug: owner.username, isPrimary: true } });
   assert.equal(page.isPublished, true);
   assert.ok(page.publishedAt);
-  assert.equal(page.themeKey, 'minimal');
+  assert.equal(page.themeKey, 'default');
   const secondPage = await db.page.create({ data: { userId: owner.id, slug: 'second' } });
   const otherPage = await db.page.create({ data: { userId: other.id, slug: owner.username, isPrimary: true } });
   await assert.rejects(db.page.create({ data: { userId: owner.id, slug: 'second' } }), { code: 'P2002' });
@@ -147,7 +147,7 @@ test('page migration enforces multi-page ownership and cascades; username change
   const alicePage = createdPages.find(r => r.status === 201).body.data;
   const root = `/pages/${alicePage.id}`;
   assert.equal(alicePage.slug, 'page_alice');
-  assert.equal(alicePage.themeKey, 'minimal');
+  assert.equal(alicePage.themeKey, 'default');
   assert.equal(alicePage.isPublished, true);
   assert.equal(alicePage.isPrimary, true);
   assert.equal(alicePage.userId, undefined);

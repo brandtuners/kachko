@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { MediaAsset, PageTemplate, ThemeConfig } from "@kachko/types";
+import { createPortal } from "react-dom";
+import Link from "next/link";
+import { DEFAULT_PAGE_THEME_KEY, type MediaAsset, type ThemeConfig } from "@kachko/types";
 import { apiFetch, ApiClientError } from "../../lib/api";
 import { IconArrowLeft, IconCheck, IconTrash } from "../../components/icons";
 import { useEditor } from "../editor/use-editor";
 import { useMediaUpload } from "../editor/use-media-upload";
 import { PAGE_FONT_STACKS, themeBackground, themeButtonStyle, themeVars } from "../page/theme";
 
-type View = "home" | "template" | "theme" | "wallpaper" | "buttons" | "text" | "colors" | "footer";
+type View = "home" | "theme" | "customize" | "background" | "buttons" | "text" | "footer";
 
 const VIEW_TITLES: Record<Exclude<View, "home">, string> = {
-  template: "Templates", theme: "Theme", wallpaper: "Wallpaper", buttons: "Buttons", text: "Text", colors: "Colors", footer: "Footer",
+  theme: "Themes", customize: "Customize", background: "Background", buttons: "Buttons", text: "Texts", footer: "Footer",
 };
 
 const FONT_OPTIONS: Array<{ value: ThemeConfig["typography"]["fontFamily"]; label: string }> = [
@@ -58,8 +60,6 @@ function ColorControl({ label, value, onChange }: { label: string; value: string
   );
 }
 
-const pageHasBlocks = (blocks: Array<unknown> | undefined) => Boolean(blocks?.length);
-
 export function DesignPanel() {
   const editor = useEditor();
   const upload = useMediaUpload();
@@ -72,12 +72,11 @@ export function DesignPanel() {
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [deletingMediaId, setDeletingMediaId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<MediaAsset | null>(null);
-  const [pendingTemplate, setPendingTemplate] = useState<PageTemplate | null>(null);
-  const [templateError, setTemplateError] = useState<string | null>(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   useEffect(() => { if (serverConfig) setDraft(serverConfig); }, [serverConfig]);
   useEffect(() => {
-    if (view !== "wallpaper" || mediaLoaded || mediaLoading) return;
+    if (view !== "background" || mediaLoaded || mediaLoading) return;
     setMediaLoading(true);
     apiFetch<MediaAsset[]>("/media").then(setMedia).catch(() => setMediaError("Could not load your images.")).finally(() => { setMediaLoading(false); setMediaLoaded(true); });
   }, [view, mediaLoaded, mediaLoading]);
@@ -114,78 +113,29 @@ export function DesignPanel() {
   };
   const backgroundColor = draft.background.type === "solid" ? draft.background.color : draft.background.from;
   const fontLabel = FONT_OPTIONS.find((font) => font.value === draft.typography.fontFamily)?.label ?? "System";
+  const openCustomize = () => {
+    setView("customize");
+    if (editor.page?.themeId === DEFAULT_PAGE_THEME_KEY) return;
+    const defaultTheme = editor.themes.find((theme) => theme.id === DEFAULT_PAGE_THEME_KEY);
+    if (defaultTheme?.config) setDraft(defaultTheme.config);
+    editor.pickTheme.mutate(DEFAULT_PAGE_THEME_KEY, { onError: () => setView("home") });
+  };
 
   if (view === "home") {
     return (
       <div className="grid gap-3">
-        <CardButton title="Templates" value="Page layouts" preview={<span className="grid grid-cols-2 gap-1"><i className="h-3 w-3 rounded-sm bg-[#9fce23]" /><i className="h-3 w-3 rounded-sm bg-[#252a26]" /><i className="col-span-2 h-2 rounded-sm bg-[#dfe3d9]" /></span>} onClick={() => setView("template")} />
-        <CardButton title="Theme" value={editor.themes.find((theme) => theme.id === editor.page?.themeId)?.name ?? editor.page?.themeId ?? "Custom"}
+        <CardButton title="Themes" value={editor.themes.find((theme) => theme.id === editor.page?.themeId)?.name ?? editor.page?.themeId ?? "Custom"}
           preview={<span className="font-serif text-lg font-bold">Aa</span>} onClick={() => setView("theme")} />
-        <p className="mb-0 mt-3 px-1 text-xs font-extrabold uppercase tracking-[.14em] text-[#777d76]">Customize</p>
-        <CardButton title="Wallpaper" value={draft.background.imageMediaId ? "Image" : draft.background.type === "gradient" ? "Gradient" : "Fill"}
-          preview={<span className="h-full w-full" style={{ background: themeBackground({ config: draft }) }} />} onClick={() => setView("wallpaper")} />
-        <CardButton title="Buttons" value={draft.buttons.variant[0]!.toUpperCase() + draft.buttons.variant.slice(1)}
-          preview={<span className="h-5 w-8 border" style={{ ...themeButtonStyle(), ...themeVars({ config: draft }) }} />} onClick={() => setView("buttons")} />
-        <CardButton title="Text" value={fontLabel} preview={<span className="text-lg">Aa</span>} onClick={() => setView("text")} />
-        <CardButton title="Colors" preview={<span className="flex h-full w-full">{[backgroundColor, draft.buttons.background, draft.buttons.color].map((color) => <i key={color} className="h-full flex-1" style={{ background: color }} />)}</span>} onClick={() => setView("colors")} />
-        <CardButton title="Footer" value={draft.footer.visible ? "Shown" : "Hidden"} preview={<span className="text-[10px] font-semibold">KACHKO</span>} onClick={() => setView("footer")} />
+        <CardButton title="Customize" value="Make it your own" preview={<span className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5 p-2">{[backgroundColor, draft.buttons.background, draft.typography.color, "#9fce23"].map((color, index) => <i key={`${color}-${index}`} className="rounded-sm" style={{ background: color }} />)}</span>} onClick={openCustomize} />
         {(editor.saveAppearance.isError || editor.pickTheme.isError) ? <p role="alert" className="mt-2 text-xs font-semibold text-[#b4322c]">Could not save that design change. Please try again.</p> : null}
       </div>
     );
   }
 
-  if (view === "template") {
-    const apply = (template: PageTemplate, replaceExistingBlocks: boolean) => {
-      setTemplateError(null);
-      editor.applyTemplate.mutate(
-        { templateKey: template.key, replaceExistingBlocks },
-        {
-          onSuccess: (page) => {
-            if (page.theme?.config) setDraft(page.theme.config);
-            setPendingTemplate(null);
-            setView("home");
-          },
-          onError: (error) => {
-            if (error instanceof ApiClientError && error.code === "TEMPLATE_REPLACE_REQUIRED") setPendingTemplate(template);
-            else setTemplateError(error instanceof Error ? error.message : "Could not apply this template.");
-          },
-        },
-      );
-    };
-    return <div><BackHeader view={view} back={() => setView("home")} />
-      <p className="mb-4 text-sm text-[#737973]">Start from a ready-made design and block layout. You can customize everything afterward.</p>
-      {editor.templatesLoading ? <p className="py-8 text-center text-sm text-[#8b918a]">Loading templates…</p> : null}
-      <div className="grid gap-3 sm:grid-cols-3">
-        {editor.templates.map((template) => {
-          const theme = editor.themes.find((item) => item.id === template.themeKey);
-          return <button key={template.key} type="button" disabled={editor.applyTemplate.isPending} onClick={() => pageHasBlocks(editor.page?.blocks) ? setPendingTemplate(template) : apply(template, false)} className="overflow-hidden rounded-2xl border-2 border-[#e4e7df] bg-white text-left transition hover:border-[#9fce23] disabled:opacity-60">
-            <span className="relative block h-32 p-4" style={theme ? { ...themeVars(theme), background: themeBackground(theme) } : undefined}>
-              <span className="block text-lg font-extrabold text-[color:var(--page-title-color,var(--page-text,#111312))]">Aa</span>
-              <span className="mt-5 block h-7 rounded-[var(--page-button-radius,12px)] border border-[color:var(--page-button-bg,#111312)]" />
-              <span className="mt-2 block h-5 w-4/5 rounded-[var(--page-button-radius,12px)] border border-[color:var(--page-button-bg,#111312)]" />
-            </span>
-            <span className="block p-3"><span className="block text-sm font-extrabold text-[#111312]">{template.name}</span><span className="mt-1 block text-xs leading-relaxed text-[#737973]">{template.description}</span><span className="mt-2 block text-[10px] font-bold uppercase tracking-wide text-[#8c928b]">{template.blocks.length} starter blocks</span></span>
-          </button>;
-        })}
-      </div>
-      {templateError ? <p role="alert" className="mt-3 text-sm font-semibold text-[#b4322c]">{templateError}</p> : null}
-      {pendingTemplate ? <div className="fixed inset-0 z-[100] grid place-items-center bg-[#111312]/45 px-5 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget && !editor.applyTemplate.isPending) setPendingTemplate(null); }}>
-        <div role="alertdialog" aria-modal="true" aria-labelledby="replace-template-title" aria-describedby="replace-template-description" className="w-full max-w-md rounded-[24px] border border-[#dfe3d9] bg-[#fbfaf6] p-6 shadow-[0_24px_80px_rgba(17,19,18,.28)]">
-          <h4 id="replace-template-title" className="text-lg font-extrabold tracking-[-.3px] text-[#111312]">Apply {pendingTemplate.name}?</h4>
-          <p id="replace-template-description" className="mt-2 text-sm leading-relaxed text-[#697069]">This replaces every existing block on this page and applies the template theme. This action cannot be undone.</p>
-          <div className="mt-6 flex justify-end gap-2">
-            <button type="button" autoFocus disabled={editor.applyTemplate.isPending} onClick={() => setPendingTemplate(null)} className="k-btn-line !rounded-full disabled:opacity-50">Cancel</button>
-            <button type="button" disabled={editor.applyTemplate.isPending} onClick={() => apply(pendingTemplate, true)} className="rounded-full bg-[#111312] px-5 py-2.5 text-sm font-extrabold text-white disabled:opacity-60">{editor.applyTemplate.isPending ? "Applying…" : "Replace and apply"}</button>
-          </div>
-        </div>
-      </div> : null}
-    </div>;
-  }
-
   if (view === "theme") return (
     <div><BackHeader view={view} back={() => setView("home")} />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {editor.themes.map((theme) => {
+        {editor.themes.filter((theme) => theme.id !== DEFAULT_PAGE_THEME_KEY).map((theme) => {
           const active = theme.id === editor.page?.themeId;
           return <button key={theme.id} type="button" disabled={editor.pickTheme.isPending} onClick={() => editor.pickTheme.mutate(theme.id)} className="text-left">
             <span className={`relative block aspect-[4/5] overflow-hidden rounded-2xl border-2 ${active ? "border-[#9fce23]" : "border-[#e5e7e1]"}`} style={{ ...themeVars(theme), background: themeBackground(theme) }}>
@@ -200,13 +150,26 @@ export function DesignPanel() {
     </div>
   );
 
-  if (view === "wallpaper") {
+  if (view === "customize") return (
+    <div><BackHeader view={view} back={() => setView("home")} />
+      <div className="grid gap-3">
+        <CardButton title="Background" value={draft.background.imageMediaId ? "Image" : draft.background.type === "gradient" ? "Gradient" : "Fill"}
+          preview={<span className="h-full w-full" style={{ background: themeBackground({ config: draft }) }} />} onClick={() => setView("background")} />
+        <CardButton title="Buttons" value={draft.buttons.variant[0]!.toUpperCase() + draft.buttons.variant.slice(1)}
+          preview={<span className="h-5 w-8 border" style={{ ...themeButtonStyle(), ...themeVars({ config: draft }) }} />} onClick={() => setView("buttons")} />
+        <CardButton title="Texts" value={fontLabel} preview={<span className="text-lg">Aa</span>} onClick={() => setView("text")} />
+        <CardButton title="Footer" value={draft.footer.visible ? "Shown" : "Hidden"} preview={<span className="text-[10px] font-semibold">KACHKO</span>} onClick={() => setView("footer")} />
+      </div>
+    </div>
+  );
+
+  if (view === "background") {
     const solidBackground = draft.background.type === "solid" ? draft.background : null;
     const gradientBackground = draft.background.type === "gradient" ? draft.background : null;
     const setSolid = () => commit({ ...draft, background: { type: "solid", color: backgroundColor } });
     const setGradient = () => commit({ ...draft, background: { type: "gradient", from: backgroundColor, to: draft.background.type === "gradient" ? draft.background.to : "#111312", angle: draft.background.type === "gradient" ? draft.background.angle : 180 } });
-    return <div><BackHeader view={view} back={() => setView("home")} />
-      <p className="mb-2 text-xs font-bold text-[#515750]">Wallpaper style</p>
+    return <div><BackHeader view={view} back={() => setView("customize")} />
+      <p className="mb-2 text-xs font-bold text-[#515750]">Background style</p>
       <div className="grid grid-cols-3 gap-2">
         {[{ key: "solid", label: "Fill" }, { key: "gradient", label: "Gradient" }, { key: "image", label: "Image" }].map((item) => {
           const active = item.key === "image" ? Boolean(draft.background.imageMediaId) : !draft.background.imageMediaId && draft.background.type === item.key;
@@ -246,7 +209,7 @@ export function DesignPanel() {
           <div className="flex rounded-lg bg-[#ecefe8] p-1">{(["cover", "contain"] as const).map((fit) => <button key={fit} type="button" onClick={() => commit({ ...draft, background: { ...draft.background, imageFit: fit } })} className={`flex-1 rounded-md py-1.5 text-xs font-bold capitalize ${draft.background.imageFit === fit ? "bg-white shadow-sm" : "text-[#747a74]"}`}>{fit}</button>)}</div>
           {(["imagePositionX", "imagePositionY"] as const).map((key) => <label key={key} className="block text-xs font-bold text-[#596158]">{key === "imagePositionX" ? "Horizontal" : "Vertical"} position: {draft.background[key] ?? 50}%<input type="range" min="0" max="100" step="5" value={draft.background[key] ?? 50} onChange={(event) => setDraft({ ...draft, background: { ...draft.background, [key]: Number(event.target.value) } })} onPointerUp={() => commit(draft)} className="mt-1 w-full accent-[#9fce23]" /></label>)}
           <label className="block text-xs font-bold text-[#596158]">Visibility: {Math.round((draft.background.imageOpacity ?? .35) * 100)}%<input type="range" min=".1" max=".8" step=".05" value={draft.background.imageOpacity ?? .35} onChange={(event) => setDraft({ ...draft, background: { ...draft.background, imageOpacity: Number(event.target.value) } })} onPointerUp={() => commit(draft)} className="mt-1 w-full accent-[#9fce23]" /></label>
-          <button type="button" className="text-xs font-bold text-[#b4322c]" onClick={() => commit({ ...draft, background: withoutBackgroundImage(draft.background) })}>Remove from wallpaper</button>
+          <button type="button" className="text-xs font-bold text-[#b4322c]" onClick={() => commit({ ...draft, background: withoutBackgroundImage(draft.background) })}>Remove from background</button>
         </div> : null}
       </div>
       {pendingDelete ? (
@@ -271,33 +234,32 @@ export function DesignPanel() {
     </div>;
   }
 
-  if (view === "buttons") return <div><BackHeader view={view} back={() => setView("home")} />
+  if (view === "buttons") return <div><BackHeader view={view} back={() => setView("customize")} />
     <p className="mb-2 text-xs font-bold">Button style</p><div className="grid grid-cols-3 gap-2">{(["filled", "glass", "outline"] as const).map((variant) => <button key={variant} type="button" onClick={() => commit({ ...draft, buttons: { ...draft.buttons, variant } })} className={`rounded-xl border-2 p-2 ${draft.buttons.variant === variant ? "border-[#111312]" : "border-[#e4e7df]"}`}><span className="mx-auto block h-7 w-4/5 border" style={{ borderRadius: draft.buttons.radius, background: variant === "outline" ? "transparent" : variant === "glass" ? "#dfe3df99" : draft.buttons.background, borderColor: draft.buttons.background }} /><span className="mt-2 block text-xs font-bold capitalize">{variant}</span></button>)}</div>
     <p className="mb-2 mt-6 text-xs font-bold">Corner roundness</p><div className="grid grid-cols-5 gap-2">{[0, 8, 16, 24, 32].map((radius) => <button key={radius} type="button" aria-label={`${radius}px corners`} title={`${radius}px`} onClick={() => commit({ ...draft, buttons: { ...draft.buttons, radius } })} className={`group grid h-12 place-items-center rounded-xl border-2 transition ${draft.buttons.radius === radius ? "border-[#111312] bg-[#f5f6f2]" : "border-[#e4e7df] bg-white hover:border-[#aeb4ac]"}`}><span aria-hidden className={`block h-6 w-6 border-l-2 border-t-2 transition ${draft.buttons.radius === radius ? "border-[#111312]" : "border-[#7d837c] group-hover:border-[#111312]"}`} style={{ borderTopLeftRadius: `${Math.min(radius, 20)}px` }} /></button>)}</div>
     <p className="mb-2 mt-6 text-xs font-bold">Button shadow</p><div className="grid grid-cols-2 gap-2">{[{ value: false, label: "None" }, { value: true, label: "Soft" }].map((option) => <button key={option.label} type="button" onClick={() => commit({ ...draft, buttons: { ...draft.buttons, shadow: option.value } })} className={`rounded-xl border-2 py-3 text-sm font-bold ${draft.buttons.shadow === option.value ? "border-[#111312]" : "border-[#e4e7df]"}`}>{option.label}</button>)}</div>
     <div className="mt-5"><ColorControl label="Button color" value={draft.buttons.background} onChange={(background) => commit({ ...draft, buttons: { ...draft.buttons, background } })} /><ColorControl label="Button text color" value={draft.buttons.color} onChange={(color) => commit({ ...draft, buttons: { ...draft.buttons, color } })} /></div>
   </div>;
 
-  if (view === "text") return <div><BackHeader view={view} back={() => setView("home")} />
+  if (view === "text") return <div><BackHeader view={view} back={() => setView("customize")} />
     <p className="mb-3 text-xs font-bold text-[#515750]">Page font</p>
     <div className="grid max-h-[360px] grid-cols-2 gap-2 overflow-y-auto pr-1">{FONT_OPTIONS.map((font) => <button key={font.value} type="button" aria-pressed={draft.typography.fontFamily === font.value} onClick={() => commit({ ...draft, typography: { ...draft.typography, fontFamily: font.value } })} className={`relative min-h-14 rounded-xl border-2 px-3 py-3 text-center text-sm transition ${draft.typography.fontFamily === font.value ? "border-[#111312] bg-white shadow-sm" : "border-transparent bg-[#f0f1ed] hover:border-[#cbd0c8]"}`} style={{ fontFamily: PAGE_FONT_STACKS[font.value] }}>{font.label}{draft.typography.fontFamily === font.value ? <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-[#9fce23] text-[#111312]"><IconCheck className="h-3 w-3" /></span> : null}</button>)}</div>
     <label className="mt-4 block text-sm font-bold">Title size: {draft.typography.titleSize}px<input type="range" min="20" max="48" value={draft.typography.titleSize} onChange={(event) => setDraft({ ...draft, typography: { ...draft.typography, titleSize: Number(event.target.value) } })} onPointerUp={() => commit(draft)} className="mt-2 w-full accent-[#9fce23]" /></label>
     <div className="mt-5"><ColorControl label="Page text color" value={draft.typography.color} onChange={(color) => commit({ ...draft, typography: { ...draft.typography, color } })} /><ColorControl label="Title color" value={draft.typography.titleColor ?? draft.typography.color} onChange={(titleColor) => commit({ ...draft, typography: { ...draft.typography, titleColor } })} /></div>
   </div>;
 
-  if (view === "colors") {
-    const gradientBackground = draft.background.type === "gradient" ? draft.background : null;
-    return <div><BackHeader view={view} back={() => setView("home")} />
-    <ColorControl label={draft.background.type === "solid" ? "Background" : "Gradient start"} value={backgroundColor} onChange={(color) => commit({ ...draft, background: draft.background.type === "solid" ? { ...draft.background, color } : { ...draft.background, from: color } })} />
-    {gradientBackground ? <ColorControl label="Gradient end" value={gradientBackground.to} onChange={(to) => commit({ ...draft, background: { ...gradientBackground, to } })} /> : null}
-    <ColorControl label="Buttons" value={draft.buttons.background} onChange={(background) => commit({ ...draft, buttons: { ...draft.buttons, background } })} /><ColorControl label="Button text" value={draft.buttons.color} onChange={(color) => commit({ ...draft, buttons: { ...draft.buttons, color } })} /><ColorControl label="Page text" value={draft.typography.color} onChange={(color) => commit({ ...draft, typography: { ...draft.typography, color } })} /><ColorControl label="Title" value={draft.typography.titleColor ?? draft.typography.color} onChange={(titleColor) => commit({ ...draft, typography: { ...draft.typography, titleColor } })} />
-  </div>;
-  }
-
-  return <div><BackHeader view="footer" back={() => setView("home")} />
+  return <div><BackHeader view="footer" back={() => setView("customize")} />
     <label className="flex items-center justify-between gap-4 rounded-2xl border border-[#e5e7e1] bg-white p-4 text-sm font-bold">
-      <span><span className="block">Show “Made with KACHKO”</span><span className="mt-1 block text-xs font-normal text-[#818780]">The report link always remains available.</span></span>
-      <button type="button" role="switch" aria-label="Show Made with KACHKO footer" aria-checked={draft.footer.visible} onClick={() => commit({ ...draft, footer: { visible: !draft.footer.visible } })} className={`relative h-7 w-12 shrink-0 rounded-full transition ${draft.footer.visible ? "bg-[#9fce23]" : "bg-[#a9aea7]"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${draft.footer.visible ? "left-6" : "left-1"}`} /></button>
+      <span><span className="flex items-center gap-2"><span>Show “Made with KACHKO”</span><span title="Premium feature" aria-label="Premium feature" className="grid h-5 w-5 place-items-center rounded-full bg-[#111312] text-[#c8f24a]"><svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden><path d="M13.2 2 5 13h6l-.2 9L19 10h-6l.2-8Z" /></svg></span></span><span className="mt-1 block text-xs font-normal text-[#818780]">Removing the Kachko watermark requires a premium subscription.</span></span>
+      <button type="button" role="switch" aria-label="Show Made with KACHKO footer" aria-checked={draft.footer.visible} onClick={() => draft.footer.visible ? setShowUpgrade(true) : commit({ ...draft, footer: { visible: true } })} className={`relative h-7 w-12 shrink-0 rounded-full transition ${draft.footer.visible ? "bg-[#9fce23]" : "bg-[#a9aea7]"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${draft.footer.visible ? "left-6" : "left-1"}`} /></button>
     </label>
+    {showUpgrade ? createPortal(<div className="fixed inset-0 z-[120] grid min-h-dvh place-items-center bg-[#111312]/45 px-4 py-8 backdrop-blur-[6px]" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowUpgrade(false); }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="subscribe-title" aria-describedby="subscribe-description" className="w-full max-w-md rounded-3xl border border-[#dfe3d9] bg-[#fbfaf6] p-6 shadow-[0_24px_80px_rgba(17,19,18,.3)]">
+        <span className="grid h-11 w-11 place-items-center rounded-full bg-[#eaf7bd] text-[#35430d]"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden><path d="M13.2 2 5 13h6l-.2 9L19 10h-6l.2-8Z" /></svg></span>
+        <h4 id="subscribe-title" className="mt-4 text-xl font-extrabold tracking-[-.4px] text-[#111312]">Subscribe to disable the watermark</h4>
+        <p id="subscribe-description" className="mt-2 text-sm leading-relaxed text-[#697069]">Removing “Made with KACHKO” is a premium feature. Subscribe to keep your public page completely brand-free.</p>
+        <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={() => setShowUpgrade(false)} className="k-btn-line !rounded-full">Not now</button><Link href="/#pricing" className="k-btn-ink !rounded-full" onClick={() => setShowUpgrade(false)}>View plans</Link></div>
+      </div>
+    </div>, document.body) : null}
   </div>;
 }

@@ -44,7 +44,17 @@ test('new system theme migration rows match the runtime theme contract', () => {
     const configs = [...line.matchAll(/'([^']+)'::jsonb/g)].map(match => JSON.parse(match[1]));
     assert.equal(themeConfigSchema.safeParse({ background: configs[0], typography: configs[1], buttons: configs[2], cards: configs[3] }).success, true);
   }
-  for (const key of ['aurora', 'neon-pop', 'cyan-pulse', 'sunset-lime', 'coral-drift']) assert.equal(themeKeySchema.parse(key), key);
+  for (const key of ['default', 'aurora', 'neon-pop', 'cyan-pulse', 'sunset-lime', 'coral-drift']) assert.equal(themeKeySchema.parse(key), key);
+});
+
+test('default customization theme is neutral and becomes the page default', () => {
+  const fs = require('node:fs');
+  const { themeConfigSchema } = require('@kachko/validation');
+  const sql = fs.readFileSync('../../prisma/migrations/20261022020000_default_design_theme/migration.sql', 'utf8');
+  const configs = [...sql.matchAll(/'([^']+)'::jsonb/g)].map(match => JSON.parse(match[1]));
+  assert.equal(configs.length, 4);
+  assert.equal(themeConfigSchema.safeParse({ background: configs[0], typography: configs[1], buttons: configs[2], cards: configs[3] }).success, true);
+  assert.match(sql, /ALTER TABLE "Page" ALTER COLUMN "themeKey" SET DEFAULT 'default'/);
 });
 
 test('neon presentation patches retain strict theme validation', () => {

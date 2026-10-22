@@ -5,14 +5,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addBlock,
   addSocial,
-  applyPageTemplate,
   createMyPage,
   deleteBlock,
   deleteMyPage,
   deleteSocial,
   getMyPage,
   listMyPages,
-  listTemplates,
   listThemes,
   reorderBlocks,
   reorderSocials,
@@ -27,7 +25,7 @@ import {
 import { usePageSelection } from "./page-selection";
 import type { BackgroundImageSettings } from "./api";
 import type { EditorPage } from "./types";
-import type { PageSummary, PageTemplate, ThemeConfig } from "@kachko/types";
+import type { PageSummary, PageThemeKey, ThemeConfig } from "@kachko/types";
 
 export const pagesKey = ["my-pages"] as const;
 export const pageKey = (pageId: string) => ["my-page", pageId] as const;
@@ -68,11 +66,6 @@ export function useEditor() {
   const themesQuery = useQuery({
     queryKey: ["themes"],
     queryFn: listThemes,
-  });
-
-  const templatesQuery = useQuery({
-    queryKey: ["templates"],
-    queryFn: listTemplates,
   });
 
   const setPageCache = (updater: (p: EditorPage) => EditorPage) => {
@@ -230,13 +223,29 @@ export function useEditor() {
   const pickTheme = useMutation({
     mutationKey: [...editorMutationKey, "theme"],
     mutationFn: (themeId: string) => setTheme(activePageId(), themeId),
-    // The PATCH response carries themeId only; merge the full theme row from the
-    // themes list so the fixed phone preview restyles instantly.
+    onMutate: async (themeId) => {
+      if (effectivePageId) await qc.cancelQueries({ queryKey: pageKey(effectivePageId) });
+      const previous = effectivePageId ? qc.getQueryData<EditorPage>(pageKey(effectivePageId)) : undefined;
+      const selected = themesQuery.data?.find((theme) => theme.id === themeId);
+      if (selected) {
+        setPageCache((page) => ({
+          ...page,
+          themeKey: themeId as PageThemeKey,
+          themeId,
+          theme: selected,
+        }));
+      }
+      return { previous };
+    },
     onSuccess: (p) =>
       setPageCache((prev) => {
         const theme = p.theme ?? null;
         return { ...prev, ...p, theme };
       }),
+    onError: (_error, _themeId, context) => {
+      if (context?.previous && effectivePageId) qc.setQueryData(pageKey(effectivePageId), context.previous);
+    },
+    onSettled: () => { if (effectivePageId) void qc.invalidateQueries({ queryKey: pageKey(effectivePageId) }); },
   });
   const setBackground = useMutation({
     mutationKey: [...editorMutationKey, "background"],
@@ -248,16 +257,6 @@ export function useEditor() {
     mutationFn: (config: ThemeConfig) => setAppearanceConfig(activePageId(), config),
     onSuccess: (page) => qc.setQueryData(pageKey(page.id), page),
   });
-  const applyTemplate = useMutation({
-    mutationKey: [...editorMutationKey, "template"],
-    mutationFn: (input: { templateKey: PageTemplate["key"]; replaceExistingBlocks: boolean }) =>
-      applyPageTemplate(activePageId(), input.templateKey, input.replaceExistingBlocks),
-    onSuccess: (page) => {
-      qc.setQueryData(pageKey(page.id), page);
-      qc.setQueryData<PageSummary[]>(pagesKey, (current = []) => current.map((item) => item.id === page.id ? pageSummary(page) : item));
-    },
-  });
-
   return {
     page: pageQuery.data,
     pages,
@@ -270,8 +269,6 @@ export function useEditor() {
     error: pagesQuery.error ?? pageQuery.error,
     refetch: async () => { await pagesQuery.refetch(); return pageQuery.refetch(); },
     themes: themesQuery.data ?? [],
-    templates: templatesQuery.data ?? [],
-    templatesLoading: templatesQuery.isLoading,
     saveMeta,
     saveUser,
     createBlock,
@@ -285,7 +282,6 @@ export function useEditor() {
     pickTheme,
     setBackground,
     saveAppearance,
-    applyTemplate,
   };
 }
 

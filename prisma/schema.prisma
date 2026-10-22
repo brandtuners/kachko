@@ -98,7 +98,7 @@ model Page {
   description         String?
   isPublished         Boolean          @default(true)
   publishedAt         DateTime?         @default(now())
-  themeKey            String           @default("minimal")
+  themeKey            String           @default("default")
   theme               Theme            @relation(fields: [themeKey], references: [slug], onDelete: Restrict)
   appearanceOverrides Json             @default("{}")
   socials             SocialProfile[]

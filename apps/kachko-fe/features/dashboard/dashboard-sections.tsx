@@ -9,12 +9,11 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import { apiFetch } from "../../lib/api";
 import { useEditor } from "../editor/use-editor";
 import { useMediaUpload } from "../editor/use-media-upload";
-import { BLOCK_DEFINITIONS, BLOCK_LABELS, BLOCK_TYPES, SOCIAL_PLATFORMS, type BlockType, type EditorBlock, type EditorSocial } from "../editor/types";
-import { Avatar } from "./dash-chrome";
+import { BLOCK_DEFINITIONS, BLOCK_LABELS, BLOCK_TYPES, type BlockType, type EditorBlock } from "../editor/types";
 import { BLOCK_ICONS, SortableBlock } from "./block-row";
 import { DesignPanel } from "./design-panel";
 import { useClicksByBlock, useStats } from "./home-panels";
-import { IconArrowUpRight, IconCheck, IconChart, IconEye, IconLink, IconPencil, IconPlus, IconQr, IconTrash, SOCIAL_ICONS } from "../../components/icons";
+import { IconArrowUpRight, IconCheck, IconChart, IconEye, IconLink, IconPlus, IconQr, IconUpload, SOCIAL_ICONS } from "../../components/icons";
 import { PageQr } from "../share/page-qr";
 import { publicPageUrl } from "../../lib/public-url";
 import { createTemplateForm } from "../conversion/api";
@@ -500,15 +499,11 @@ export function LinksPanel() {
   const [name, setName] = useState(page.user.displayName ?? "");
   const [tagline, setTagline] = useState(page.title ?? "");
   const [bio, setBio] = useState(page.description ?? "");
-  const [platform, setPlatform] = useState<string>(SOCIAL_PLATFORMS[0]!);
-  const [socialUrl, setSocialUrl] = useState("");
 
   useEffect(() => {
     setName(page.user.displayName ?? "");
     setTagline(page.title ?? "");
     setBio(page.description ?? "");
-    setPlatform(SOCIAL_PLATFORMS[0]!);
-    setSocialUrl("");
   }, [page.id, page.user.displayName, page.title, page.description]);
 
   useEffect(() => {
@@ -526,30 +521,36 @@ export function LinksPanel() {
   return (
     <Panel title="Settings" sub="How you show up at the top of your page.">
       <div className="grid gap-5 xl:grid-cols-2">
-        <div className="k-panel p-6">
+        <div className="k-panel p-6 xl:col-span-2">
           <div className="flex items-center gap-4">
-            <Avatar size={12} />
-            <div className="flex flex-col gap-1.5">
-              <label className="k-btn-line !h-9 cursor-pointer text-xs">
-                {upload.isUploading ? "Uploading…" : "Change photo"}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  className="hidden"
-                  disabled={upload.isUploading}
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (f) await upload.uploadAvatar(f);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
+            <label className={`group relative grid h-20 w-20 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full bg-[#dfe1dc] text-xl font-extrabold text-[#262927] shadow-[0_0_0_4px_#f7f6f1] ${upload.isUploading ? "cursor-wait" : ""}`}>
               {page.user.avatarUrl ? (
-                <button type="button" className="text-xs font-semibold text-[#9a9f9b] hover:text-[#b4322c]" onClick={upload.removeAvatar}>
-                  Remove
-                </button>
-              ) : null}
-            </div>
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={page.user.avatarUrl} alt="Profile" className="h-full w-full object-cover" />
+              ) : (
+                (page.user.displayName ?? page.user.username ?? "K").slice(0, 1).toUpperCase()
+              )}
+              <span className={`pointer-events-none absolute inset-0 grid place-items-center bg-black/55 text-white transition-opacity ${upload.isUploading ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"}`}>
+                {upload.isUploading ? <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <IconUpload className="h-6 w-6" />}
+              </span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                aria-label="Upload profile photo"
+                className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-wait"
+                disabled={upload.isUploading}
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (file) await upload.uploadAvatar(file);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+            {page.user.avatarUrl ? (
+              <button type="button" disabled={upload.isUploading} className="text-xs font-semibold text-[#9a9f9b] hover:text-[#b4322c] disabled:opacity-50" onClick={upload.removeAvatar}>
+                Remove photo
+              </button>
+            ) : <p className="text-xs text-[#818780]">Hover over the profile image to upload a photo.</p>}
           </div>
           {upload.error ? <p className="mt-2 text-sm text-[#b4322c]">{upload.error}</p> : null}
 
@@ -573,61 +574,6 @@ export function LinksPanel() {
           </div>
         </div>
 
-        <div className="k-panel p-6">
-          <p className="k-label">Social links</p>
-          <div className="flex flex-col gap-2">
-            {page.socials.length === 0 ? <p className="text-sm text-[#9a9f9b]">No social links yet.</p> : null}
-            {[...page.socials].sort((a, b) => a.position - b.position).map((soc, index, socials) => (
-              <SocialEditorRow
-                key={soc.id}
-                social={soc}
-                index={index}
-                count={socials.length}
-                busy={editor.editSocial.isPending || editor.moveSocial.isPending || editor.removeSocial.isPending}
-                onSave={(data) => editor.editSocial.mutate({ id: soc.id, data })}
-                onToggle={() => editor.editSocial.mutate({ id: soc.id, data: { isVisible: !soc.isVisible } })}
-                onMove={(offset) => {
-                  const target = index + offset;
-                  if (target < 0 || target >= socials.length) return;
-                  editor.moveSocial.mutate(arrayMove(socials.map((item) => item.id), index, target));
-                }}
-                onDelete={() => editor.removeSocial.mutate(soc.id)}
-              />
-            ))}
-            {(editor.createSocial.isError || editor.editSocial.isError || editor.moveSocial.isError || editor.removeSocial.isError) ? (
-              <p role="alert" className="text-xs font-semibold text-[#b4322c]">Could not save that social-link change. Check the platform URL and try again.</p>
-            ) : null}
-          </div>
-
-          <div className="mt-5 grid gap-3 border-t border-[#eceee9] pt-5 sm:grid-cols-[auto_1fr_auto]">
-            <select aria-label="Platform" className="k-input !w-auto" value={platform} onChange={(e) => setPlatform(e.target.value)}>
-              {SOCIAL_PLATFORMS.map((p) => (
-                <option key={p} value={p}>
-                  {p.charAt(0) + p.slice(1).toLowerCase()}
-                </option>
-              ))}
-            </select>
-            <input
-              aria-label="Profile URL"
-              className="k-input"
-              placeholder="https://…"
-              value={socialUrl}
-              onChange={(e) => setSocialUrl(e.target.value)}
-            />
-            <button
-              type="button"
-              className="k-btn-ink"
-              disabled={!socialUrl.trim() || editor.createSocial.isPending}
-              onClick={() => {
-                editor.createSocial.mutate({ platform, url: socialUrl.trim() }, { onSuccess: () => setSocialUrl("") });
-              }}
-            >
-              <IconPlus className="h-4 w-4" />
-              Add link
-            </button>
-          </div>
-        </div>
-
         <div className="xl:col-span-2 flex items-center justify-between gap-4 rounded-[18px] border border-[#e9ebe6] bg-white/[.94] px-5 py-4 shadow-[var(--k-shadow)]">
           <p className="text-sm text-[var(--k-muted)]">See the real thing — your saved changes appear on your live page automatically.</p>
           <Link
@@ -643,83 +589,6 @@ export function LinksPanel() {
         <DeleteAccount />
       </div>
     </Panel>
-  );
-}
-
-function SocialEditorRow({ social, index, count, busy, onSave, onToggle, onMove, onDelete }: {
-  social: EditorSocial;
-  index: number;
-  count: number;
-  busy: boolean;
-  onSave: (data: { platform: string; url: string; username: string | null }) => void;
-  onToggle: () => void;
-  onMove: (offset: -1 | 1) => void;
-  onDelete: () => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [platform, setPlatform] = useState(social.platform);
-  const [url, setUrl] = useState(social.url);
-  const [username, setUsername] = useState(social.username ?? "");
-  const committed = useRef(JSON.stringify({ platform: social.platform, url: social.url, username: social.username ?? null }));
-  const save = useRef(onSave);
-  const Icon = SOCIAL_ICONS[social.platform] ?? IconLink;
-
-  useEffect(() => { save.current = onSave; }, [onSave]);
-
-  useEffect(() => {
-    setPlatform(social.platform);
-    setUrl(social.url);
-    setUsername(social.username ?? "");
-    committed.current = JSON.stringify({ platform: social.platform, url: social.url, username: social.username ?? null });
-  }, [social.id, social.platform, social.url, social.username]);
-
-  useEffect(() => {
-    const data = { platform, url: url.trim(), username: username.trim() || null };
-    const serialized = JSON.stringify(data);
-    let validUrl = false;
-    try { validUrl = ["http:", "https:"].includes(new URL(data.url).protocol); } catch { validUrl = false; }
-    if (!editing || busy || !validUrl || serialized === committed.current) return;
-    const timer = window.setTimeout(() => {
-      committed.current = serialized;
-      save.current(data);
-    }, 800);
-    return () => window.clearTimeout(timer);
-  }, [busy, editing, platform, url, username]);
-
-  if (editing) return (
-    <div className="grid gap-2 rounded-[14px] border border-[#dfe2dc] bg-white p-3">
-      <div className="grid gap-2 sm:grid-cols-[auto_1fr]">
-        <select aria-label="Edit platform" className="k-input !w-auto" value={platform} onChange={(event) => setPlatform(event.target.value)}>
-          {SOCIAL_PLATFORMS.map((value) => <option key={value} value={value}>{value.charAt(0) + value.slice(1).toLowerCase()}</option>)}
-        </select>
-        <input aria-label="Edit profile URL" className="k-input" value={url} onChange={(event) => setUrl(event.target.value)} />
-      </div>
-      <input aria-label="Edit social username" className="k-input" placeholder="Username (optional)" value={username} onChange={(event) => setUsername(event.target.value)} />
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-[#718c1b]">Changes save automatically</span>
-        <button type="button" className="k-btn-line !h-9" disabled={busy || !url.trim()} onClick={() => setEditing(false)}>Done</button>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className={`flex items-center gap-2 rounded-[14px] border border-[#eceee9] bg-white px-3 py-2.5 ${social.isVisible ? "" : "opacity-55"}`}>
-      <span className="k-tile-icon"><Icon className="h-4 w-4" /></span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-extrabold text-[var(--k-ink)]">{social.platform}</p>
-        <p className="truncate text-xs text-[var(--k-muted)]">{social.url}</p>
-      </div>
-      <button type="button" role="switch" aria-checked={social.isVisible} aria-label={`${social.isVisible ? "Hide" : "Show"} ${social.platform} link`} disabled={busy} onClick={onToggle}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition ${social.isVisible ? "bg-[var(--k-lime)]" : "bg-[#c7cbc4]"}`}>
-        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${social.isVisible ? "left-[22px]" : "left-0.5"}`} />
-      </button>
-      <div className="flex flex-col">
-        <button type="button" className="h-5 px-1 text-xs disabled:opacity-25" aria-label={`Move ${social.platform} up`} disabled={busy || index === 0} onClick={() => onMove(-1)}>↑</button>
-        <button type="button" className="h-5 px-1 text-xs disabled:opacity-25" aria-label={`Move ${social.platform} down`} disabled={busy || index === count - 1} onClick={() => onMove(1)}>↓</button>
-      </div>
-      <button type="button" aria-label={`Edit ${social.platform} link`} className="k-icon-btn !h-8 !w-8" onClick={() => setEditing(true)}><IconPencil className="h-4 w-4" /></button>
-      <button type="button" aria-label={`Delete ${social.platform} link`} className="k-icon-btn !h-8 !w-8 hover:!text-[#b4322c]" disabled={busy} onClick={onDelete}><IconTrash className="h-4 w-4" /></button>
-    </div>
   );
 }
 

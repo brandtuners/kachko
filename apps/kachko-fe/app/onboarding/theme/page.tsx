@@ -6,6 +6,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { DEFAULT_PAGE_THEME_KEY } from "@kachko/types";
 import { listThemes, setTheme, ensurePage } from "../../../features/editor/api";
 import type { EditorTheme } from "../../../features/editor/types";
 import { ObShell } from "../../../features/onboarding/ob-shell";
@@ -68,7 +69,7 @@ export default function OnboardingThemeStep() {
         <p className="text-sm text-[var(--k-muted)]">Couldn’t load themes — you can pick one later.</p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {(themes.data ?? []).map((t) => {
+          {(themes.data ?? []).filter((theme) => theme.id !== DEFAULT_PAGE_THEME_KEY).map((t) => {
             const active = picked === t.id;
             return (
               <button

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const themeKeySchema = z.enum(['minimal', 'dark', 'gradient', 'professional', 'elegant', 'nature', 'aurora', 'neon-pop', 'cyan-pulse', 'sunset-lime', 'coral-drift']);
+export const themeKeySchema = z.enum(['default', 'minimal', 'dark', 'gradient', 'professional', 'elegant', 'nature', 'aurora', 'neon-pop', 'cyan-pulse', 'sunset-lime', 'coral-drift']);
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a six-digit hex color');
 const translucentColor = z.string().regex(/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/, 'Use a hex color');
 const backgroundImageOptions = {
