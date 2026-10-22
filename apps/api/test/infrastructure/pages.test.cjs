@@ -45,8 +45,8 @@ test('page migration enforces multi-page ownership and cascades; username change
   const owner = await db.user.create({ data: { email: 'owner@example.test', username: 'owner' } });
   const other = await db.user.create({ data: { email: 'other@example.test', username: 'other' } });
   const page = await db.page.create({ data: { userId: owner.id, slug: owner.username, isPrimary: true } });
-  assert.equal(page.isPublished, false);
-  assert.equal(page.publishedAt, null);
+  assert.equal(page.isPublished, true);
+  assert.ok(page.publishedAt);
   assert.equal(page.themeKey, 'minimal');
   const secondPage = await db.page.create({ data: { userId: owner.id, slug: 'second' } });
   const otherPage = await db.page.create({ data: { userId: other.id, slug: owner.username, isPrimary: true } });
@@ -148,11 +148,11 @@ test('page migration enforces multi-page ownership and cascades; username change
   const root = `/pages/${alicePage.id}`;
   assert.equal(alicePage.slug, 'page_alice');
   assert.equal(alicePage.themeKey, 'minimal');
-  assert.equal(alicePage.isPublished, false);
+  assert.equal(alicePage.isPublished, true);
   assert.equal(alicePage.isPrimary, true);
   assert.equal(alicePage.userId, undefined);
   assert.equal(alicePage.revision, undefined);
-  assert.equal((await request('/public/page_alice')).status, 404);
+  assert.equal((await request('/public/page_alice')).status, 200);
   const portfolio = await request('/pages', { method: 'POST', cookie: alice.cookie,
     body: { slug: 'portfolio', title: 'Alice portfolio' } });
   assert.equal(portfolio.status, 201);
@@ -456,7 +456,8 @@ test('page migration enforces multi-page ownership and cascades; username change
   assert.equal(fromTemplate.status, 201);
   assert.equal(fromTemplate.body.data.themeKey, 'professional');
   assert.equal(fromTemplate.body.data.blocks.length, 2);
-  assert.equal(fromTemplate.body.data.isPublished, false);
+  assert.equal(fromTemplate.body.data.isPublished, true);
+  await db.page.update({ where: { id: fromTemplate.body.data.id }, data: { isPublished: false, publishedAt: null } });
   // Public analytics accepts only published, visible targets and owner queries stay private.
   await redisClient.flushDb();
   const analyticsLink = applied.body.data.blocks.find(block => block.type === 'LINK');

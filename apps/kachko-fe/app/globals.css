@@ -284,6 +284,18 @@ a {
   }
 }
 
+/* Keep the dashboard preview anchored to the viewport on desktop. The grid's
+   390px aside remains in flow so the editor never expands underneath it. */
+@media (min-width: 1024px) {
+  .dashboard-live-preview-fixed {
+    position: fixed;
+    z-index: 20;
+    top: 94px;
+    right: max(40px, calc((100vw - 1380px) / 2 + 40px));
+    width: 390px;
+  }
+}
+
 /* Respect reduced-motion preferences. */
 @media (prefers-reduced-motion: reduce) {
   *,

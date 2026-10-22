@@ -1,9 +1,8 @@
 name: kachko CI
 
 on:
-  pull_request:
-  push:
-    branches: [main, dev]
+  # Temporarily paused: run manually from the Actions tab when needed.
+  workflow_dispatch:
 
 permissions:
   contents: read

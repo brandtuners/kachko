@@ -96,8 +96,8 @@ model Page {
   isPrimary           Boolean          @default(false)
   title               String?
   description         String?
-  isPublished         Boolean          @default(false)
-  publishedAt         DateTime?
+  isPublished         Boolean          @default(true)
+  publishedAt         DateTime?         @default(now())
   themeKey            String           @default("minimal")
   theme               Theme            @relation(fields: [themeKey], references: [slug], onDelete: Restrict)
   appearanceOverrides Json             @default("{}")

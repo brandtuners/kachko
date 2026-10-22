@@ -88,6 +88,7 @@ export function BlockEditor({ focusId = null, clearFocus = () => undefined }: { 
               blocks={sorted}
               clicks={clicks}
               editingId={editingId}
+              newBlockId={justAddedId}
               onEditingDone={() => { clearFocus(); setJustAddedId(null); }}
             />
           )}
@@ -126,7 +127,7 @@ export function BlockEditor({ focusId = null, clearFocus = () => undefined }: { 
 
 export const BlocksPanel = BlockEditor;
 
-export function BlockList({ blocks, clicks, editingId, onEditingDone }: { blocks: EditorBlock[]; clicks: Map<string, number>; editingId: string | null; onEditingDone: () => void }) {
+export function BlockList({ blocks, clicks, editingId, newBlockId, onEditingDone }: { blocks: EditorBlock[]; clicks: Map<string, number>; editingId: string | null; newBlockId: string | null; onEditingDone: () => void }) {
   const editor = useEditor();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -145,7 +146,8 @@ export function BlockList({ blocks, clicks, editingId, onEditingDone }: { blocks
         <div className="flex flex-col gap-2">
           {blocks.map((block, index) => (
             <SortableBlock key={block.id} block={block} index={index} count={blocks.length} clicks={clicks.get(block.id)}
-              startEditing={editingId === block.id} onEditingChange={editingId === block.id ? (open) => { if (!open) onEditingDone(); } : undefined} />
+              startEditing={editingId === block.id} newlyCreated={newBlockId === block.id}
+              onEditingChange={editingId === block.id ? (open) => { if (!open) onEditingDone(); } : undefined} />
           ))}
         </div>
       </SortableContext>
@@ -197,7 +199,7 @@ export function AddBlockMenu({ imageInput, addBlock, addError, justAddedId, onIm
       {uploadProgress !== null && !uploadError ? <div className="mt-3" role="status" aria-label={`Image upload ${uploadProgress}%`}><div className="mb-1 flex justify-between text-xs font-semibold text-[#718c1b]"><span>{uploadProgress === 100 ? "Upload complete" : "Uploading image"}</span><span>{uploadProgress}%</span></div><div className="h-2 overflow-hidden rounded-full bg-[#e8ebdf]"><div className="h-full rounded-full bg-[var(--k-lime)] transition-[width]" style={{ width: `${uploadProgress}%` }} /></div></div> : null}
       {uploadError ? <div role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800"><span>{uploadError}</span>{canRetryUpload ? <button type="button" disabled={disabled} onClick={() => void onRetryUpload()} className="rounded-full border border-red-300 bg-white px-3 py-1 font-extrabold">Retry upload</button> : null}</div> : null}
       {addError ? <p className="mt-3 text-xs font-semibold text-[#b4322c]">{addError}</p> : null}
-      {justAddedId ? <p className="mt-3 text-xs text-[#9a9f9b]">New block added above — fill in its details and Save.</p> : null}
+      {justAddedId ? <p className="mt-3 text-xs text-[#9a9f9b]">New block added above — its details save automatically.</p> : null}
     </div>
   );
 }
@@ -509,13 +511,17 @@ export function LinksPanel() {
     setSocialUrl("");
   }, [page.id, page.user.displayName, page.title, page.description]);
 
-  const saveProfile = () => {
-    editor.saveMeta.mutate({ title: tagline, description: bio });
-    apiFetch("/users/me", { method: "PATCH", body: JSON.stringify({ displayName: name }) }).then(
-      () => editor.refetch(),
-      () => {},
-    );
-  };
+  useEffect(() => {
+    const unchanged = name === (page.user.displayName ?? "") && tagline === (page.title ?? "") && bio === (page.description ?? "");
+    if (unchanged) return;
+    const timer = window.setTimeout(() => {
+      if (name !== (page.user.displayName ?? "")) editor.saveUser.mutate({ displayName: name.trim() || null });
+      if (tagline !== (page.title ?? "") || bio !== (page.description ?? "")) {
+        editor.saveMeta.mutate({ title: tagline.trim() || null, description: bio.trim() || null });
+      }
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [bio, editor.saveMeta, editor.saveUser, name, page.description, page.title, page.user.displayName, tagline]);
 
   return (
     <Panel title="Settings" sub="How you show up at the top of your page.">
@@ -561,21 +567,9 @@ export function LinksPanel() {
               <textarea id="dash-bio" className="k-input min-h-24 resize-y" value={bio} maxLength={300} onChange={(e) => setBio(e.target.value)} placeholder="A few words about you…" />
               <p className="mt-1 text-right text-[11px] text-[#9a9f9b]">{bio.length}/300</p>
             </div>
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => editor.saveMeta.mutate({ isPublished: !page.isPublished })}
-                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
-                  page.isPublished ? "bg-[var(--k-lime-soft)] text-[#718c1b] hover:bg-[#e6f5c4]" : "bg-[#f2f2ec] text-[var(--k-muted)] hover:bg-[#e9ebe4]"
-                }`}
-              >
-                <span className={`h-2 w-2 rounded-full ${page.isPublished ? "bg-[#8bc34a]" : "bg-[#b6bab4]"}`} />
-                {page.isPublished ? "Published" : "Draft — publish"}
-              </button>
-              <button type="button" className="k-btn-ink !rounded-full" disabled={editor.saveMeta.isPending} onClick={saveProfile}>
-                {editor.saveMeta.isPending ? "Saving…" : "Save profile"}
-              </button>
-            </div>
+            <p role="status" className={`text-xs font-semibold ${(editor.saveMeta.isError || editor.saveUser.isError) ? "text-[#b4322c]" : "text-[#718c1b]"}`}>
+              {(editor.saveMeta.isError || editor.saveUser.isError) ? "Could not save profile changes." : (editor.saveMeta.isPending || editor.saveUser.isPending) ? "Saving automatically…" : "Changes save automatically"}
+            </p>
           </div>
         </div>
 
@@ -635,16 +629,12 @@ export function LinksPanel() {
         </div>
 
         <div className="xl:col-span-2 flex items-center justify-between gap-4 rounded-[18px] border border-[#e9ebe6] bg-white/[.94] px-5 py-4 shadow-[var(--k-shadow)]">
-          <p className="text-sm text-[var(--k-muted)]">
-            {page.isPublished
-              ? "See the real thing — your page is live for anyone with the link."
-              : "Publish your page to make it visible to anyone with the link."}
-          </p>
+          <p className="text-sm text-[var(--k-muted)]">See the real thing — your saved changes appear on your live page automatically.</p>
           <Link
             href={`/${page.user.username}${page.isPrimary ? "" : `/${page.slug}`}`}
             target="_blank"
             rel="noreferrer"
-            className={`k-btn-line shrink-0 !rounded-full ${page.isPublished ? "" : "pointer-events-none opacity-50"}`}
+            className="k-btn-line shrink-0 !rounded-full"
           >
             View my page
             <IconArrowUpRight className="h-4 w-4" />
@@ -670,13 +660,31 @@ function SocialEditorRow({ social, index, count, busy, onSave, onToggle, onMove,
   const [platform, setPlatform] = useState(social.platform);
   const [url, setUrl] = useState(social.url);
   const [username, setUsername] = useState(social.username ?? "");
+  const committed = useRef(JSON.stringify({ platform: social.platform, url: social.url, username: social.username ?? null }));
+  const save = useRef(onSave);
   const Icon = SOCIAL_ICONS[social.platform] ?? IconLink;
+
+  useEffect(() => { save.current = onSave; }, [onSave]);
 
   useEffect(() => {
     setPlatform(social.platform);
     setUrl(social.url);
     setUsername(social.username ?? "");
+    committed.current = JSON.stringify({ platform: social.platform, url: social.url, username: social.username ?? null });
   }, [social.id, social.platform, social.url, social.username]);
+
+  useEffect(() => {
+    const data = { platform, url: url.trim(), username: username.trim() || null };
+    const serialized = JSON.stringify(data);
+    let validUrl = false;
+    try { validUrl = ["http:", "https:"].includes(new URL(data.url).protocol); } catch { validUrl = false; }
+    if (!editing || busy || !validUrl || serialized === committed.current) return;
+    const timer = window.setTimeout(() => {
+      committed.current = serialized;
+      save.current(data);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [busy, editing, platform, url, username]);
 
   if (editing) return (
     <div className="grid gap-2 rounded-[14px] border border-[#dfe2dc] bg-white p-3">
@@ -687,9 +695,9 @@ function SocialEditorRow({ social, index, count, busy, onSave, onToggle, onMove,
         <input aria-label="Edit profile URL" className="k-input" value={url} onChange={(event) => setUrl(event.target.value)} />
       </div>
       <input aria-label="Edit social username" className="k-input" placeholder="Username (optional)" value={username} onChange={(event) => setUsername(event.target.value)} />
-      <div className="flex justify-end gap-2">
-        <button type="button" className="k-btn-line !h-9" onClick={() => setEditing(false)}>Cancel</button>
-        <button type="button" className="k-btn-ink !h-9" disabled={busy || !url.trim()} onClick={() => { onSave({ platform, url: url.trim(), username: username.trim() || null }); setEditing(false); }}>Save</button>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-[#718c1b]">Changes save automatically</span>
+        <button type="button" className="k-btn-line !h-9" disabled={busy || !url.trim()} onClick={() => setEditing(false)}>Done</button>
       </div>
     </div>
   );

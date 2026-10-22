@@ -42,7 +42,7 @@ export class PagesRepository {
       const template = templateKey ? await tx.pageTemplate.findUnique({ where: { key: templateKey } }) : null;
       if (templateKey && !template) throw new PageResourceError('TEMPLATE_NOT_FOUND');
       const blocks = template ? this.templateBlocks(template.blocks) : [];
-      return tx.page.create({ data: { ...fields, userId, slug, isPrimary: existing === 0,
+      return tx.page.create({ data: { ...fields, userId, slug, isPrimary: existing === 0, isPublished: true, publishedAt: new Date(),
         ...(template ? { themeKey: template.themeKey } : {}), blocks: { create: blocks } }, include: fullPage });
     });
   }

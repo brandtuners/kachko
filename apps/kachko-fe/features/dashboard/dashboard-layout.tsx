@@ -42,8 +42,8 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="relative min-h-dvh pb-28">
       <MountainArt />
-      <Header tab={tab} go={go} isPublished={page.isPublished} />
-      <EditorWorkspace preview={<LivePreview page={page} isPublished={page.isPublished} />}>
+      <Header tab={tab} go={go} />
+      <EditorWorkspace preview={<LivePreview page={page} />}>
         {children}
         <footer className="pb-4 pt-12 text-center text-xs text-[#9a9f9b] lg:text-left">{displayName} · kachko.in/{page.user.username}{page.isPrimary ? "" : `/${page.slug}`} — Powered by <span className="font-extrabold text-[#718c1b]">Kachko</span></footer>
       </EditorWorkspace>
@@ -57,7 +57,7 @@ export function EditorWorkspace({ children, preview }: { children: ReactNode; pr
     <div className="relative z-10 mx-auto grid w-full max-w-[1380px] gap-[52px] px-5 pb-16 pt-12 sm:px-8 lg:grid-cols-[minmax(0,1fr)_390px] lg:px-[40px]">
       <main className="min-w-0">{children}</main>
       <aside className="order-first pb-2 lg:order-none lg:pb-0">
-        <div className="lg:sticky lg:top-[102px]">{preview}</div>
+        <div data-live-preview-sticky className="dashboard-live-preview-fixed">{preview}</div>
       </aside>
     </div>
   );

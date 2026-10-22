@@ -53,6 +53,12 @@ export const IconUpload = (p: IconProps) => (
     <path d="M4 20h16" />
   </Svg>
 );
+export const IconShare = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 15V3M7 8l5-5 5 5" />
+    <path d="M6 11H4v10h16V11h-2" />
+  </Svg>
+);
 export const IconClipboard = (p: IconProps) => (
   <Svg {...p}>
     <rect x="8" y="3" width="8" height="4" rx="1" />

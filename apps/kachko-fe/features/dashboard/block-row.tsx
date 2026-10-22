@@ -215,6 +215,7 @@ export function SortableBlock({
   index,
   count,
   startEditing = false,
+  newlyCreated = false,
   onEditingChange,
   clicks,
 }: {
@@ -223,6 +224,7 @@ export function SortableBlock({
   count: number;
   // A freshly-added row opens straight into edit mode so the user can fill it in.
   startEditing?: boolean;
+  newlyCreated?: boolean;
   onEditingChange?: (editing: boolean) => void;
   // Real 7-day click count for this block (from top-links) — undefined = no data.
   clicks?: number;
@@ -388,21 +390,23 @@ export function SortableBlock({
               <button type="button" className="rounded-full border border-red-300 bg-white px-3 py-1 font-extrabold" disabled={blockSavePending} onClick={() => saveDraft(false)}>Retry</button>
             </div>
           ) : savedAutomatically && !dirty && !blockSavePending ? <p role="status" className="text-xs font-semibold text-[#718c1b]">Saved automatically</p> : null}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="k-btn-ink"
-              disabled={blockSavePending || (!dirty && !saveError)}
-              onClick={() => {
-                if (dirty || saveError) saveDraft(true);
-                else setEdit(false);
-              }}
-            >
-              {blockSavePending ? "Saving…" : dirty || saveError ? "Save now" : "Saved"}
-            </button>
-            <button type="button" className="k-btn-line" disabled={blockSavePending} onClick={() => dirty ? saveDraft(true) : setEdit(false)}>
-              Done
-            </button>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-[#8b908c]">Changes save automatically</span>
+            <div className="flex items-center gap-2">
+              {newlyCreated ? (
+                <button
+                  type="button"
+                  className="k-btn-line !border-red-200 !text-[#b4322c] hover:!bg-red-50"
+                  disabled={blockSavePending || editor.removeBlock.isPending}
+                  onClick={() => editor.removeBlock.mutate(block.id, { onSuccess: () => setEdit(false) })}
+                >
+                  {editor.removeBlock.isPending ? "Discarding…" : "Discard new block"}
+                </button>
+              ) : null}
+              <button type="button" className="k-btn-line" disabled={blockSavePending || editor.removeBlock.isPending} onClick={() => dirty ? saveDraft(true) : setEdit(false)}>
+                {blockSavePending ? "Saving…" : "Done"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

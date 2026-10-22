@@ -48,13 +48,13 @@ export function BrandFooter({ visible, compact = false }: { visible: boolean; co
   );
 }
 
-export function PublicPageRenderer({ page, compact = false, reportAction }: { page: RenderablePage; compact?: boolean; reportAction?: ReactNode }) {
+export function PublicPageRenderer({ page, compact = false, reportAction, forceBrandFooter = false }: { page: RenderablePage; compact?: boolean; reportAction?: ReactNode; forceBrandFooter?: boolean }) {
   return (
     <div className="flex w-full flex-col items-center">
       <ProfileHeader page={page} compact={compact} />
       <SocialBar socials={page.socials} />
       <BlockRenderer page={page} compact={compact} />
-      <BrandFooter visible={page.theme?.config?.footer.visible ?? true} compact={compact} />
+      <BrandFooter visible={forceBrandFooter || (page.theme?.config?.footer.visible ?? true)} compact={compact} />
       {reportAction}
     </div>
   );

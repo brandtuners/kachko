@@ -20,6 +20,7 @@ import {
   setAppearanceConfig,
   setBackgroundImage,
   updateBlock,
+  updateMyProfile,
   updatePageMeta,
   updateSocial,
 } from "./api";
@@ -116,12 +117,18 @@ export function useEditor() {
 
   const saveMeta = useMutation({
     mutationKey: [...editorMutationKey, "page-meta"],
-    mutationFn: (data: { title?: string; description?: string; isPublished?: boolean }) =>
+    mutationFn: (data: { title?: string | null; description?: string | null }) =>
       updatePageMeta(activePageId(), data),
     onSuccess: (page) => {
       qc.setQueryData(pageKey(page.id), page);
       qc.setQueryData<PageSummary[]>(pagesKey, (current = []) => current.map((item) => item.id === page.id ? pageSummary(page) : item));
     },
+  });
+
+  const saveUser = useMutation({
+    mutationKey: [...editorMutationKey, "user-profile"],
+    mutationFn: updateMyProfile,
+    onSuccess: (user) => setPageCache((page) => ({ ...page, user })),
   });
 
   const createBlock = useMutation({
@@ -266,6 +273,7 @@ export function useEditor() {
     templates: templatesQuery.data ?? [],
     templatesLoading: templatesQuery.isLoading,
     saveMeta,
+    saveUser,
     createBlock,
     editBlock,
     removeBlock,

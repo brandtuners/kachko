@@ -1,8 +1,7 @@
 name: analytics retention
 
 on:
-  schedule:
-    - cron: "25 2 * * *"
+  # Temporarily paused: run manually from the Actions tab when needed.
   workflow_dispatch:
 
 permissions:

@@ -44,15 +44,16 @@ export async function ensurePage(): Promise<EditorPage> {
 }
 
 export async function updatePageMeta(pageId: string, data: {
-  title?: string;
-  description?: string;
-  isPublished?: boolean;
+  title?: string | null;
+  description?: string | null;
 }): Promise<EditorPage> {
   const path = pagePath(pageId);
-  const { isPublished, ...metadata } = data;
-  if (Object.keys(metadata).length) await apiFetch(path, { method: "PATCH", body: JSON.stringify(metadata) });
-  if (isPublished !== undefined) await apiFetch(`${path}/${isPublished ? "publish" : "unpublish"}`, { method: "POST", body: "{}" });
+  await apiFetch(path, { method: "PATCH", body: JSON.stringify(data) });
   return editorPage(await apiFetch<OwnerPage>(path));
+}
+
+export function updateMyProfile(data: { displayName?: string | null }): Promise<IdentityUser> {
+  return apiFetch<IdentityUser>("/users/me", { method: "PATCH", body: JSON.stringify(data) });
 }
 
 export async function addBlock(pageId: string, type: string, content: Record<string, unknown>): Promise<EditorBlock> {
