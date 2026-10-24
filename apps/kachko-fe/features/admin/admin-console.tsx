@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useClerk } from "@clerk/nextjs";
 import type { IdentityUser, ModerationReport, ReportStatus } from "@kachko/types";
 import { ApiClientError, apiFetch } from "../../lib/api";
 import { ObLogo } from "../onboarding/ob-shell";
@@ -29,6 +30,7 @@ const nav = [
 
 export function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const { signOut } = useClerk();
   const pathname = usePathname();
   const me = useQuery({ queryKey: ["auth", "me"], queryFn: () => apiFetch<IdentityUser>("/auth/me"), retry: false });
 
@@ -46,7 +48,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await apiFetch("/auth/logout", { method: "POST", body: "{}" }).catch(() => undefined);
-    router.replace("/login");
+    await signOut({ redirectUrl: "/login" });
     router.refresh();
   };
   return (

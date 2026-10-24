@@ -5,6 +5,7 @@ import type { Request, Response } from 'express';
 import type { IdentityUser } from '@kachko/types';
 import { RedisService } from '../../redis/redis.service';
 import { IdentityService, identityError, tokenDigest } from './identity.service';
+import { ClerkIdentityService } from './clerk-identity.service';
 
 export type IdentityRequest = Request & { identity: IdentityUser };
 export const RatePolicy = (name: string, limit: number, seconds: number) => SetMetadata('identityRate', { name, limit, seconds });
@@ -16,6 +17,15 @@ export function sessionCookie(request: Request, config: ConfigService): string |
     .filter(part => part.startsWith(`${name}=`)).map(part => part.slice(name.length + 1));
   // Reject ambiguous or malformed cookies instead of authenticating with a guessed value.
   return values.length === 1 && /^[A-Za-z0-9_-]{43}$/.test(values[0]!) ? values[0] : undefined;
+}
+
+export function clerkSessionToken(request: Request): string | undefined {
+  const authorization = request.headers.authorization;
+  if (authorization?.startsWith('Bearer ')) return authorization.slice(7).trim() || undefined;
+  const values = (request.headers.cookie ?? '').split(';').map(part => part.trim())
+    .filter(part => part.startsWith('__session='))
+    .map(part => decodeURIComponent(part.slice('__session='.length)));
+  return values.length === 1 && values[0] ? values[0] : undefined;
 }
 
 @Injectable()
@@ -71,10 +81,14 @@ export class IdentityRateGuard implements CanActivate {
 
 @Injectable()
 export class SessionGuard implements CanActivate {
-  constructor(private readonly identity: IdentityService, private readonly config: ConfigService) {}
+  constructor(private readonly identity: IdentityService, private readonly clerk: ClerkIdentityService,
+    private readonly config: ConfigService) {}
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<IdentityRequest>();
-    request.identity = await this.identity.authenticate(sessionCookie(request, this.config));
+    const clerkToken = clerkSessionToken(request);
+    request.identity = clerkToken
+      ? await this.clerk.authenticate(clerkToken)
+      : await this.identity.authenticate(sessionCookie(request, this.config));
     return true;
   }
 }

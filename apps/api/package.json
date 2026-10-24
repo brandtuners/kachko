@@ -19,6 +19,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.883.0",
     "@aws-sdk/s3-request-presigner": "^3.883.0",
+    "@clerk/backend": "3.26.2",
     "@kachko/types": "workspace:*",
     "@kachko/validation": "workspace:*",
     "@nestjs/common": "^11.0.0",

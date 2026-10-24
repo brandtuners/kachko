@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useIsMutating, useMutationState } from "@tanstack/react-query";
+import { useClerk } from "@clerk/nextjs";
 import { apiFetch } from "../../lib/api";
 import { editorMutationKey, useEditor } from "../editor/use-editor";
 import {
@@ -133,6 +134,7 @@ export function PreviewButton({ username, pageSlug }: { username?: string; pageS
  *  and My QR. */
 function AccountMenu({ handle, go, active }: { handle: string; go: (t: DashTab) => void; active: boolean }) {
   const router = useRouter();
+  const { signOut } = useClerk();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -149,9 +151,9 @@ function AccountMenu({ handle, go, active }: { handle: string; go: (t: DashTab) 
     try {
       await apiFetch("/auth/logout", { method: "POST", body: "{}" });
     } catch {
-      /* session cookie cleared server-side even on a hiccup; send them out anyway */
+      /* Legacy-session cleanup is best effort during the Clerk migration. */
     }
-    router.push("/login");
+    await signOut({ redirectUrl: "/login" });
     router.refresh();
   };
 

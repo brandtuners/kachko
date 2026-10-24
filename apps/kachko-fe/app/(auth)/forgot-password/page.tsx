@@ -1,1 +1,5 @@
-export { default } from "../reset-password/page";
+import { redirect } from "next/navigation";
+
+export default function ForgotPasswordPage() {
+  redirect("/login");
+}

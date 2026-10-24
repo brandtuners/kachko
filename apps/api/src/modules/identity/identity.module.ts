@@ -10,12 +10,13 @@ import { IdentityService } from './identity.service';
 import { IdentityRepository } from './identity.repository';
 import { CsrfGuard, IdentityRateGuard, SessionGuard } from './identity.guards';
 import { PasswordResetMailer } from './password-reset.mailer';
+import { ClerkIdentityService } from './clerk-identity.service';
 
 @Module({
   imports: [DatabaseModule, RedisModule],
   controllers: [AuthController, UsersController, GoogleController],
-  exports: [SessionGuard, IdentityRateGuard, IdentityService],
-  providers: [GoogleService, GoogleProvider, PasswordResetMailer, IdentityService, IdentityRepository, IdentityRateGuard, SessionGuard,
+  exports: [SessionGuard, IdentityRateGuard, IdentityService, ClerkIdentityService],
+  providers: [GoogleService, GoogleProvider, PasswordResetMailer, ClerkIdentityService, IdentityService, IdentityRepository, IdentityRateGuard, SessionGuard,
     { provide: APP_GUARD, useClass: CsrfGuard }],
 })
 export class IdentityModule {}

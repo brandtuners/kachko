@@ -82,7 +82,7 @@ export async function PublicPageRoute({
       }}
     >
       <div aria-hidden className="absolute inset-0 hidden bg-black/25 backdrop-blur-[2px] md:block" />
-      <section data-public-profile-shell className="relative z-10 mx-auto min-h-dvh w-full overflow-hidden md:min-h-[calc(100dvh-3.5rem)] md:max-w-[680px] md:rounded-[32px] md:border md:border-white/20 md:shadow-[0_28px_90px_rgba(0,0,0,.28)]" style={{ background }}>
+      <section data-public-profile-shell className="relative z-10 mx-auto min-h-dvh w-full overflow-hidden md:min-h-[calc(100dvh-3.5rem)] md:max-w-[680px] md:rounded-[32px] md:border md:border-white/20 md:shadow-[0_28px_90px_rgba(0,0,0,.28)] lg:max-w-[820px]" style={{ background }}>
         <div className="absolute right-5 top-5 z-20"><PublicShareButton url={url} title={`${name} on Kachko`} /></div>
         <div className="container-app flex min-h-dvh flex-col items-center pb-16 pt-10 sm:pt-16 md:min-h-[calc(100dvh-3.5rem)] md:pt-24">
           <PublicPageRenderer page={page} reportAction={<ReportPage pageId={page.id} />} />

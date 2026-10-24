@@ -4,10 +4,12 @@ import { verify } from '@node-rs/argon2';
 import { PrismaService } from '../../database/prisma.service';
 import { MediaStorage } from '../media/media.storage';
 import { identityError } from '../identity/identity.service';
+import { ClerkIdentityService } from '../identity/clerk-identity.service';
 
 @Injectable()
 export class ModerationService {
-  constructor(private readonly prisma: PrismaService, private readonly storage: MediaStorage) {}
+  constructor(private readonly prisma: PrismaService, private readonly storage: MediaStorage,
+    private readonly clerk: ClerkIdentityService) {}
 
   async createReport(input: CreateReportInput) {
     const page = await this.prisma.page.findFirst({ where: { id: input.pageId, isPublished: true, user: { isActive: true, deletedAt: null } }, select: { id: true } });
@@ -112,9 +114,10 @@ export class ModerationService {
 
   async deleteUserAsAdmin(actorId: string, userId: string) {
     if (actorId === userId) identityError(400, 'SELF_MODERATION_REJECTED', 'You cannot delete your own administrator account');
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true, media: { select: { storageKey: true } } } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true, clerkUserId: true, media: { select: { storageKey: true } } } });
     if (!user) identityError(404, 'USER_NOT_FOUND', 'User not found');
     if (user.role === 'ADMIN') identityError(403, 'FORBIDDEN', 'Administrator accounts cannot be deleted here');
+    if (user.clerkUserId) await this.clerk.deleteUser(user.clerkUserId);
     const storageKeys = user.media.map(item => item.storageKey);
     await this.prisma.$transaction(async tx => {
       await tx.auditLog.create({ data: { actorId, action: 'ACCOUNT_DELETED_BY_ADMIN', entityType: 'User', entityId: userId } });
@@ -135,11 +138,12 @@ export class ModerationService {
   }
 
   async deleteAccount(userId: string, input: DeleteAccountInput) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true, media: { select: { storageKey: true } } } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true, clerkUserId: true, media: { select: { storageKey: true } } } });
     if (!user) identityError(404, 'USER_NOT_FOUND', 'User not found');
     if (user.passwordHash && (!input.password || !await verify(user.passwordHash, input.password))) {
       identityError(401, 'INVALID_CREDENTIALS', 'Your password is incorrect');
     }
+    if (user.clerkUserId) await this.clerk.deleteUser(user.clerkUserId);
     const storageKeys = user.media.map(item => item.storageKey);
     await this.prisma.$transaction(async tx => {
       await tx.auditLog.create({ data: { action: 'ACCOUNT_DELETED', entityType: 'User', entityId: userId } });

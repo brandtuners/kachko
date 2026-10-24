@@ -64,6 +64,9 @@ export function validateEnvironment(env: Record<string, unknown>) {
   if (Boolean(googleId) !== Boolean(googleSecret)) throw new Error('Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET');
   const googleCallback = String(env.GOOGLE_REDIRECT_URI ?? `http://localhost:${port}/api/v1/auth/google/callback`);
   const googleRedirect = String(env.GOOGLE_LOGIN_REDIRECT_URL ?? '');
+  const clerkSecretKey = String(env.CLERK_SECRET_KEY ?? '').trim();
+  if (clerkSecretKey && !/^sk_(test|live)_/.test(clerkSecretKey)) throw new Error('CLERK_SECRET_KEY must be a Clerk secret key');
+  if (nodeEnv === 'production' && !clerkSecretKey) throw new Error('CLERK_SECRET_KEY is required in production');
   const mediaStorage = String(env.MEDIA_STORAGE ?? 'local');
   if (!['local', 'r2'].includes(mediaStorage)) throw new Error('MEDIA_STORAGE must be local or r2');
   const mediaLocalDir = String(env.MEDIA_LOCAL_DIR ?? './tmp/media');
@@ -91,6 +94,7 @@ export function validateEnvironment(env: Record<string, unknown>) {
     PUBLIC_APP_URL: publicAppUrl, RESEND_API_KEY: resendKey, EMAIL_FROM: emailFrom,
     ANALYTICS_HASH_SALT: analyticsSalt, NODE_ENV: nodeEnv, PORT: port, CORS_ORIGINS: allowedOrigins,
     GOOGLE_CLIENT_ID: googleId, GOOGLE_CLIENT_SECRET: googleSecret, GOOGLE_REDIRECT_URI: googleCallback, GOOGLE_LOGIN_REDIRECT_URL: googleRedirect,
+    CLERK_SECRET_KEY: clerkSecretKey,
     DATABASE_URL: connectionUrl(env, 'DATABASE_URL'),
     REDIS_URL: connectionUrl(env, 'REDIS_URL'),
     DEPENDENCY_TIMEOUT_MS: timeout,

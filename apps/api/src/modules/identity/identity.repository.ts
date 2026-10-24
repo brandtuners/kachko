@@ -10,8 +10,26 @@ export class IdentityRepository {
     return this.prisma.googleAccount.findUnique({ where: { subject }, include: { user: true } });
   }
   findByEmail(email: string) { return this.prisma.user.findUnique({ where: { email } }); }
+  findByClerkUserId(clerkUserId: string) { return this.prisma.user.findUnique({ where: { clerkUserId } }); }
   findByUsername(username: string) {
     return this.prisma.user.findUnique({ where: { username }, select: { id: true } });
+  }
+  async linkClerkUser(clerkUserId: string, email: string, profile: { displayName?: string; avatarUrl?: string }) {
+    return this.prisma.$transaction(async tx => {
+      const linked = await tx.user.findUnique({ where: { clerkUserId } });
+      if (linked) return linked;
+      const user = await tx.user.findUnique({ where: { email } });
+      if (!user || (user.clerkUserId && user.clerkUserId !== clerkUserId)) return null;
+      return tx.user.update({ where: { id: user.id }, data: {
+        clerkUserId,
+        isVerified: true,
+        ...(!user.displayName && profile.displayName ? { displayName: profile.displayName } : {}),
+        ...(!user.avatarUrl && profile.avatarUrl ? { avatarUrl: profile.avatarUrl } : {}),
+      } });
+    });
+  }
+  createClerkUser(data: { clerkUserId: string; email: string; username: string; displayName?: string; avatarUrl?: string }) {
+    return this.prisma.user.create({ data: { ...data, isVerified: true } });
   }
   register(data: Prisma.UserCreateInput, tokenHash: string, expiresAt: Date, previousHash?: string) {
     return this.prisma.$transaction(async tx => {

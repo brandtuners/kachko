@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { DM_Sans, Inter, Lato, Lora, Manrope, Playfair_Display, Poppins, Space_Grotesk, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "../features/query-provider";
@@ -33,7 +34,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={[manrope.variable, dmSans.variable, inter.variable, lato.variable, poppins.variable, spaceGrotesk.variable, lora.variable, playfair.variable, spaceMono.variable].join(" ")}>
       <body>
-        <QueryProvider>{children}</QueryProvider>
+        <ClerkProvider
+          signInUrl="/login"
+          signUpUrl="/register"
+          signInFallbackRedirectUrl="/dashboard"
+          signUpFallbackRedirectUrl="/onboarding"
+          appearance={{
+            variables: {
+              colorPrimary: "#111312",
+              colorBackground: "#ffffff",
+              borderRadius: "1rem",
+              fontFamily: "var(--font-manrope)",
+            },
+            options: {
+              socialButtonsVariant: "blockButton",
+              socialButtonsPlacement: "top",
+            },
+          }}
+        >
+          <QueryProvider>{children}</QueryProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

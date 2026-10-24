@@ -153,7 +153,8 @@ test("real V1 and V1.1 journey reaches leads, publish, media, analytics and QR",
   await page.goto(`/${username}`);
   await page.setViewportSize({ width: 1440, height: 900 });
   const desktopShell = await page.locator("[data-public-profile-shell]").boundingBox();
-  expect(desktopShell?.width).toBeLessThanOrEqual(681);
+  expect(desktopShell?.width).toBeGreaterThanOrEqual(819);
+  expect(desktopShell?.width).toBeLessThanOrEqual(821);
   expect(desktopShell?.x).toBeGreaterThan(300);
   await expect(page.locator("[data-desktop-qr]")).toBeVisible();
   await expect(page.getByRole("button", { name: "Share this page" })).toBeVisible();
