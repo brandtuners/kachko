@@ -1,6 +1,9 @@
 # Launch protections
 
-Password recovery, public abuse reporting, role-protected moderation, audit logs, account suspension and permanent account deletion are implemented.
+Clerk password recovery, public abuse reporting, role-protected moderation,
+audit logs, account suspension and permanent account deletion are implemented.
+The Nest password-reset endpoints described below remain as legacy compatibility
+for accounts created by the former password flow.
 
 ## Required deployment configuration
 
@@ -20,7 +23,13 @@ Apply the new database migration before deployment:
 pnpm db:deploy
 ```
 
-## Password reset
+## Password recovery
+
+The current frontend sends `/forgot-password` to Clerk's sign-in experience;
+Clerk owns password recovery and session handling. Configure email delivery and
+password policy in the Clerk instance.
+
+Legacy API behavior:
 
 - `POST /api/v1/auth/password-reset/request` accepts `{ "email": "user@example.com" }` and always returns `202 {data:{accepted:true}}` to prevent account enumeration.
 - `POST /api/v1/auth/password-reset/confirm` accepts `{ "token": "...", "password": "at-least-12-characters" }`.
@@ -39,7 +48,12 @@ Promote the first administrator deliberately through a controlled database opera
 
 ## Account deletion
 
-`DELETE /api/v1/users/me` accepts `{ "confirmation": "DELETE", "password": "..." }`. Password is required for password-based accounts; a valid authenticated session and the exact confirmation are required for Google-only accounts. The operation permanently deletes relational account data, sessions, pages, blocks, analytics, and media metadata, then best-effort deletes stored media objects and clears the session cookie.
+`DELETE /api/v1/users/me` accepts `{ "confirmation": "DELETE", "password": "..." }`.
+A Clerk-authenticated account does not supply its Clerk password to Kachko; a
+password is required only for a legacy local-password account. The operation
+deletes the Clerk user first, then permanently deletes relational account data,
+sessions, pages, blocks, analytics, and media metadata, and best-effort deletes
+stored media objects. Dashboard sign-out is handled by Clerk.
 
 ## Checks
 

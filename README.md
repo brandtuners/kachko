@@ -60,6 +60,7 @@ Named volumes retain PostgreSQL data and Redis append-only data when containers 
 
 - Root `.env`: Compose service credentials and published ports, plus connection values for root Prisma migration commands.
 - `apps/api/.env`: NestJS runtime configuration when launched with the workspace commands below. The API does not automatically read the root `.env`.
+- `apps/kachko-fe/.env.local`: Clerk frontend/server keys and frontend runtime configuration. Pull development Clerk keys with `pnpm dlx clerk@latest env pull --file apps/kachko-fe/.env.local`; pull the same linked application's backend key into `apps/api/.env`.
 - If ports are occupied, set `POSTGRES_PORT=5433` and/or `REDIS_PORT=6380` in the root `.env`. Update `DATABASE_URL`/`REDIS_URL` in both environment files to match, then rerun `docker compose up -d --wait postgres redis`.
 - Keep database/user/password values synchronized with the URLs. Percent-encode special characters in URL credentials. Use `127.0.0.1` for host applications; `postgres`/`redis` are service names for containers on the Compose network.
 - PostgreSQL initialization variables only create users/databases when its data volume is empty. Changing them later does not change existing database credentials; update the database deliberately or restore the original environment values.
@@ -88,7 +89,7 @@ Prisma database access belongs only to the API. The root holds the schema, migra
 
 | Location | Responsibility |
 |---|---|
-| `prisma/schema.prisma` | User, Session and UserRole definitions |
+| `prisma/schema.prisma` | User identity (including `clerkUserId`), legacy Session, roles, and product models |
 | `prisma/migrations/` | Versioned PostgreSQL SQL migrations |
 | `prisma.config.ts` | CLI configuration, loading root `.env` |
 | Root `package.json` | Prisma CLI development dependency and `db:*` commands |
@@ -118,7 +119,12 @@ pnpm db:generate
 
 Review and commit the generated SQL. `migrate dev` needs a shadow database and may request a reset if the database has drifted; never point it at production or accept a reset of data you need. Deployment uses `pnpm db:deploy`. `pnpm db:studio` opens the database browser. A seed command will be introduced when seed data is needed; the previously unconfigured placeholder was removed.
 
-The models include unique email/username/token hashes, account role/status fields, session expiry/revocation timestamps, and a cascading User → Session relation. Unique email/username constraints already create indexes, so the duplicate non-unique indexes shown in the LLD example are unnecessary. Future auth code must normalize email/usernames, enforce reserved-name/password rules, hash passwords/tokens, and check session expiry/revocation: the schema does not implement those behaviors.
+The User model includes a unique nullable Clerk user ID alongside normalized
+email/username and account role/status fields. The Session and password/reset
+fields support the retained legacy identity API. Clerk token verification,
+verified-email linking, username generation, suspension checks, and legacy
+session expiry/revocation are implemented in Nest services rather than by the
+schema alone.
 
 ### Database integration test
 
@@ -138,9 +144,13 @@ Configuration references: [Docker Compose services](https://docs.docker.com/refe
 
 ### Identity API
 
-Auth/session/profile endpoints and shared identity contracts are implemented. See [local endpoint testing and the FE contract](docs/05-IDENTITY-API.md). All identity mutations require `X-Kachko-CSRF: 1`; authenticated requests also send the session cookie.
+Clerk owns browser sign-up, sign-in, Google authentication, and sessions. The
+Next.js BFF forwards Clerk bearer tokens to Nest, which links/provisions the
+local user. Legacy Kachko cookie endpoints remain for compatibility tests. See
+[the identity contract](docs/05-IDENTITY-API.md). All application mutations
+still require `X-Kachko-CSRF: 1`.
 
-Google signup/login is now included. See [Google credentials, migration and local browser testing](docs/06-GOOGLE-LOGIN.md).
+See [Clerk authentication, Google configuration, and browser testing](docs/06-GOOGLE-LOGIN.md).
 
 Page/LINK CRUD, publishing and public lookup are implemented and listed in Swagger. Apply all migrations with `pnpm db:deploy` and restart the API before testing. See [the page contract and FE fixture](docs/07-PAGE-LINK-CONTRACT.md). Run `pnpm --filter api test:pages` for isolated database verification.
 

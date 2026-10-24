@@ -1,8 +1,12 @@
 # kachko — Identity API and local testing
 
-Google signup/login is also implemented; see [Google setup and browser testing](06-GOOGLE-LOGIN.md).
+Clerk now owns browser sign-up, sign-in, Google authentication, and sessions;
+see [Clerk authentication and Google sign-in](06-GOOGLE-LOGIN.md).
 
-Implemented backend scope: registration, login/logout, persistent cookie sessions, username availability, and own-profile reads/updates. Rohan owns the API; Girish uses the shared contracts and verifies the browser integration. The blueprint's identity integration gate remains open until the real frontend journey is verified.
+Nest accepts verified Clerk bearer tokens and lazily links/provisions the local
+User record. The older registration, login/logout, and persistent Kachko cookie
+session endpoints remain implemented as a compatibility API and for isolated
+backend tests. New frontend work must use Clerk rather than those endpoints.
 
 ## Start locally
 
@@ -19,14 +23,14 @@ API base: `http://localhost:4000/api/v1`. Swagger: `http://localhost:4000/api/do
 
 ## Endpoint contract
 
-| Method | Path under `/api/v1` | Session | Success |
+| Method | Path under `/api/v1` | Authentication | Success |
 |---|---|---|---|
-| POST | `/auth/register` | No; creates session | 201 `{data: IdentityUser}` |
-| POST | `/auth/login` | No; creates session | 200 `{data: IdentityUser}` |
-| GET | `/auth/me` | Required | 200 `{data: IdentityUser}` |
-| POST | `/auth/logout` | Optional; revokes supplied session | 200 `{data:{loggedOut:true}}` |
-| GET | `/users/me` | Required | 200 `{data: IdentityUser}` |
-| PATCH | `/users/me` | Required | 200 `{data: IdentityUser}` |
+| POST | `/auth/register` | None; creates legacy cookie | 201 `{data: IdentityUser}` |
+| POST | `/auth/login` | None; creates legacy cookie | 200 `{data: IdentityUser}` |
+| GET | `/auth/me` | Clerk bearer or legacy session | 200 `{data: IdentityUser}` |
+| POST | `/auth/logout` | Optional legacy session | 200 `{data:{loggedOut:true}}` |
+| GET | `/users/me` | Clerk bearer or legacy session | 200 `{data: IdentityUser}` |
+| PATCH | `/users/me` | Clerk bearer or legacy session | 200 `{data: IdentityUser}` |
 | GET | `/users/username/:username` | No | 200 `{data:{username,available,reason?}}` |
 
 IdentityUser contains exactly `id`, `email`, `username`, `displayName`, `bio`, `avatarUrl`. The last three can be null. No hashes, session tokens, database flags or roles are exposed. All identity responses use `Cache-Control: no-store`.
@@ -46,13 +50,24 @@ New passwords are 12–128 characters and are never trimmed. Login accepts 1–1
 
 Username updates now synchronize User.username and an existing Page.slug in one transaction. Every public profile edit also increments the page revision, invalidating cached profile/page responses. Public lookup rejects the old username after a rename. The separate LLD `PATCH /users/me/username` example is consolidated into the blueprint's `PATCH /users/me` endpoint.
 
-## Cookies, CSRF and rate limits
+## Clerk bearer tokens, legacy cookies, CSRF and rate limits
+
+The current browser path is Clerk → Next.js BFF → Nest. The BFF forwards the
+short-lived Clerk session JWT in the Authorization header; Nest verifies it and
+uses the `sub` claim to resolve the local user. Frontend code must not read or
+persist this token. Direct API clients may send the same bearer token.
+
+The cookie behavior below applies to the legacy `/auth/register` and
+`/auth/login` compatibility flow and its automated backend tests.
 
 For local Swagger testing, set `CORS_ORIGINS=http://localhost:3000,http://localhost:4000` in `apps/api/.env` and restart the API. Swagger sends the API origin (`http://localhost:4000`) even though its generated curl example may omit the browser-added Origin header. If PORT changes, update this origin too. Production should list only intended application origins.
 
 Every POST/PATCH requires `X-Kachko-CSRF: 1`, including registration/login/logout. A supplied Origin must exactly match `CORS_ORIGINS`. This implements the [OWASP custom-header approach for API requests](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#employing-custom-request-headers-for-ajaxapi): browsers must pass CORS preflight before sending the header. It is a fixed required header, not a secret or a token-fetch endpoint. Non-browser tools such as curl may omit Origin but still require the header. CORS allows Content-Type and X-Kachko-CSRF and exposes Retry-After.
 
-Girish's client must use `credentials: 'include'` and send this header on mutations. The session cookie is HTTP-only; frontend code must not read/store it. Local FE/API should both use `localhost` (not one `localhost` and one `127.0.0.1`). Production FE/API must be same-site HTTPS origins, for example `app.kachko.app` and `api.kachko.app`; unrelated Vercel/Azure domains will not work with SameSite=Lax. Their origins must also be in CORS_ORIGINS.
+The shared client uses `credentials: 'include'` and sends this header on
+mutations. Local FE/API should both use `localhost` (not one `localhost` and one
+`127.0.0.1`). `CORS_ORIGINS` is also the allowlist used for Clerk JWT
+`authorizedParties`, so it must contain each exact frontend origin.
 
 `SESSION_COOKIE_NAME=kachko_session`; `SESSION_TTL_SECONDS=604800` (7 days, configurable 60 seconds–30 days). Cookies are host-only, Path `/api/v1`, SameSite=Lax, HttpOnly, and Secure in production. Changing the API prefix also requires updating cookie Path in `identity.controller.ts`. There is no sliding refresh. Each login/register uses a fresh random 256-bit token; only its SHA-256 digest is stored. A previously supplied valid-format cookie's session is revoked atomically when login/register succeeds. Other devices retain their own sessions. Logout revokes the supplied session; repeated logout is safe. Expired/revoked sessions and inactive/deleted users are rejected. Last-used timestamps are updated at most once a minute per session.
 
@@ -73,9 +88,12 @@ Error envelope: `{error:{code,message}}`.
 
 Unexpected database errors use the existing sanitized 500 envelope. Check readiness and migration status when diagnosing database failures.
 
-## Copyable local test flow
+## Copyable legacy API test flow
 
-Run these commands in the same terminal. The cookie file is created outside the repository with restrictive permissions. Example passwords/accounts are for local development only. Choose a new email/username if you have already registered them. Use curl `-i` to see status and cookie headers; Postman can use the same URLs, JSON bodies and header and will keep cookies automatically.
+This verifies backward compatibility only; use the browser steps in
+`06-GOOGLE-LOGIN.md` for the current Clerk flow. Run these commands in the same
+terminal. The cookie file is created outside the repository with restrictive
+permissions.
 
 ```bash
 API=http://localhost:4000/api/v1

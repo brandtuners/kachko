@@ -19,7 +19,8 @@ Create separate resources for every environment:
 - Redis: one development, staging and production database/instance suitable for serverless access (Upstash is a common option).
 - Cloudflare R2: separate buckets or strictly isolated prefixes. Vercel disk is ephemeral, so staging/production must use `MEDIA_STORAGE=r2`.
 - Resend: verified sending domain and separate keys/senders for staging and production.
-- Google OAuth: environment-specific client IDs/secrets and exact callback URLs.
+- Clerk: isolated development and production instances. Configure Google as a
+  Clerk social connection and use the redirect URI shown by Clerk.
 
 Never point staging at production data.
 
@@ -87,10 +88,8 @@ PUBLIC_APP_URL=http://localhost:3000
 RESEND_API_KEY=
 EMAIL_FROM=KACHKO <no-reply@example.com>
 ANALYTICS_HASH_SALT=<32+ random characters>
-GOOGLE_CLIENT_ID=<local client id>
-GOOGLE_CLIENT_SECRET=<local secret>
-GOOGLE_REDIRECT_URI=http://localhost:4000/api/v1/auth/google/callback
-GOOGLE_LOGIN_REDIRECT_URL=http://localhost:3000/auth/google/callback
+CLERK_SECRET_KEY=<development Clerk secret key>
+# GOOGLE_* is optional legacy direct-OAuth compatibility only.
 MEDIA_STORAGE=local
 MEDIA_LOCAL_DIR=./tmp/media
 ```
@@ -110,10 +109,7 @@ PUBLIC_APP_URL=https://staging.kachko.in
 RESEND_API_KEY=<staging Resend key>
 EMAIL_FROM=KACHKO Staging <no-reply@staging.kachko.in>
 ANALYTICS_HASH_SALT=<different staging salt, 32+ characters>
-GOOGLE_CLIENT_ID=<staging client id>
-GOOGLE_CLIENT_SECRET=<staging secret>
-GOOGLE_REDIRECT_URI=https://api-staging.kachko.in/api/v1/auth/google/callback
-GOOGLE_LOGIN_REDIRECT_URL=https://staging.kachko.in/auth/google/callback
+CLERK_SECRET_KEY=<staging Clerk secret key>
 MEDIA_STORAGE=r2
 R2_ACCOUNT_ID=<account id>
 R2_ACCESS_KEY_ID=<staging key>
@@ -135,8 +131,7 @@ PUBLIC_APP_URL=https://kachko.in
 RESEND_API_KEY=<production Resend key>
 EMAIL_FROM=KACHKO <no-reply@kachko.in>
 ANALYTICS_HASH_SALT=<different production salt, 32+ characters>
-GOOGLE_REDIRECT_URI=https://api.kachko.in/api/v1/auth/google/callback
-GOOGLE_LOGIN_REDIRECT_URL=https://kachko.in/auth/google/callback
+CLERK_SECRET_KEY=<production Clerk secret key>
 MEDIA_STORAGE=r2
 R2_BUCKET=<production bucket>
 R2_PUBLIC_URL=https://cdn.kachko.in
@@ -169,23 +164,31 @@ Set FE variables per environment:
 # Development
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 API_URL=http://localhost:4000
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=<development Clerk publishable key>
+CLERK_SECRET_KEY=<development Clerk secret key>
 NEXT_PUBLIC_CDN_URL=
 NEXT_PUBLIC_SENTRY_DSN=
 
 # Staging / Preview
 NEXT_PUBLIC_APP_URL=https://staging.kachko.in
 API_URL=https://api-staging.kachko.in
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=<staging Clerk publishable key>
+CLERK_SECRET_KEY=<staging Clerk secret key>
 NEXT_PUBLIC_CDN_URL=https://cdn-staging.kachko.in
 
 # Production
 NEXT_PUBLIC_APP_URL=https://kachko.in
 API_URL=https://api.kachko.in
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=<production Clerk publishable key>
+CLERK_SECRET_KEY=<production Clerk secret key>
 NEXT_PUBLIC_CDN_URL=https://cdn.kachko.in
 ```
 
-The Next.js rewrite sends browser `/api/v1/*` calls to the API while keeping cookies and CSRF requests same-origin from the browser.
+The Next.js App Router BFF handles browser `/api/v1/*` calls. It obtains the
+Clerk session token server-side, sends it to Nest as a bearer token, and keeps
+API and CSRF requests same-origin from the browser.
 
-## 6. Domains and OAuth
+## 6. Domains and Clerk
 
 Add these domains in Vercel and configure DNS/TLS:
 
@@ -196,15 +199,15 @@ API: api.kachko.in, api-staging.kachko.in
 
 Assign the staging hostnames to the `staging` branch (or your custom staging environment) in Vercel’s Domains settings. Otherwise a Preview deployment may receive a generated URL while `API_URL` still points at the previous deployment.
 
-In Google Cloud Console, add these exact authorized redirect URIs:
+Link the existing Clerk application; do not run `clerk init` again. Before the
+first production deployment, run `pnpm dlx clerk@latest deploy` interactively
+from a trusted terminal, configure the production domain in Clerk, and add the
+Google OAuth redirect URI displayed by Clerk to the production Google client.
+Development, Preview/staging, and Production must not share secret keys.
 
-```text
-http://localhost:4000/api/v1/auth/google/callback
-https://api-staging.kachko.in/api/v1/auth/google/callback
-https://api.kachko.in/api/v1/auth/google/callback
-```
-
-Use matching `GOOGLE_LOGIN_REDIRECT_URL` values for each environment.
+Add each frontend hostname as an authorized party by including its exact origin
+in the API's `CORS_ORIGINS`. The Nest token verifier rejects a valid Clerk token
+when its `azp` does not match this allowlist.
 
 ## 7. Migrate each database
 
@@ -225,14 +228,17 @@ Run this checklist against staging:
 
 1. `/api/v1/health/live` returns 200.
 2. `/api/v1/health/ready` returns 200.
-3. Register → create page → add link → publish → open `/username`.
+3. Clerk sign-up (including Google) → onboarding → create page → add link →
+   publish → open `/username`.
 4. Edit profile, theme and social links; reload and confirm persistence.
 5. Upload avatar/IMAGE through R2.
 6. Generate/download QR and open it on a phone.
 7. Inspect canonical, Open Graph and Twitter metadata.
 8. Verify analytics totals and owner-only access.
-9. Test password reset email, expiry, replay rejection and session revocation.
-10. Test Google signup, existing-account linking and repeat Google login.
+9. Test Clerk password recovery, session expiry/revocation, sign-out, and
+   protected-route redirection.
+10. Test Google sign-up, verified-email local-user linking, and repeat Google
+    login through Clerk.
 11. Submit a report, resolve it as admin, suspend a disposable user, and verify their public page becomes 404.
 12. Delete a disposable account and verify sessions, public visibility and media metadata are removed.
 
@@ -280,8 +286,9 @@ Environment changes affect new deployments, so redeploy after changing variables
 - [ ] Development, Preview/staging and Production variables are isolated.
 - [ ] Staging/production use managed PostgreSQL, Redis and R2.
 - [ ] Migrations applied and recorded for the intended database.
-- [ ] HTTPS domains, CORS and credentialed cookies verified.
-- [ ] Google redirects and Resend sender domain verified.
+- [ ] Clerk production instance, HTTPS domains, authorized parties, and BFF
+      bearer-token forwarding verified.
+- [ ] Clerk Google connection/redirect and Resend sender domain verified.
 - [ ] All staging browser journeys pass.
 - [ ] Production health, smoke tests and rollback procedure are ready.
 - [ ] Analytics retention is scheduled through a protected job.

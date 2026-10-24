@@ -1,5 +1,12 @@
 # kachko — Development Blueprint
 
+> **Authentication update:** Clerk now owns the browser authentication journey.
+> Next.js forwards Clerk session JWTs through an authenticated BFF and Nest maps
+> the verified subject to `User.clerkUserId`. Password/cookie and direct Google
+> OAuth sections later in this historical blueprint describe the retained legacy
+> compatibility API, not the current frontend path. See
+> [06-GOOGLE-LOGIN.md](06-GOOGLE-LOGIN.md).
+
 > **Purpose:** A step-by-step implementation plan for building kachko, a modern free Linktree-style personal landing-page platform.
 >
 > **Primary stack:** TypeScript, Next.js App Router, React, Tailwind CSS, shadcn/ui, NestJS, Prisma, PostgreSQL, Redis, Cloudflare R2, Turborepo, pnpm, Docker.

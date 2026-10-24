@@ -133,7 +133,8 @@ pnpm --filter api test:pages
 
 `test:pages` uses uniquely named temporary PostgreSQL/Redis containers and applies all migrations twice. It verifies DB constraints/cascades/rollback, the real HTTP journey, ownership, concurrent create/append/rename, safe output, hidden links, publish/unpublish, profile/cache changes, deletion, moderation gates, Redis outage fallback and Swagger paths. It never targets development data. Unit tests verify strict request boundaries and dangerous-URL rejection.
 
-Next for both: verify the real FE page/link/publish/public-renderer journey. TEXT and reorder support are also implemented; Girish can integrate them into the editor. No frontend files are changed by this API implementation.
+The frontend page/link/publish/public-renderer journey and TEXT/reorder support
+are implemented. Use the dashboard for current end-to-end verification.
 
 
 ## Cache behavior
@@ -142,11 +143,14 @@ Public requests first read PostgreSQL to check the current page ID/revision, pub
 
 Profile edits (including display name and bio) increment revision, as do page/block edits and publication changes. Page recreation receives a new UUID. Future direct moderation/content writers must increment revision transactionally; active/deleted status changes are already enforced by the database gate. In-flight reads can complete using the snapshot current when they started; requests after a completed mutation see the current revision.
 
-## Local Swagger test — actual endpoints
+## Local Swagger test — legacy-cookie compatibility
 
 1. From the project root run `pnpm db:deploy`, then restart `pnpm dev`. Both PostgreSQL and Redis should be running. Apply the revision migration even if you already applied the page foundation migration.
 2. Open **http://localhost:4000/api/docs**. Expand **Pages and blocks** and **Public pages**. If missing, restart the API and refresh the Swagger page.
-3. Login/register through Swagger first. The browser stores the session cookie. Use `X-Kachko-CSRF: 1` for every POST/PATCH/DELETE. Local CORS_ORIGINS must include `http://localhost:4000`.
+3. Login/register through Swagger first using the retained legacy identity API.
+   The browser stores its Kachko session cookie. Use `X-Kachko-CSRF: 1` for every
+   POST/PATCH/DELETE. This is not the current Clerk frontend flow. Local
+   `CORS_ORIGINS` must include `http://localhost:4000`.
 4. Execute `POST /api/v1/pages` with `{"title":"My links","description":"Welcome to my page"}`. Expect 201. Copy `data.id` as your page ID. If you already have a page, use `GET /api/v1/pages` to find its ID instead.
 5. Execute `POST /api/v1/pages/{pageId}/blocks` with the LINK example above. Expect 201; save `data.id` as the block ID.
 6. Execute `GET /api/v1/pages/{id}`: expect the draft and its ordered links. `GET /api/v1/public/{yourUsername}` should return 404 while it is a draft.
@@ -154,9 +158,10 @@ Profile edits (including display name and bio) increment revision, as do page/bl
 8. Test block updates using PATCH with `{"content":{"title":"Updated website","url":"https://example.org/","openInNewTab":true}}` or `{"isVisible":false}`. Re-fetch public JSON to see the change.
 9. Execute `POST /api/v1/pages/{id}/unpublish`: expect 200; public lookup must now return 404.
 
-This implements the public JSON API. The frontend URL `http://localhost:3000/{username}` still depends on Girish's renderer.
+The same public JSON API now powers the implemented frontend route
+`http://localhost:3000/{username}`.
 
-## Curl test with an existing account
+## Curl test with an existing legacy account
 
 Use the same terminal. Replace the login credentials with your local account. Curl uses its own cookie jar, separate from your browser.
 

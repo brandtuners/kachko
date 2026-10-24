@@ -1,5 +1,13 @@
 # kachko — Low-Level Design (LLD)
 
+> **Current authentication implementation:** Clerk owns browser sign-up,
+> sign-in, Google OAuth, and sessions. Next.js protects dashboard/admin/onboarding
+> routes and its `/api/v1/*` BFF forwards a Clerk bearer token to Nest. Nest
+> verifies the token and maps JWT `sub` to `User.clerkUserId`, lazily linking or
+> provisioning the local user. The Session model and `/auth/register` and
+> `/auth/login` endpoints described below are retained as legacy compatibility,
+> not the primary frontend flow. See [06-GOOGLE-LOGIN.md](06-GOOGLE-LOGIN.md).
+
 **Document status:** Implementation baseline for V1  
 **Companion document:** `01-HLD.md`  
 **Primary language:** TypeScript  

@@ -49,7 +49,8 @@ The architecture must allow these later without changing the core Page/Block mod
 2. **Composable blocks** instead of a separate table for every content type.
 3. **Public pages are performance-critical** and must be independently optimized from the dashboard.
 4. **Backend owns business rules**; frontend validation is not trusted.
-5. **HTTP-only secure sessions** rather than tokens in localStorage.
+5. **Clerk-managed HTTP-only sessions**; no tokens in localStorage. The Next.js
+   BFF forwards short-lived session JWTs to Nest server-to-server.
 6. **PostgreSQL is the system of record.**
 7. **Redis is for cache/rate limits/transient workloads**, not primary persistence.
 8. **Object storage is used for media**, not PostgreSQL blobs.
@@ -212,7 +213,8 @@ The central abstraction is **Page → Blocks**.
 - Logout
 - Session management
 - Password reset
-- Google OAuth in the current identity milestone; GitHub and explicit account linking later (see docs/06-GOOGLE-LOGIN.md)
+- Clerk sign-up/sign-in with Google; additional providers remain configuration
+  work (see docs/06-GOOGLE-LOGIN.md)
 - Username availability
 
 ### Profile
@@ -413,12 +415,13 @@ Store only metadata in PostgreSQL.
 
 ### Authentication
 
-- Secure HTTP-only cookie
-- Secure flag in production
-- SameSite=Lax or stricter where compatible
-- Password hashing using Argon2id or equivalent
-- Session expiry/revocation
-- OAuth state validation
+- Clerk-managed secure HTTP-only browser session
+- Next.js route protection with Clerk middleware and `auth.protect()`
+- Server-side BFF token acquisition; no browser token storage
+- Nest verification of signature, expiry/not-before and authorized party
+- Stable Clerk user ID mapped to the local User record
+- Local suspension/deletion checks after token verification
+- Legacy Kachko password/cookie endpoints retained only for compatibility
 
 ### API security
 
@@ -727,4 +730,3 @@ The architecture should support:
 **AD-008:** Secure HTTP-only sessions.  
 **AD-009:** API versioned under `/api/v1`.  
 **AD-010:** No Kubernetes requirement for V1.
-

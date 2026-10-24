@@ -1,103 +1,107 @@
-# kachko — Google login
+# Kachko — Clerk authentication and Google sign-in
 
-Google login is now part of the current identity milestone, alongside email/password. Rohan owns the API and Google Cloud configuration; Girish owns the Google button, callback UI and username form. Other providers and account linking remain later work.
+Kachko's browser authentication is provided by Clerk. The Next.js application
+renders Clerk's sign-in/sign-up UI at `/login` and `/register`; Google is a
+Clerk social connection, not a browser flow owned by the Nest API.
 
-## Google Cloud configuration
+The linked Clerk application is `kachko`
+(`app_3L90hLW2Iya0T5mY1RmP389jvsi`). Do not run `clerk init` again or create a
+replacement application for this repository.
 
-Follow Google's [web-server OAuth guide](https://developers.google.com/identity/protocols/oauth2/web-server) and [OpenID Connect guide](https://developers.google.com/identity/openid-connect/openid-connect).
+## Local configuration
 
-1. Create/select your Google Cloud project and configure the Google Auth consent screen (branding, audience and contact information).
-2. Create an OAuth client of type **Web application**. Use the client ID and client secret, not an API key or service account.
-3. Add this exact authorized redirect URI for local testing: `http://localhost:4000/api/v1/auth/google/callback`.
-4. If the consent app is in testing mode, add the Google accounts you will test with as test users.
-5. Put the values in `apps/api/.env` (never in a NEXT_PUBLIC variable, browser bundle, root Compose config or committed file):
-
-```dotenv
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-client-secret
-GOOGLE_REDIRECT_URI=http://localhost:4000/api/v1/auth/google/callback
-# Leave empty for API-only local tests; callback displays JSON.
-GOOGLE_LOGIN_REDIRECT_URL=
-CORS_ORIGINS=http://localhost:3000,http://localhost:4000
-```
-
-Both client values may be empty to disable Google while keeping password login available. Partial credentials fail environment validation. Production redirect URLs must be HTTPS. The optional frontend redirect must have an origin in CORS_ORIGINS and contain no query, fragment or embedded credentials. No request-controlled return URL is accepted.
-
-Apply the new additive GoogleAccount migration and restart:
+Use pnpm because this repository declares pnpm as its package manager:
 
 ```bash
+pnpm dlx clerk@latest auth login
+pnpm dlx clerk@latest link --app app_3L90hLW2Iya0T5mY1RmP389jvsi
+pnpm dlx clerk@latest env pull --file apps/kachko-fe/.env.local
+pnpm dlx clerk@latest env pull --file apps/api/.env
+pnpm dlx clerk@latest doctor --json
+```
+
+Skip `link` when the repository is already linked. `env pull` merges Clerk keys;
+it must not replace the database, Redis, media, email, or other API variables.
+Never commit either environment file or expose `CLERK_SECRET_KEY` to browser
+code. The checked-in examples document variable names only.
+
+Required values:
+
+- Frontend: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`.
+- API: `CLERK_SECRET_KEY`.
+- API `CORS_ORIGINS` must include the exact frontend origin because Nest verifies
+  the Clerk token's authorized party (`azp`). Local development uses
+  `http://localhost:3000`.
+
+## Request flow
+
+1. `<ClerkProvider>` owns the browser session and the `/login` and `/register`
+   components.
+2. Clerk middleware recognizes the session and protects `/dashboard`, `/admin`,
+   and `/onboarding`.
+3. Browser API calls stay same-origin at `/api/v1/*`.
+4. The Next.js BFF route calls `await auth()`, obtains the current Clerk session
+   token with `getToken()`, and forwards it to Nest as
+   `Authorization: Bearer <token>`.
+5. Nest verifies the token with `@clerk/backend`, including expiry/not-before
+   and `authorizedParties`, then uses the JWT `sub` claim as the stable Clerk
+   user ID.
+6. On the first authenticated API request, Nest links an existing local user by
+   verified email or creates a local user and stores `User.clerkUserId`.
+
+The browser never stores a token in localStorage/sessionStorage and never sends
+the Clerk secret key. Public API endpoints continue to work through the same BFF
+without a bearer token.
+
+## Google sign-in
+
+Enable and configure Google in the selected Clerk application's Social
+Connections settings. Development instances may use Clerk's development OAuth
+configuration. Before production, claim/configure the application, create the
+production instance with `pnpm dlx clerk@latest deploy`, and follow the redirect
+URI shown by Clerk for the production Google OAuth client.
+
+Do not configure Google to redirect to
+`/api/v1/auth/google/callback` for the current frontend flow. Those Nest routes
+and `GOOGLE_*` environment variables belong to the legacy direct-OAuth
+implementation and are retained temporarily for backward compatibility and API
+tests; the Clerk UI does not call them.
+
+## Account lifecycle
+
+- Clerk is the source of truth for browser sessions and sign-in methods.
+- PostgreSQL remains the source of truth for Kachko profile, role, pages, media,
+  analytics, and product data.
+- Existing local users are linked only when Clerk supplies a verified matching
+  email address.
+- A generated username uses the Clerk username when present, otherwise the
+  verified email prefix, with collision-safe suffixing.
+- Suspending a local user makes Nest reject their otherwise valid Clerk token.
+- Permanent account deletion deletes the Clerk user before deleting local
+  application data.
+- Dashboard/admin sign-out calls Clerk `signOut()`; the legacy API logout is
+  only a compatibility cleanup.
+
+## Local verification
+
+```bash
+docker compose up -d --wait postgres redis
 pnpm db:deploy
 pnpm dev
+pnpm dlx clerk@latest doctor --json
 ```
 
-Root DATABASE_URL must target the same database as apps/api/.env. PostgreSQL and Redis must be running. If the API port changes, update GOOGLE_REDIRECT_URI, the Google Cloud authorized redirect URI, and the Swagger origin in CORS_ORIGINS.
+Then:
 
-## Endpoints
+1. Open `http://localhost:3000/register` and continue with Google.
+2. Confirm the flow reaches `/onboarding` for a new account and `/dashboard` for
+   a returning account.
+3. In DevTools Network, confirm `GET /api/v1/pages` returns `200` after sign-in.
+4. Reload `/dashboard`; the session should remain active.
+5. Sign out and confirm `/dashboard` redirects to
+   `/login?redirect_url=...` and protected API requests return `401`.
+6. Run `pnpm --filter kachko-fe typecheck`, `pnpm --filter kachko-fe lint`,
+   `pnpm --filter api typecheck`, and `pnpm --filter api lint`.
 
-All paths below use `http://localhost:4000/api/v1` locally.
-
-| Method | Path | Behavior |
-|---|---|---|
-| GET | `/auth/google` | Browser navigation; sets state cookie and redirects to Google |
-| GET | `/auth/google/callback` | Google-only callback; validates state/code, then logs in or requests onboarding |
-| GET | `/auth/google/pending` | Returns `{data:{email}}` for a valid pending onboarding cookie |
-| POST | `/auth/google/complete` | Accepts `{username,displayName?}`; creates user + Google link + session atomically; returns 201 `{data:IdentityUser}` |
-| POST | `/auth/google/link/complete` | Authenticated confirmation that attaches a pending Google identity to the matching existing account |
-
-POST complete requires `X-Kachko-CSRF: 1`, JSON, and the pending cookie. Email, Google subject, roles and tokens cannot be supplied in the body. Username validation is shared with password registration. No account exists until username completion succeeds. The pending cookie never authenticates protected API routes.
-
-With no frontend redirect configured, callback returns one of:
-
-```json
-{"data":{"onboardingRequired":true}}
-```
-
-or `{data:{onboardingRequired:false,user:IdentityUser}}`, with the ordinary kachko session cookie. An email collision returns `{data:{linkRequired:true}}` and a short-lived HTTP-only link-grant cookie. After login, use the existing `/auth/me`, `/users/me`, `/users/me` PATCH and `/auth/logout` endpoints.
-
-## Browser test without frontend changes
-
-1. Open **http://localhost:4000/api/v1/auth/google** directly in a browser tab. Do not use Swagger Execute or fetch for this step: it is a browser redirect flow.
-2. Choose a Google account and approve consent.
-3. For a new user, the callback displays `onboardingRequired: true` and sets an HTTP-only pending cookie, valid for 10 minutes.
-4. In the **same browser**, open **http://localhost:4000/api/docs**, execute `POST /api/v1/auth/google/complete` with header `X-Kachko-CSRF: 1` and body:
-
-```json
-{"username":"rohan_google","displayName":"Rohan"}
-```
-
-5. Expect 201 and the session cookie. Open **http://localhost:4000/api/v1/auth/me** to verify it. The browser sends cookies automatically; curl/Postman do not share browser cookies.
-6. Execute `POST /api/v1/auth/logout` from Swagger with the CSRF header; `/auth/me` should then return 401.
-7. Open `/api/v1/auth/google` again and use the same Google account: it logs into the same kachko user without another username step.
-
-If that email already belongs to a password account, the callback requests account linking. Sign in to the existing account, then POST `{}` to `/auth/google/link/complete` with the session, CSRF header and link-grant cookie. The API requires the authenticated account email to exactly match Google's verified email; the grant is single-use and expires after ten minutes. Merely matching an email never links an account.
-
-## Girish's integration
-
-Use browser navigation (an anchor or `window.location.assign`) to the API `/auth/google` URL. Once the frontend callback page exists, set:
-
-```dotenv
-GOOGLE_LOGIN_REDIRECT_URL=http://localhost:3000/auth/google/callback
-```
-
-The API redirects there with `?status=onboarding`, `?status=authenticated`, or `?status=link-required`. These values are UI hints only; the authority stays in HTTP-only cookies and the authenticated API. For onboarding, show the shared username form and POST complete. For `link-required`, authenticate the existing password account and POST `/auth/google/link/complete`. Returning users verify `/auth/me` and enter the dashboard.
-
-The frontend now provides Google actions on both `/login` and `/register`. Returning accounts proceed to `/dashboard`; new Google identities are verified at `/auth/google/callback`, where the user selects the required username before continuing to onboarding.
-
-As with password sessions, production frontend/API must be same-site HTTPS origins for SameSite=Lax cookies. When the frontend proxies `/api/v1/*` to a separately deployed API, register the frontend callback URL with Google and use it for `GOOGLE_REDIRECT_URI`, for example `https://kachko.vercel.app/api/v1/auth/google/callback`. Set `GOOGLE_LOGIN_REDIRECT_URL=https://kachko.vercel.app/auth/google/callback`. This keeps the state and session cookies on the same browser origin used by frontend API calls.
-
-## Security and data
-
-- Authorization-code flow uses PKCE S256, a random state bound to an HTTP-only cookie, and nonce verification.
-- Redis stores hashed state/onboarding/link grants for 10 minutes. State is consumed atomically before code exchange; onboarding and link grants are single-use. Linking additionally requires a valid existing session, an exact verified-email match, and an unlinked Google subject. Missing, expired, mismatched or reused credentials are rejected.
-- Google's official `google-auth-library` verifies ID-token signature, issuer, audience and expiry. The API also requires the expected nonce, a verified valid email and a nonempty Google subject.
-- Google subject is the stable login key in `GoogleAccount`, unique and linked to one User. Email changes at Google do not change the linked user or silently rewrite the kachko email.
-- New Google users have passwordHash=null and isVerified=true. They use the same session expiry/revocation and inactive/deleted-user checks as password users.
-- Provider tokens and Google avatar URLs are neither stored nor returned. Profile display name is user-supplied during onboarding; avatars remain part of the media feature.
-- Provider exchange/verification requests have a five-second per-request timeout and sanitized errors. State/pending operations use the dependency timeout and fail closed on Redis outage.
-- Rate limits: Google start 10/min/IP, callback 20/min/IP, complete 3/hour/IP; pending uses the shared identity limit. Browser return callbacks use state verification instead of requiring the mutation CSRF header.
-
-Additional error codes: 503 GOOGLE_NOT_CONFIGURED; 401 GOOGLE_AUTH_FAILED, GOOGLE_ONBOARDING_EXPIRED or GOOGLE_LINK_EXPIRED; 403 GOOGLE_STATE_INVALID; 409 GOOGLE_LINK_MISMATCH, GOOGLE_ACCOUNT_UNAVAILABLE or ACCOUNT_UNAVAILABLE. Existing validation/CSRF/rate-limit errors still apply.
-
-## Verification
-
-`pnpm --filter api test` covers Google configuration and rejection of invalid provider claims. `pnpm --filter api test:auth` applies both migrations to isolated PostgreSQL and uses real Redis/HTTP/session flows with only the Google exchange mocked. It covers onboarding, no account before username, single-use state/grants, expiry, callback denial, email collision, repeated Google login, logout and inactive-user rejection, as well as the password-login regression journey. Live consent and Google credentials must be verified manually using the browser steps above.
+For production verification, use an isolated Clerk production instance and a
+disposable account. Do not reuse development keys in Preview or Production.

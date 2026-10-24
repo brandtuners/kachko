@@ -67,11 +67,19 @@ Dependency lifecycle references: [NestJS lifecycle hooks](https://docs.nestjs.co
 
 ## Identity endpoints
 
-Registration, login/logout, cookie sessions, username availability and own-profile updates are implemented. See [the identity API contract and local curl guide](../../docs/05-IDENTITY-API.md) for all endpoints, request bodies, headers, limits and acceptance checks. Shared contracts live in `packages/types` and `packages/validation`; API build/dev/typecheck build them automatically.
+Clerk bearer-token authentication, lazy local-user linking/provisioning,
+username availability, and own-profile updates are implemented. Legacy
+registration/login cookie endpoints remain for compatibility and isolated API
+tests. See [the identity API contract](../../docs/05-IDENTITY-API.md). Shared
+contracts live in `packages/types` and `packages/validation`; API
+build/dev/typecheck build them automatically.
 
-Run `pnpm --filter api test:auth` from the root for the isolated real PostgreSQL/Redis identity journey (Docker required). FE integration is still pending.
+Run `pnpm --filter api test:auth` from the root for the isolated legacy
+PostgreSQL/Redis identity journey (Docker required). The Clerk frontend/BFF
+integration is implemented and must also be verified through the browser.
 
-Google signup/login is now included. See [Google credentials, migration and local browser testing](../../docs/06-GOOGLE-LOGIN.md).
+Google sign-in is configured through Clerk for the current frontend. See
+[Clerk authentication and Google sign-in](../../docs/06-GOOGLE-LOGIN.md).
 
 Page/LINK CRUD, publishing and public lookup are implemented and listed in Swagger. Apply all migrations with `pnpm db:deploy` and restart the API before testing. See [the page contract and FE fixture](../../docs/07-PAGE-LINK-CONTRACT.md). Run `pnpm --filter api test:pages` for isolated database verification.
 
