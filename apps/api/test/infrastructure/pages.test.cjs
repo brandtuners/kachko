@@ -225,7 +225,7 @@ test('page migration enforces multi-page ownership and cascades; username change
   assert.deepEqual(Object.keys(publicPage.body.data.profile).sort(), ['avatarUrl', 'bio', 'displayName', 'username']);
   assert.deepEqual(Object.keys(publicPage.body.data.blocks[0]).sort(), ['content', 'id', 'type']);
   const persisted = await db.page.findUnique({ where: { id: alicePage.id } });
-  const oldKey = `page:page_alice:${persisted.id}:${persisted.revision}`;
+  const oldKey = `page:page_alice:${persisted.id}:${persisted.revision}:0`;
   assert.ok(await redisClient.get(oldKey), 'public response cached');
   await request(`${root}/blocks/${first}`, { method: 'PATCH', cookie: alice.cookie, body: { content: { title: 'Changed title', url: 'https://changed.example/' } } });
   publicPage = await request('/public/page_alice');
@@ -357,7 +357,8 @@ test('page migration enforces multi-page ownership and cascades; username change
   await redisClient.flushDb();
   const themeCatalog = await request('/themes');
   assert.equal(themeCatalog.status, 200);
-  assert.equal(themeCatalog.body.data.length, 11);
+  assert.equal(themeCatalog.body.data.length, 12);
+  assert.ok(themeCatalog.body.data.some(theme => theme.key === 'default'));
   for (const theme of themeCatalog.body.data) {
     const { themeConfigSchema } = require('@kachko/validation');
     assert.equal(themeConfigSchema.safeParse(theme.config).success, true);

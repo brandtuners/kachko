@@ -11,6 +11,13 @@ export class IdentityRepository {
   }
   findByEmail(email: string) { return this.prisma.user.findUnique({ where: { email } }); }
   findByClerkUserId(clerkUserId: string) { return this.prisma.user.findUnique({ where: { clerkUserId } }); }
+  updateBilling(clerkUserId: string, plan: string, features: string[], observedAt = new Date()) {
+    return this.prisma.user.updateMany({ where: { clerkUserId, OR: [
+      { billingUpdatedAt: null }, { billingUpdatedAt: { lte: observedAt } },
+    ] }, data: {
+      billingPlan: plan, billingFeatures: features, billingUpdatedAt: observedAt,
+    } });
+  }
   findByUsername(username: string) {
     return this.prisma.user.findUnique({ where: { username }, select: { id: true } });
   }
@@ -20,12 +27,19 @@ export class IdentityRepository {
       if (linked) return linked;
       const user = await tx.user.findUnique({ where: { email } });
       if (!user || (user.clerkUserId && user.clerkUserId !== clerkUserId)) return null;
-      return tx.user.update({ where: { id: user.id }, data: {
+      const migrated = await tx.user.update({ where: { id: user.id, AND: [{ clerkUserId: null }] }, data: {
         clerkUserId,
         isVerified: true,
+        passwordHash: null,
         ...(!user.displayName && profile.displayName ? { displayName: profile.displayName } : {}),
         ...(!user.avatarUrl && profile.avatarUrl ? { avatarUrl: profile.avatarUrl } : {}),
       } });
+      // A verified Clerk email must not inherit credentials planted through
+      // unverified legacy registration, or retain access outside Clerk MFA.
+      await tx.session.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
+      await tx.passwordResetToken.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } });
+      await tx.googleAccount.deleteMany({ where: { userId: user.id } });
+      return migrated;
     });
   }
   createClerkUser(data: { clerkUserId: string; email: string; username: string; displayName?: string; avatarUrl?: string }) {
@@ -45,8 +59,8 @@ export class IdentityRepository {
   }
   async linkGoogle(userId: string, subject: string, email: string) {
     return this.prisma.$transaction(async tx => {
-      const user = await tx.user.findUnique({ where: { id: userId }, select: { id: true, email: true, isActive: true, deletedAt: true } });
-      if (!user?.isActive || user.deletedAt || user.email !== email) return null;
+      const user = await tx.user.findUnique({ where: { id: userId }, select: { id: true, email: true, isActive: true, deletedAt: true, clerkUserId: true } });
+      if (!user?.isActive || user.clerkUserId || user.deletedAt || user.email !== email) return null;
       await tx.googleAccount.create({ data: { userId, subject } });
       await tx.auditLog.create({ data: { actorId: userId, action: 'GOOGLE_ACCOUNT_LINKED', entityType: 'User', entityId: userId } });
       return user;
@@ -63,8 +77,8 @@ export class IdentityRepository {
   }
   async createPasswordReset(email: string, tokenHash: string, expiresAt: Date) {
     return this.prisma.$transaction(async tx => {
-      const user = await tx.user.findUnique({ where: { email }, select: { id: true, email: true, isActive: true, deletedAt: true, passwordHash: true } });
-      if (!user?.isActive || user.deletedAt || !user.passwordHash) return null;
+      const user = await tx.user.findUnique({ where: { email }, select: { id: true, email: true, isActive: true, deletedAt: true, passwordHash: true, clerkUserId: true } });
+      if (!user?.isActive || user.clerkUserId || user.deletedAt || !user.passwordHash) return null;
       await tx.passwordResetToken.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } });
       await tx.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt } });
       return { email: user.email };
@@ -76,7 +90,8 @@ export class IdentityRepository {
       if (!reset || reset.usedAt || reset.expiresAt.getTime() <= Date.now()) return false;
       const consumed = await tx.passwordResetToken.updateMany({ where: { id: reset.id, usedAt: null, expiresAt: { gt: new Date() } }, data: { usedAt: new Date() } });
       if (consumed.count !== 1) return false;
-      await tx.user.update({ where: { id: reset.userId }, data: { passwordHash } });
+      const updated = await tx.user.updateMany({ where: { id: reset.userId, clerkUserId: null, isActive: true, deletedAt: null }, data: { passwordHash } });
+      if (updated.count !== 1) return false;
       await tx.session.updateMany({ where: { userId: reset.userId, revokedAt: null }, data: { revokedAt: new Date() } });
       await tx.passwordResetToken.updateMany({ where: { userId: reset.userId, usedAt: null }, data: { usedAt: new Date() } });
       return true;

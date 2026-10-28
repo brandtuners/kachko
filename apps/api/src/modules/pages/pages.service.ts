@@ -2,12 +2,14 @@ import type { Page, Theme, SocialProfile as StoredSocial, PageTemplate as Stored
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import QRCode from 'qrcode';
-import { resolveAppearance, appearanceOverridesSchema, themeKeySchema, templateKeySchema, createBlockSchema, publicSocialSchema, type UpdateAppearanceInput, type ApplyTemplateInput, type CreateSocialInput, type UpdateSocialInput,  publicPageSchema, publicBlockSchema, type CreatePageInput, type UpdatePageInput,
+import { resolveAppearance, appearanceOverridesSchema, themeKeySchema, templateKeySchema, createBlockSchema, linkContentSchema, publicSocialSchema, type UpdateAppearanceInput, type ApplyTemplateInput, type CreateSocialInput, type UpdateSocialInput,  publicPageSchema, publicBlockSchema, type CreatePageInput, type UpdatePageInput,
   type CreateBlockInput, type UpdateBlockInput, type ReorderBlocksInput } from '@kachko/validation';
 import type { OwnerPage, PageSummary, PageBlock, PublicPage, SocialProfile, SystemTheme, PageTemplate, CreatorForm } from '@kachko/types';
 import { PagesRepository, PageResourceError, PageInputError, type StoredBlock, type StoredPage } from './pages.repository';
 import { PublicPageCache } from './public-page.cache';
 import { identityError } from '../identity/identity.service';
+import { KACHKO_FEATURES } from '@kachko/types';
+import type { Request } from 'express';
 
 function summary(page: Page): PageSummary {
   return { id: page.id, slug: page.slug, isPrimary: page.isPrimary, title: page.title, description: page.description, themeKey: themeKeySchema.parse(page.themeKey),
@@ -116,22 +118,66 @@ export class PagesService {
     const gate = await this.repository.publicGate(username, pageSlug);
     if (!gate) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');
     const routeKey = pageSlug ? `${username}/${pageSlug}` : username;
-    const hit = await this.cache.get(this.cache.key(routeKey, gate));
+    const usesAutomations = gate.billingFeatures.includes(KACHKO_FEATURES.AUTOMATIONS);
+    const hit = usesAutomations ? null : await this.cache.get(this.cache.key(routeKey, gate));
     if (hit) return { data: hit };
     const page = await this.repository.publicSnapshot(username, pageSlug);
     if (!page) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');
     const forms = new Map(page.forms.map(form => [form.id, publicFormDto(form)]));
+    const automationEnabled = page.user.billingFeatures.includes(KACHKO_FEATURES.AUTOMATIONS);
+    const now = Date.now();
+    const blocks = page.blocks.filter(block => {
+      if (!automationEnabled || block.type !== 'LINK') return true;
+      const automation = (block.content as { automation?: { activeFrom?: string; activeUntil?: string } }).automation;
+      return (!automation?.activeFrom || new Date(automation.activeFrom).getTime() <= now)
+        && (!automation?.activeUntil || new Date(automation.activeUntil).getTime() > now);
+    });
+    const redirect = automationEnabled ? blocks.find(block => block.type === 'LINK'
+      && (block.content as { automation?: { redirectPage?: boolean } }).automation?.redirectPage) : undefined;
     const result: PublicPage = publicPageSchema.parse({
-      profile: page.user, page: { id: page.id, slug: page.slug, isPrimary: page.isPrimary, title: page.title, description: page.description, themeKey: page.themeKey, appearance: resolveAppearance(themeConfig(page.theme), page.appearanceOverrides) },
-      blocks: page.blocks.map(block => {
+      profile: { username: page.user.username, displayName: page.user.displayName, bio: page.user.bio, avatarUrl: page.user.avatarUrl },
+      page: { id: page.id, slug: page.slug, isPrimary: page.isPrimary, title: page.title, description: page.description, themeKey: page.themeKey, appearance: resolveAppearance(themeConfig(page.theme), page.appearanceOverrides) },
+      blocks: blocks.map(block => {
         const content = block.type === 'IMAGE' ? { ...(block.content as Record<string, unknown>), url: block.media?.url } : block.content;
         const formId = block.type === 'FORM' || block.type === 'SUBSCRIBE' ? (content as { formId?: string }).formId : undefined;
         return publicBlockSchema.parse({ id: block.id, type: block.type, content: formId ? { ...(content as Record<string, unknown>), form: forms.get(formId) } : content });
       }),
       socials: page.socials.map(social => publicSocialSchema.parse({ id: social.id, platform: social.platform, username: social.username, url: social.url })),
+      ...(redirect ? { redirect: { blockId: redirect.id } } : {}),
     });
     // Old in-flight readers can populate only their old revision, not the new one.
-    await this.cache.set(this.cache.key(routeKey, page), result);
+    if (!usesAutomations) await this.cache.set(this.cache.key(routeKey, { ...page, billingUpdatedAt: page.user.billingUpdatedAt }), result);
     return { data: result };
+  }
+
+  async resolvePublicLink(blockId: string, request: Request) {
+    const block = await this.repository.publicLink(blockId);
+    if (!block) identityError(404, 'BLOCK_NOT_FOUND', 'Link not found');
+    const content = linkContentSchema.parse(block.content);
+    if (block.page.user.billingFeatures.includes(KACHKO_FEATURES.AUTOMATIONS) && content.automation) {
+      const now = Date.now();
+      if ((content.automation.activeFrom && new Date(content.automation.activeFrom).getTime() > now)
+        || (content.automation.activeUntil && new Date(content.automation.activeUntil).getTime() <= now)) {
+        identityError(404, 'BLOCK_NOT_FOUND', 'Link is not active');
+      }
+    }
+    if (!block.page.user.billingFeatures.includes(KACHKO_FEATURES.SMART_ROUTING)) return content.url;
+    const forwardedCountry = request.headers['x-vercel-ip-country'] ?? request.headers['cf-ipcountry'];
+    const country = (Array.isArray(forwardedCountry) ? forwardedCountry[0] : forwardedCountry)?.toUpperCase();
+    const ua = request.headers['user-agent'] ?? '';
+    const device = /ipad|tablet/i.test(ua) ? 'tablet' : /mobile|iphone|android/i.test(ua) ? 'mobile' : 'desktop';
+    let referrer = '';
+    try {
+      const source = typeof request.query?.source === 'string' ? request.query.source : request.headers.referer;
+      const url = new URL(source ?? '');
+      if (['http:', 'https:'].includes(url.protocol)) referrer = url.hostname.toLowerCase();
+    } catch { /* no valid referrer */ }
+    const rule = content.smartRouting?.rules.find(item => {
+      const value = item.value.toLowerCase();
+      if (item.condition === 'device') return value === device;
+      if (item.condition === 'country') return item.value.toUpperCase() === country;
+      return referrer === value || referrer.endsWith(`.${value}`);
+    });
+    return rule?.destinationUrl ?? content.url;
   }
 }

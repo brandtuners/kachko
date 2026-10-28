@@ -12,8 +12,10 @@
 // kv→ViewsChart, kd→TopLinks, tt→Section, pu→SectionHead.
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import type { ButtonHTMLAttributes, ReactNode, SVGProps } from "react";
+import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/cn";
 
 const AVATAR = "/landing-avatar.jpg";
@@ -106,6 +108,63 @@ function Button({ variant = "primary", size = "md", className, children, href, .
     <button {...rest} className={cn(base, className)}>
       {children}
     </button>
+  );
+}
+
+const CLAIMED_USERNAME_KEY = "kachko-claimed-username";
+
+function UsernameClaim({ tone = "light" }: { tone?: "light" | "dark" }) {
+  const router = useRouter();
+  const [username, setUsername] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const value = username.trim().toLowerCase();
+    if (!/^[a-z0-9_.-]{3,30}$/.test(value)) {
+      setError("Use 3–30 letters, numbers, dots, dashes or underscores.");
+      return;
+    }
+    setChecking(true);
+    setError(null);
+    try {
+      const result = await apiFetch<{ username: string; available: boolean; reason?: "reserved" | "taken" }>(`/users/username/${encodeURIComponent(value)}`);
+      if (!result.available) {
+        setError(result.reason === "reserved" ? "That name is reserved." : "That name is already taken.");
+        return;
+      }
+      window.sessionStorage.setItem(CLAIMED_USERNAME_KEY, value);
+      router.push(`/register?username=${encodeURIComponent(value)}`);
+    } catch {
+      setError("We couldn’t check that name. Please try again.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const dark = tone === "dark";
+  return (
+    <form onSubmit={submit} className="w-full max-w-[520px]" aria-label="Claim your Kachko username">
+      <div className={cn("flex items-center gap-2 rounded-[16px] border p-1.5 shadow-sm", dark ? "border-white/20 bg-white/10" : "border-line bg-white")}>
+        <label htmlFor={`claim-${tone}`} className={cn("hidden pl-3 text-sm font-bold sm:block", dark ? "text-ivory/65" : "text-muted")}>kachko.in/</label>
+        <input
+          id={`claim-${tone}`}
+          value={username}
+          onChange={(event) => { setUsername(event.target.value); setError(null); }}
+          autoCapitalize="none"
+          autoComplete="username"
+          spellCheck={false}
+          maxLength={30}
+          placeholder="yourname"
+          className={cn("min-w-0 flex-1 bg-transparent px-3 py-3 text-[15px] font-semibold outline-none placeholder:font-medium", dark ? "text-ivory placeholder:text-ivory/35" : "text-ink placeholder:text-muted/60")}
+        />
+        <button type="submit" disabled={checking} className={cn("shrink-0 rounded-[12px] px-4 py-3 text-[13px] font-extrabold transition active:scale-[.98] disabled:opacity-60 sm:px-5", dark ? "bg-lime text-ink hover:bg-lime-deep" : "bg-ink text-ivory hover:bg-ink/85")}>
+          {checking ? "Checking…" : "Claim yours"}
+        </button>
+      </div>
+      {error ? <p role="alert" className={cn("mt-2 text-left text-xs font-semibold", dark ? "text-[#ffd3ce]" : "text-[#b4322c]")}>{error}</p> : null}
+    </form>
   );
 }
 
@@ -485,6 +544,8 @@ function Header() {
           <button
             type="button"
             aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            aria-controls="marketing-mobile-menu"
             onClick={() => setMenuOpen((o) => !o)}
             className="flex h-10 w-10 items-center justify-center rounded-[12px] border border-line bg-cream/70 text-ink transition-colors hover:border-ink/25 lg:hidden"
           >
@@ -493,6 +554,8 @@ function Header() {
         </nav>
       </Container>
       <div
+        id="marketing-mobile-menu"
+        aria-hidden={!menuOpen}
         className={cn(
           "overflow-hidden border-t border-line bg-ivory transition-[max-height,opacity] duration-500 ease-out lg:hidden",
           menuOpen ? "max-h-[520px] opacity-100" : "max-h-0 border-transparent opacity-0",
@@ -558,14 +621,12 @@ function Hero() {
               </p>
             </Reveal>
             <Reveal delay={240}>
-              <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button href="/register" size="lg">
-                  Create your Kachko
-                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                </Button>
-                <Button href="#product" variant="ghost" size="lg">
-                  Explore Kachko
-                </Button>
+              <div className="mt-10">
+                <UsernameClaim />
+                <a href="#product" className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-ink/70 transition hover:text-ink">
+                  Explore how Kachko works
+                  <ArrowRight className="h-4 w-4" />
+                </a>
               </div>
             </Reveal>
             <Reveal delay={300}>
@@ -1718,14 +1779,44 @@ function StepsSection() {
 
 const PLANS = [
   {
-    name: "Kachko",
-    price: "$0",
-    note: "currently free",
-    copy: "Everything currently available, with no paid upgrade required.",
-    features: ["Multiple pages and content blocks", "Themes, templates and design controls", "Privacy-safe basic analytics"],
-    cta: "Create your Kachko",
-    variant: "primary" as const,
+    name: "Free",
+    price: "₹0",
+    note: "forever",
+    copy: "Publish your page and start growing an audience without a card.",
+    features: ["Unlimited links and content blocks", "Themes and basic analytics", "Audience capture forms"],
+    cta: "Start free",
+    variant: "ghost" as const,
     href: "/register",
+  },
+  {
+    name: "Creator",
+    price: "Live",
+    note: "monthly or annual",
+    copy: "A polished, brand-free presence with portable audience data.",
+    features: ["Everything in Free", "Remove Kachko branding", "Export audience data to CSV"],
+    cta: "See live pricing",
+    variant: "accent" as const,
+    href: "/pricing",
+  },
+  {
+    name: "Pro",
+    price: "Live",
+    note: "monthly or annual",
+    copy: "Understand more visitors and route each one to the most relevant destination.",
+    features: ["Everything in Creator", "Up to one year of analytics", "Device, country, and referrer routing"],
+    cta: "See live pricing",
+    variant: "ghost" as const,
+    href: "/pricing",
+  },
+  {
+    name: "Premium",
+    price: "Live",
+    note: "monthly or annual",
+    copy: "Schedule campaigns and temporarily turn your page into one focused destination.",
+    features: ["Everything in Pro", "Scheduled link availability", "Automated page redirects"],
+    cta: "See live pricing",
+    variant: "ghost" as const,
+    href: "/pricing",
   },
 ];
 
@@ -1737,12 +1828,12 @@ function PricingSection() {
           <div className="lg:col-span-4">
             <Reveal>
               <h2 className="heading text-[clamp(2rem,4.6vw,3rem)]">
-                Start building.
+                Start free.
                 <br />
-                Everything is included.
+                Upgrade as you grow.
               </h2>
               <p className="mt-6 max-w-sm text-[15.5px] leading-relaxed text-muted">
-                Kachko is currently free. No credit card, trial countdown or unavailable paid tier.
+                Simple creator plans with monthly and annual billing. Live prices come from our secure billing page, so offers can change without changing the product.
               </p>
             </Reveal>
           </div>
@@ -1752,8 +1843,8 @@ function PricingSection() {
                 <div className="flex h-full flex-col border-t border-line pt-7">
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="text-[13px] font-extrabold uppercase tracking-[0.16em]">{plan.name}</p>
-                    {i === 0 && (
-                      <span className="rounded-full bg-lime px-2.5 py-1 text-[10.5px] font-extrabold uppercase tracking-[0.12em] text-ink">Included</span>
+                    {i === 1 && (
+                      <span className="rounded-full bg-lime px-2.5 py-1 text-[10.5px] font-extrabold uppercase tracking-[0.12em] text-ink">Popular</span>
                     )}
                   </div>
                   <p className="mt-6 flex items-baseline gap-2">
@@ -1775,6 +1866,44 @@ function PricingSection() {
                 </div>
               </Reveal>
             ))}
+          </div>
+        </div>
+      </Container>
+    </Section>
+  );
+}
+
+/* -------------------------------------------------------------------- FAQ */
+
+const FAQS = [
+  { question: "What is a link-in-bio page?", answer: "It is one mobile-friendly page that holds the links, content and actions you want people to find from any social profile." },
+  { question: "What can I add to Kachko?", answer: "Add links, text, images, social profiles, YouTube, Spotify, email, phone, locations, WhatsApp actions, contact forms and email signups." },
+  { question: "Can I customize the design?", answer: "Yes. Choose a theme or template, then adjust your background, typography, buttons, cards and profile details with a live preview." },
+  { question: "How do I know what is working?", answer: "Kachko records privacy-conscious page views and clicks, then shows trends, top links, referrers, devices and conversion activity in your dashboard." },
+  { question: "Can I collect enquiries or subscribers?", answer: "Yes. Contact forms, email signup blocks and WhatsApp actions are built in, with contacts, notes, tags and CSV export in the audience area." },
+  { question: "Is Kachko free?", answer: "Kachko is currently free and the features shown on this page are included. No credit card is required." },
+];
+
+function FaqSection() {
+  return (
+    <Section id="faq" className="border-t border-line">
+      <Container>
+        <div className="grid gap-12 lg:grid-cols-12">
+          <div className="lg:col-span-4">
+            <SectionHead eyebrow="Questions, answered" title={<>Everything you<br />need to know.</>} copy="The quick version before you claim your page." />
+          </div>
+          <div className="lg:col-span-7 lg:col-start-6">
+            <div className="border-t border-line">
+              {FAQS.map(({ question, answer }) => (
+                <details key={question} className="group border-b border-line">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-6 text-left text-[17px] font-extrabold tracking-[-.02em] marker:hidden">
+                    {question}
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line text-lg font-medium transition group-open:rotate-45 group-open:bg-lime">+</span>
+                  </summary>
+                  <p className="max-w-2xl pb-7 pr-12 text-[15px] leading-relaxed text-muted">{answer}</p>
+                </details>
+              ))}
+            </div>
           </div>
         </div>
       </Container>
@@ -1807,14 +1936,8 @@ function FinalCta() {
             <p className="mt-7 text-[17px] font-medium text-ivory/60">One link for a brighter you.</p>
           </Reveal>
           <Reveal delay={210}>
-            <div className="mt-11 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Button href="/register" variant="darkPrimary" size="lg">
-                Create your Kachko
-                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-              </Button>
-              <Button href="#product" variant="darkGhost" size="lg">
-                See an example
-              </Button>
+            <div className="mt-11 flex w-full justify-center">
+              <UsernameClaim tone="dark" />
             </div>
           </Reveal>
           <Reveal delay={260}>
@@ -1918,6 +2041,7 @@ export function Landing() {
         <IdeaSection />
         <StepsSection />
         <PricingSection />
+        <FaqSection />
         <FinalCta />
       </main>
       <Footer />

@@ -14,7 +14,9 @@ test('analytics event and date-range contracts reject ambiguous targets', () => 
   assert.equal(analyticsEventSchema.safeParse({ pageId, blockId, socialProfileId: blockId, eventType: 'SOCIAL_CLICK' }).success, false);
   assert.equal(analyticsEventSchema.safeParse({ pageId, blockId, eventType: 'LINK_CLICK', country: 'US' }).success, false);
   assert.deepEqual(analyticsRangeSchema.parse({}), { range: '7d' });
-  assert.equal(analyticsRangeSchema.safeParse({ range: '365d' }).success, false);
+  assert.equal(analyticsRangeSchema.safeParse({ range: '365d' }).success, true);
+  assert.equal(analyticsRangeSchema.safeParse({ range: 'all' }).success, true);
+  assert.equal(analyticsRangeSchema.safeParse({ range: '730d' }).success, false);
 });
 
 test('analytics hashes network identity and computes bounded owner metrics', async () => {

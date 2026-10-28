@@ -14,13 +14,18 @@ const ROUTES: Record<Exclude<DashTab, "qr">, string> = {
   home: "/dashboard", blocks: "/dashboard/links", appearance: "/dashboard/appearance",
   analytics: "/dashboard/analytics", links: "/dashboard/settings",
   forms: "/dashboard/forms", audience: "/dashboard/audience",
+  social: "/dashboard/social", automations: "/dashboard/automations", shortener: "/dashboard/link-shortener",
 };
 
 function tabFor(pathname: string): DashTab {
+  if (pathname === "/dashboard/billing") return "links";
   if (pathname === "/dashboard/links") return "blocks";
   if (pathname === "/dashboard/appearance") return "appearance";
   if (pathname === "/dashboard/analytics") return "analytics";
   if (pathname === "/dashboard/forms") return "forms";
+  if (pathname === "/dashboard/social") return "social";
+  if (pathname === "/dashboard/automations") return "automations";
+  if (pathname === "/dashboard/link-shortener") return "shortener";
   if (pathname.startsWith("/dashboard/audience")) return "audience";
   if (pathname === "/dashboard/settings") return "links";
   if (pathname === "/dashboard/qr") return "qr";

@@ -65,8 +65,30 @@ export function validateEnvironment(env: Record<string, unknown>) {
   const googleCallback = String(env.GOOGLE_REDIRECT_URI ?? `http://localhost:${port}/api/v1/auth/google/callback`);
   const googleRedirect = String(env.GOOGLE_LOGIN_REDIRECT_URL ?? '');
   const clerkSecretKey = String(env.CLERK_SECRET_KEY ?? '').trim();
+  const clerkWebhookSigningSecret = String(env.CLERK_WEBHOOK_SIGNING_SECRET ?? '').trim();
+  const socialValues = Object.fromEntries(['SOCIAL_INSTAGRAM_CLIENT_ID', 'SOCIAL_INSTAGRAM_CLIENT_SECRET',
+    'SOCIAL_INSTAGRAM_REDIRECT_URI', 'SOCIAL_INSTAGRAM_WEBHOOK_VERIFY_TOKEN', 'SOCIAL_YOUTUBE_CLIENT_ID',
+    'SOCIAL_YOUTUBE_CLIENT_SECRET', 'SOCIAL_YOUTUBE_REDIRECT_URI', 'SOCIAL_TOKEN_ENCRYPTION_KEY']
+    .map(key => [key, String(env[key] ?? '').trim()])) as Record<string, string>;
+  for (const provider of ['INSTAGRAM', 'YOUTUBE']) {
+    const values = ['CLIENT_ID', 'CLIENT_SECRET', 'REDIRECT_URI'].map(key => socialValues[`SOCIAL_${provider}_${key}`]);
+    if (values.some(Boolean) && !values.every(Boolean)) throw new Error(`Set all SOCIAL_${provider} OAuth settings`);
+    if (values.every(Boolean)) {
+      const url = new URL(values[2]!);
+      if (url.search || url.hash || url.username || url.password ||
+        (url.protocol !== 'https:' && !(nodeEnv !== 'production' && url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) ||
+        url.origin !== publicAppUrl || url.pathname !== `/api/v1/social/callback/${provider.toLowerCase()}`) throw new Error(`SOCIAL_${provider}_REDIRECT_URI must use PUBLIC_APP_URL with the matching social callback path`);
+      if (Buffer.from(socialValues.SOCIAL_TOKEN_ENCRYPTION_KEY!, 'base64').length !== 32) throw new Error('SOCIAL_TOKEN_ENCRYPTION_KEY must be 32 base64-encoded bytes');
+    }
+  }
+  const instagramVersion = String(env.SOCIAL_INSTAGRAM_API_VERSION ?? 'v25.0');
+  if (!/^v\d{2}\.0$/.test(instagramVersion)) throw new Error('SOCIAL_INSTAGRAM_API_VERSION must be a version such as v25.0');
+  const dmMonthlyLimit = Number(env.SOCIAL_DM_MONTHLY_LIMIT ?? 2500);
+  if (!Number.isSafeInteger(dmMonthlyLimit) || dmMonthlyLimit < 1) throw new Error('SOCIAL_DM_MONTHLY_LIMIT must be a positive integer');
   if (clerkSecretKey && !/^sk_(test|live)_/.test(clerkSecretKey)) throw new Error('CLERK_SECRET_KEY must be a Clerk secret key');
   if (nodeEnv === 'production' && !clerkSecretKey) throw new Error('CLERK_SECRET_KEY is required in production');
+  if (clerkWebhookSigningSecret && !/^whsec_/.test(clerkWebhookSigningSecret)) throw new Error('CLERK_WEBHOOK_SIGNING_SECRET must be a Clerk webhook signing secret');
+  if (nodeEnv === 'production' && !clerkWebhookSigningSecret) throw new Error('CLERK_WEBHOOK_SIGNING_SECRET is required in production');
   const mediaStorage = String(env.MEDIA_STORAGE ?? 'local');
   if (!['local', 'r2'].includes(mediaStorage)) throw new Error('MEDIA_STORAGE must be local or r2');
   const mediaLocalDir = String(env.MEDIA_LOCAL_DIR ?? './tmp/media');
@@ -94,7 +116,8 @@ export function validateEnvironment(env: Record<string, unknown>) {
     PUBLIC_APP_URL: publicAppUrl, RESEND_API_KEY: resendKey, EMAIL_FROM: emailFrom,
     ANALYTICS_HASH_SALT: analyticsSalt, NODE_ENV: nodeEnv, PORT: port, CORS_ORIGINS: allowedOrigins,
     GOOGLE_CLIENT_ID: googleId, GOOGLE_CLIENT_SECRET: googleSecret, GOOGLE_REDIRECT_URI: googleCallback, GOOGLE_LOGIN_REDIRECT_URL: googleRedirect,
-    CLERK_SECRET_KEY: clerkSecretKey,
+    CLERK_SECRET_KEY: clerkSecretKey, CLERK_WEBHOOK_SIGNING_SECRET: clerkWebhookSigningSecret,
+    ...socialValues, SOCIAL_INSTAGRAM_API_VERSION: instagramVersion, SOCIAL_DM_MONTHLY_LIMIT: dmMonthlyLimit,
     DATABASE_URL: connectionUrl(env, 'DATABASE_URL'),
     REDIS_URL: connectionUrl(env, 'REDIS_URL'),
     DEPENDENCY_TIMEOUT_MS: timeout,

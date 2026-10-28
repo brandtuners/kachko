@@ -45,7 +45,7 @@ export class IdentityService {
   async googleLogin(subject: string, previous?: string) {
     const account = await this.repository.findGoogle(subject);
     if (!account) return null;
-    if (!account.user.isActive || account.user.deletedAt) identityError(401, 'INVALID_CREDENTIALS', 'Unable to sign in');
+    if (account.user.clerkUserId || !account.user.isActive || account.user.deletedAt) identityError(401, 'INVALID_CREDENTIALS', 'Unable to sign in');
     const session = this.newSession();
     await this.repository.createSession(account.userId, session.tokenHash, session.expiresAt, previous && tokenDigest(previous));
     return { user: safeUser(account.user), ...session };
@@ -67,7 +67,7 @@ export class IdentityService {
     // Unknown accounts still perform a real password verification.
     const encoded = user?.passwordHash ?? await (this.dummyHash ??= hash(randomBytes(32), passwordOptions));
     const valid = await verify(encoded, input.password);
-    if (!valid || !user?.passwordHash || !user.isActive || user.deletedAt) {
+    if (!valid || !user?.passwordHash || user.clerkUserId || !user.isActive || user.deletedAt) {
       identityError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
     const session = this.newSession();
@@ -78,7 +78,7 @@ export class IdentityService {
     if (!token) identityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
     const session = await this.repository.findSession(tokenDigest(token));
     if (!session || session.revokedAt || session.expiresAt.getTime() <= Date.now() ||
-        !session.user.isActive || session.user.deletedAt) identityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        session.user.clerkUserId || !session.user.isActive || session.user.deletedAt) identityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
     if (!session.lastUsedAt || Date.now() - session.lastUsedAt.getTime() > 60_000) {
       await this.repository.touchSession(session.id);
     }

@@ -1,15 +1,30 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Req, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
+import { KACHKO_FEATURES } from '@kachko/types';
 import { z, createPageSchema, updatePageSchema, createBlockSchema, updateBlockSchema, reorderBlocksSchema, pageIdSchema, blockIdSchema, pageSlugSchema, usernameSchema,
   type CreatePageInput, type UpdatePageInput, type CreateBlockInput, type UpdateBlockInput, type ReorderBlocksInput } from '@kachko/validation';
 import { IdentityValidationPipe } from '../identity/identity.controller';
 import { IdentityRateGuard, SessionGuard, RatePolicy, type IdentityRequest } from '../identity/identity.guards';
 import { PagesService } from './pages.service';
+import { identityError } from '../identity/identity.service';
 import * as schema from './pages.swagger';
 const pageId = new IdentityValidationPipe(pageIdSchema);
 const blockId = new IdentityValidationPipe(blockIdSchema);
 const emptyBody = new IdentityValidationPipe(z.strictObject({}).default({}));
+function assertPremiumLink(request: IdentityRequest, input: CreateBlockInput | UpdateBlockInput, existing?: Record<string, unknown>) {
+  const content = input.content;
+  if (!content) return;
+  const premium = content as { smartRouting?: unknown; automation?: unknown };
+  if (premium.smartRouting && JSON.stringify(premium.smartRouting) !== JSON.stringify(existing?.smartRouting)
+    && !request.entitlements.features.includes(KACHKO_FEATURES.SMART_ROUTING)) {
+    identityError(403, 'FEATURE_REQUIRED', 'Smart routing requires the smart_routing feature');
+  }
+  if (premium.automation && JSON.stringify(premium.automation) !== JSON.stringify(existing?.automation)
+    && !request.entitlements.features.includes(KACHKO_FEATURES.AUTOMATIONS)) {
+    identityError(403, 'FEATURE_REQUIRED', 'Link automations require the automations feature');
+  }
+}
 
 @ApiTags('Pages and blocks')
 @ApiCookieAuth()
@@ -79,7 +94,10 @@ export class PagesController {
   } }, text: { value: { type: 'TEXT', content: { text: 'Welcome to my page', alignment: 'left' }, isVisible: true } } } })
   @ApiResponse({ status: 201, schema: schema.envelope(schema.block) })
   addBlock(@Req() request: IdentityRequest, @Param('pageId', pageId) id: string,
-    @Body(new IdentityValidationPipe(createBlockSchema)) input: CreateBlockInput) { return this.pages.addBlock(request.identity.id, id, input); }
+    @Body(new IdentityValidationPipe(createBlockSchema)) input: CreateBlockInput) {
+    assertPremiumLink(request, input);
+    return this.pages.addBlock(request.identity.id, id, input);
+  }
 
   @Post(':pageId/blocks/reorder')
   @HttpCode(200)
@@ -98,8 +116,10 @@ export class PagesController {
   @Patch(':pageId/blocks/:blockId')
   @ApiBody({ schema: schema.blockUpdateBody })
   @ApiResponse({ status: 200, schema: schema.envelope(schema.block) })
-  updateBlock(@Req() request: IdentityRequest, @Param('pageId', pageId) id: string, @Param('blockId', blockId) block: string,
+  async updateBlock(@Req() request: IdentityRequest, @Param('pageId', pageId) id: string, @Param('blockId', blockId) block: string,
     @Body(new IdentityValidationPipe(updateBlockSchema)) input: UpdateBlockInput) {
+    const existing = (await this.pages.get(request.identity.id, id)).data.blocks.find(item => item.id === block);
+    assertPremiumLink(request, input, existing?.content as unknown as Record<string, unknown> | undefined);
     return this.pages.updateBlock(request.identity.id, id, block, input);
   }
   @Delete(':pageId/blocks/:blockId')
@@ -113,6 +133,13 @@ export class PagesController {
 @Controller('public')
 export class PublicPagesController {
   constructor(private readonly pages: PagesService) {}
+  @Get('routes/:blockId')
+  @Header('Cache-Control', 'private, no-store')
+  async route(@Param('blockId', blockId) id: string, @Req() request: Request, @Res() response: Response) {
+    const url = await this.pages.resolvePublicLink(id, request);
+    return response.redirect(302, url);
+  }
+
   @Get(':username')
   @Header('Cache-Control', 'no-store')
   @ApiOperation({ summary: 'Published profile and visible LINK/TEXT blocks; no authentication required' })

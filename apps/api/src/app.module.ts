@@ -8,6 +8,8 @@ import { MediaModule } from './modules/media/media.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { ConversionModule } from './modules/conversion/conversion.module';
+import { ShortLinksModule } from './modules/short-links/short-links.module';
+import { SocialModule } from './modules/social/social.module';
 
 @Module({
   imports: [
@@ -19,6 +21,8 @@ import { ConversionModule } from './modules/conversion/conversion.module';
     AnalyticsModule,
     ModerationModule,
     ConversionModule,
+    ShortLinksModule,
+    SocialModule,
   ],
 })
 export class AppModule {}

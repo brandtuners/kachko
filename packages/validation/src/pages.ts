@@ -12,10 +12,37 @@ export const linkUrlSchema = z.string().max(2048).refine(value => {
 }, 'Use an absolute HTTP(S) URL without credentials, spaces or control characters')
   .transform(value => new URL(value).href);
 
+export const smartRouteConditionSchema = z.enum(['device', 'country', 'referrer']);
+export const smartRouteSchema = z.strictObject({
+  condition: smartRouteConditionSchema,
+  value: z.string().trim().min(1).max(253),
+  destinationUrl: linkUrlSchema,
+}).superRefine((rule, ctx) => {
+  if (rule.condition === 'device' && !['mobile', 'tablet', 'desktop'].includes(rule.value.toLowerCase())) {
+    ctx.addIssue({ code: 'custom', path: ['value'], message: 'Device must be mobile, tablet or desktop' });
+  }
+  if (rule.condition === 'country' && !/^[A-Za-z]{2}$/.test(rule.value)) {
+    ctx.addIssue({ code: 'custom', path: ['value'], message: 'Country must be a two-letter ISO country code' });
+  }
+  if (rule.condition === 'referrer' && !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(rule.value)) {
+    ctx.addIssue({ code: 'custom', path: ['value'], message: 'Referrer must be a hostname such as instagram.com' });
+  }
+});
+export const linkAutomationSchema = z.strictObject({
+  activeFrom: z.iso.datetime().optional(),
+  activeUntil: z.iso.datetime().optional(),
+  redirectPage: z.boolean().default(false),
+}).superRefine((automation, ctx) => {
+  if (automation.activeFrom && automation.activeUntil && new Date(automation.activeFrom) >= new Date(automation.activeUntil)) {
+    ctx.addIssue({ code: 'custom', path: ['activeUntil'], message: 'End time must be after start time' });
+  }
+});
 export const linkContentSchema = z.strictObject({
   title: z.string().trim().min(1).max(120),
   url: linkUrlSchema,
   openInNewTab: z.boolean().default(true),
+  smartRouting: z.strictObject({ rules: z.array(smartRouteSchema).max(10) }).optional(),
+  automation: linkAutomationSchema.optional(),
 });
 const pageFields = {
   title: z.string().trim().min(1).max(120).nullable().optional(),
@@ -148,4 +175,5 @@ export const publicPageSchema = z.strictObject({
   page: z.strictObject({ id: z.uuid(), slug: pageSlugSchema, isPrimary: z.boolean(), title: z.string().nullable(), description: z.string().nullable(), themeKey: themeKeySchema, appearance: themeConfigSchema }),
   blocks: z.array(publicBlockSchema),
   socials: z.array(publicSocialSchema),
+  redirect: z.strictObject({ blockId: z.uuid() }).optional(),
 });

@@ -2,7 +2,7 @@ import { createClerkClient, verifyToken } from '@clerk/backend';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
-import type { IdentityUser } from '@kachko/types';
+import { KACHKO_FEATURES, type BillingEntitlements, type IdentityUser, type KachkoFeature } from '@kachko/types';
 import { RESERVED_USERNAMES } from '@kachko/validation';
 import { IdentityRepository } from './identity.repository';
 import { identityError } from './identity.service';
@@ -18,12 +18,35 @@ const safeUser = (user: IdentityUser): IdentityUser => ({
 });
 
 const uniqueError = (error: unknown) => typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
+const supportedFeatures = new Set<KachkoFeature>(Object.values(KACHKO_FEATURES));
+
+export function subscriptionHasAccess(item: { status: string; periodEnd: number | null }, now = Date.now()) {
+  return item.status === 'active' || (item.status === 'canceled' && item.periodEnd !== null && item.periodEnd > now);
+}
+
+function scopedValues(value: unknown, scope = 'u'): string[] {
+  const values = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : [];
+  return values.flatMap(item => typeof item === 'string' ? item.split(',') : [])
+    .map(item => item.trim())
+    .filter(item => item.startsWith(`${scope}:`))
+    .map(item => item.slice(scope.length + 1))
+    .filter(Boolean);
+}
+
+export function clerkEntitlements(claims: Record<string, unknown>): BillingEntitlements {
+  const features = scopedValues(claims.fea).filter((feature): feature is KachkoFeature => supportedFeatures.has(feature as KachkoFeature));
+  return { plan: scopedValues(claims.pla)[0] ?? 'free', features: [...new Set(features)], source: 'clerk' };
+}
 
 @Injectable()
 export class ClerkIdentityService {
   constructor(private readonly repository: IdentityRepository, private readonly config: ConfigService) {}
 
   async authenticate(token: string): Promise<IdentityUser> {
+    return (await this.authenticateSession(token)).identity;
+  }
+
+  async authenticateSession(token: string): Promise<{ identity: IdentityUser; entitlements: BillingEntitlements }> {
     const secretKey = this.config.get<string>('CLERK_SECRET_KEY');
     if (!secretKey) identityError(503, 'CLERK_NOT_CONFIGURED', 'Clerk authentication is not configured');
 
@@ -36,7 +59,11 @@ export class ClerkIdentityService {
     let user = await this.repository.findByClerkUserId(verified.sub);
     if (!user) user = await this.provision(verified.sub, secretKey);
     if (!user.isActive || user.deletedAt) identityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-    return safeUser(user);
+    const entitlements = clerkEntitlements(verified as unknown as Record<string, unknown>);
+    if (user.billingPlan !== entitlements.plan || user.billingFeatures.slice().sort().join(',') !== entitlements.features.slice().sort().join(',')) {
+      await this.repository.updateBilling(verified.sub, entitlements.plan, entitlements.features, new Date(verified.iat * 1000));
+    }
+    return { identity: safeUser(user), entitlements };
   }
 
   async deleteUser(clerkUserId: string): Promise<void> {
@@ -45,6 +72,17 @@ export class ClerkIdentityService {
     await createClerkClient({ secretKey }).users.deleteUser(clerkUserId).catch(() => {
       identityError(502, 'IDENTITY_PROVIDER_ERROR', 'The identity provider could not delete this account');
     });
+  }
+
+  async syncBilling(clerkUserId: string): Promise<void> {
+    const observedAt = new Date();
+    const secretKey = this.config.getOrThrow<string>('CLERK_SECRET_KEY');
+    const subscription = await createClerkClient({ secretKey }).billing.getUserBillingSubscription(clerkUserId);
+    const active = subscription.subscriptionItems.filter(item => subscriptionHasAccess(item) && item.plan);
+    const paid = active.find(item => !item.plan!.isDefault) ?? active[0];
+    const features = [...new Set(active.flatMap(item => item.plan?.features.map(feature => feature.slug) ?? []))]
+      .filter((feature): feature is KachkoFeature => supportedFeatures.has(feature as KachkoFeature));
+    await this.repository.updateBilling(clerkUserId, paid?.plan?.slug ?? 'free', features, observedAt);
   }
 
   private async provision(clerkUserId: string, secretKey: string) {

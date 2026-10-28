@@ -1,6 +1,18 @@
 packages:
 - "apps/*"
 - "packages/*"
+overrides:
+  'next>postcss': '^8.5.23'
+  'next>sharp': '^0.35.5'
+  'proxy-addr@<2.0.8': '^2.0.8'
+  'body-parser@>=2.0.0 <2.4.0': '^2.4.0'
+  'multer@>=2.0.0 <2.5.0': '^2.5.0'
+  'fast-uri@>=3.0.0 <3.1.9': '^3.1.9'
+  'brace-expansion@>=5.0.0 <5.0.12': '^5.0.12'
+  'source-map-js@<1.2.2': '^1.2.2'
+  'qs@>=6.0.0 <6.16.1': '^6.16.1'
+  'mysql2@>=3.0.0 <3.23.1': '^3.23.1'
+  'js-yaml@>=5.0.0 <5.4.1': '^5.4.1'
 allowBuilds:
   esbuild: false
   unrs-resolver: false

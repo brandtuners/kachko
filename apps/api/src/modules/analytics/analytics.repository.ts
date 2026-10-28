@@ -42,6 +42,10 @@ export class AnalyticsRepository {
     return Boolean(await this.db.page.findFirst({ where: { id: pageId, userId }, select: { id: true } }));
   }
 
+  firstEvent(pageId: string) {
+    return this.db.analyticsEvent.findFirst({ where: { pageId }, orderBy: { createdAt: 'asc' }, select: { createdAt: true } });
+  }
+
   counts(pageId: string, from: Date, to: Date) {
     return this.db.analyticsEvent.groupBy({
       by: ['eventType'], where: { pageId, createdAt: { gte: from, lte: to } }, _count: { _all: true },
@@ -124,6 +128,13 @@ export class AnalyticsRepository {
       WHERE "pageId" = ${pageId} AND "eventType" = 'PAGE_VIEW'::"AnalyticsEventType"
         AND "createdAt" >= ${from} AND "createdAt" <= ${to}
       GROUP BY "device" ORDER BY "visits" DESC, "device" ASC`;
+  }
+
+  exportEvents(pageId: string, from: Date, to: Date) {
+    return this.db.analyticsEvent.findMany({ where: { pageId, createdAt: { gte: from, lte: to } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 50_000,
+      select: { createdAt: true, eventType: true, country: true, city: true, device: true, browser: true, os: true,
+        referrer: true, block: { select: { content: true } }, socialProfile: { select: { platform: true, username: true } } } });
   }
 
   async conversionFunnel(pageId: string) {

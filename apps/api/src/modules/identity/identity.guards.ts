@@ -2,14 +2,16 @@ import { CanActivate, ExecutionContext, Injectable, SetMetadata } from '@nestjs/
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
-import type { IdentityUser } from '@kachko/types';
+import { KACHKO_FEATURES, type BillingEntitlements, type IdentityUser, type KachkoFeature } from '@kachko/types';
 import { RedisService } from '../../redis/redis.service';
 import { IdentityService, identityError, tokenDigest } from './identity.service';
 import { ClerkIdentityService } from './clerk-identity.service';
 
-export type IdentityRequest = Request & { identity: IdentityUser };
+export type IdentityRequest = Request & { identity: IdentityUser; entitlements: BillingEntitlements };
 export const RatePolicy = (name: string, limit: number, seconds: number) => SetMetadata('identityRate', { name, limit, seconds });
 export const SkipCsrf = () => SetMetadata('skipCsrf', true);
+export const RequireFeature = (feature: KachkoFeature) => SetMetadata('kachkoFeature', feature);
+export const hasFeature = (entitlements: BillingEntitlements, feature: KachkoFeature) => entitlements.features.includes(feature);
 
 export function sessionCookie(request: Request, config: ConfigService): string | undefined {
   const name = config.getOrThrow<string>('SESSION_COOKIE_NAME');
@@ -24,8 +26,10 @@ export function clerkSessionToken(request: Request): string | undefined {
   if (authorization?.startsWith('Bearer ')) return authorization.slice(7).trim() || undefined;
   const values = (request.headers.cookie ?? '').split(';').map(part => part.trim())
     .filter(part => part.startsWith('__session='))
-    .map(part => decodeURIComponent(part.slice('__session='.length)));
-  return values.length === 1 && values[0] ? values[0] : undefined;
+    .map(part => part.slice('__session='.length));
+  if (values.length !== 1 || !values[0]) return undefined;
+  try { return decodeURIComponent(values[0]); }
+  catch { return undefined; }
 }
 
 @Injectable()
@@ -86,9 +90,30 @@ export class SessionGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<IdentityRequest>();
     const clerkToken = clerkSessionToken(request);
-    request.identity = clerkToken
-      ? await this.clerk.authenticate(clerkToken)
-      : await this.identity.authenticate(sessionCookie(request, this.config));
+    if (clerkToken) {
+      const session = await this.clerk.authenticateSession(clerkToken);
+      request.identity = session.identity;
+      request.entitlements = session.entitlements;
+    } else {
+      request.identity = await this.identity.authenticate(sessionCookie(request, this.config));
+      request.entitlements = { plan: 'free', features: [], source: 'legacy' };
+    }
     return true;
   }
 }
+
+@Injectable()
+export class FeatureGuard implements CanActivate {
+  constructor(private readonly reflector: Reflector) {}
+  canActivate(context: ExecutionContext) {
+    const feature = this.reflector.getAllAndOverride<KachkoFeature>('kachkoFeature', [context.getHandler(), context.getClass()]);
+    if (!feature) return true;
+    const request = context.switchToHttp().getRequest<IdentityRequest>();
+    if (!request.entitlements || !hasFeature(request.entitlements, feature)) {
+      identityError(403, 'FEATURE_REQUIRED', `This action requires the ${feature} feature`);
+    }
+    return true;
+  }
+}
+
+export { KACHKO_FEATURES };

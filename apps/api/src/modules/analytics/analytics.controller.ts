@@ -1,17 +1,19 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, Req, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { analyticsEventSchema, analyticsRangeSchema, pageIdSchema,
   type AnalyticsEventInput, type AnalyticsRangeInput } from '@kachko/validation';
 import { IdentityValidationPipe } from '../identity/identity.controller';
 import { IdentityRateGuard, RatePolicy, SessionGuard, SkipCsrf, type IdentityRequest } from '../identity/identity.guards';
 import { AnalyticsService } from './analytics.service';
+import { KACHKO_FEATURES } from '@kachko/types';
+import { identityError } from '../identity/identity.service';
 
 const pageId = new IdentityValidationPipe(pageIdSchema);
 const range = new IdentityValidationPipe(analyticsRangeSchema);
-const rangeQuery = () => ApiQuery({ name: 'range', required: false, enum: ['today', '7d', '30d'], example: '7d' });
+const rangeQuery = () => ApiQuery({ name: 'range', required: false, enum: ['today', '7d', '30d', '90d', '365d', 'all'], example: '7d' });
 const periodProperties = {
-  range: { type: 'string', enum: ['today', '7d', '30d'] }, from: { type: 'string', format: 'date-time' }, to: { type: 'string', format: 'date-time' },
+  range: { type: 'string', enum: ['today', '7d', '30d', '90d', '365d', 'all'] }, from: { type: 'string', format: 'date-time' }, to: { type: 'string', format: 'date-time' },
 };
 
 @ApiTags('Analytics')
@@ -46,8 +48,24 @@ export class AnalyticsIngestionController {
 @UseGuards(IdentityRateGuard, SessionGuard)
 export class AnalyticsQueryController {
   constructor(private readonly analytics: AnalyticsService) {}
+  private advanced(request: IdentityRequest) {
+    if (!request.entitlements.features.includes(KACHKO_FEATURES.ADVANCED_ANALYTICS)) {
+      identityError(403, 'FEATURE_REQUIRED', 'This action requires the advanced_analytics feature');
+    }
+  }
   private query(request: IdentityRequest, id: string, input: AnalyticsRangeInput, method: 'summary' | 'timeseries' | 'topLinks' | 'topSocials' | 'referrers' | 'geo' | 'devices') {
+    if (['90d', '365d', 'all'].includes(input.range)) this.advanced(request);
     return this.analytics[method](request.identity.id, id, input);
+  }
+
+  @Get('export.csv')
+  @rangeQuery()
+  async exportCsv(@Req() request: IdentityRequest, @Param('pageId', pageId) id: string,
+    @Query(range) input: AnalyticsRangeInput, @Res({ passthrough: true }) response: Response) {
+    this.advanced(request);
+    const csv = await this.analytics.exportCsv(request.identity.id, id, input);
+    response.type('text/csv').setHeader('Content-Disposition', `attachment; filename="kachko-analytics-${id}.csv"`);
+    return new StreamableFile(csv);
   }
 
   @Get('summary')

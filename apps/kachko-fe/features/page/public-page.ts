@@ -40,6 +40,7 @@ export interface PublicPage {
   user: { displayName: string | null; username: string; avatarUrl: string | null };
   blocks: PublicBlock[];
   socials: PublicSocial[];
+  redirect?: { blockId: string };
 }
 
 export async function getPublicPage(username: string, pageSlug?: string): Promise<PublicPage | null> {
@@ -52,7 +53,7 @@ export async function getPublicPage(username: string, pageSlug?: string): Promis
       // exposing the API appearance fields at the renderer level.
       theme: { id: result.page.themeKey, slug: result.page.themeKey, name: result.page.themeKey, ...result.page.appearance, config: result.page.appearance }, user: result.profile,
       blocks: result.blocks.map((block, position) => ({ ...block, content: { ...block.content }, position, isVisible: true })),
-      socials: result.socials.map((social) => ({ ...social, isVisible: true })) };
+      socials: result.socials.map((social) => ({ ...social, isVisible: true })), redirect: result.redirect };
   } catch (error) {
     if (error instanceof ApiClientError && error.code === "PAGE_NOT_FOUND") return null;
     throw error;

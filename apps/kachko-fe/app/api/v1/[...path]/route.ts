@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import type { NextRequest } from "next/server";
+import { readProxyBody } from "@/lib/proxy-body";
 
 const API_URL = process.env.API_URL ?? "http://localhost:4000";
 const BODYLESS_METHODS = new Set(["GET", "HEAD"]);
@@ -36,14 +37,20 @@ async function proxy(request: NextRequest, context: RouteContext) {
   const requestHeaders = new Headers(request.headers);
   for (const header of HOP_BY_HOP_HEADERS) requestHeaders.delete(header);
 
+  const method = request.method.toUpperCase();
+  let body: ArrayBuffer | undefined;
+  try {
+    body = BODYLESS_METHODS.has(method) ? undefined : await readProxyBody(request);
+  } catch (error) {
+    if (error instanceof RangeError) return Response.json({ error: {
+      code: "PAYLOAD_TOO_LARGE", message: "Request body exceeds the 5 MiB limit",
+    } }, { status: 413, headers: { "Cache-Control": "no-store" } });
+    throw error;
+  }
+
   const { getToken } = await auth();
   const token = await getToken();
   if (token) requestHeaders.set("Authorization", `Bearer ${token}`);
-
-  const method = request.method.toUpperCase();
-  const body = BODYLESS_METHODS.has(method)
-    ? undefined
-    : await request.arrayBuffer();
   const upstream = await fetch(upstreamUrl, {
     method,
     headers: requestHeaders,

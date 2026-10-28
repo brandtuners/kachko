@@ -10,6 +10,7 @@ import { ObShell } from "../../features/onboarding/ob-shell";
 import { useOnboarding } from "../../features/onboarding/store";
 
 const NAME_MAX = 33;
+const CLAIMED_USERNAME_KEY = "kachko-claimed-username";
 
 export default function OnboardingNameStep() {
   const router = useRouter();
@@ -27,7 +28,12 @@ export default function OnboardingNameStep() {
     store.set("lastName", last.trim());
     const displayName = `${first.trim()} ${last.trim()}`.trim().slice(0, 80);
     try {
-      await apiFetch("/users/me", { method: "PATCH", body: JSON.stringify({ displayName }) });
+      const claimedUsername = window.sessionStorage.getItem(CLAIMED_USERNAME_KEY);
+      await apiFetch("/users/me", {
+        method: "PATCH",
+        body: JSON.stringify({ displayName, ...(claimedUsername ? { username: claimedUsername } : {}) }),
+      });
+      if (claimedUsername) window.sessionStorage.removeItem(CLAIMED_USERNAME_KEY);
     } catch {
       /* name is non-critical; dashboard can still set it */
     }

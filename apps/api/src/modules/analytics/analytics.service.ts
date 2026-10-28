@@ -39,6 +39,9 @@ function period(range: AnalyticsRange): { from: Date; to: Date; response: Analyt
   const from = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
   if (range === '7d') from.setUTCDate(from.getUTCDate() - 6);
   if (range === '30d') from.setUTCDate(from.getUTCDate() - 29);
+  if (range === '90d') from.setUTCDate(from.getUTCDate() - 89);
+  if (range === '365d') from.setUTCDate(from.getUTCDate() - 364);
+  if (range === 'all') from.setTime(0);
   return { from, to, response: { range, from: from.toISOString(), to: to.toISOString() } };
 }
 
@@ -68,7 +71,13 @@ export class AnalyticsService {
 
   private async ownerPeriod(userId: string, pageId: string, query: AnalyticsRangeInput) {
     if (!await this.repository.ownedPage(userId, pageId)) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');
-    return period(query.range);
+    const selected = period(query.range);
+    if (query.range === 'all') {
+      selected.from = new Date((await this.repository.firstEvent(pageId))?.createdAt ?? selected.to);
+      selected.from.setUTCHours(0, 0, 0, 0);
+    }
+    selected.response.from = selected.from.toISOString();
+    return selected;
   }
 
   async summary(userId: string, pageId: string, query: AnalyticsRangeInput) {
@@ -116,6 +125,23 @@ export class AnalyticsService {
   }
   devices(userId: string, pageId: string, query: AnalyticsRangeInput) {
     return this.breakdown(userId, pageId, query, (from, to) => this.repository.devices(pageId, from, to));
+  }
+  async exportCsv(userId: string, pageId: string, query: AnalyticsRangeInput) {
+    const selected = await this.ownerPeriod(userId, pageId, query);
+    const rows = await this.repository.exportEvents(pageId, selected.from, selected.to);
+    const csv = (value: unknown) => {
+      const text = String(value ?? '');
+      const safe = /^[\s]*[=+@-]/.test(text) ? `'${text}` : text;
+      return `"${safe.replaceAll('"', '""')}"`;
+    };
+    const header = ['timestamp', 'event', 'target', 'country', 'city', 'device', 'browser', 'os', 'referrer'];
+    const lines = rows.map(row => {
+      const content = row.block?.content as { title?: string } | undefined;
+      const target = content?.title ?? (row.socialProfile ? `${row.socialProfile.platform}:${row.socialProfile.username ?? ''}` : '');
+      return [row.createdAt.toISOString(), row.eventType, target, row.country, row.city, row.device, row.browser, row.os, row.referrer]
+        .map(csv).join(',');
+    });
+    return Buffer.from([header.map(csv).join(','), ...lines].join('\n'), 'utf8');
   }
   async conversionFunnel(userId: string, pageId: string) {
     if (!await this.repository.ownedPage(userId, pageId)) identityError(404, 'PAGE_NOT_FOUND', 'Page not found');

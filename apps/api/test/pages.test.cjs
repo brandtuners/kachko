@@ -13,6 +13,26 @@ test('LINK contracts normalize safe destinations and reject dangerous or ambiguo
   }
 });
 
+test('premium LINK routing and automation contracts are ordered, bounded and safe', () => {
+  const valid = createLinkBlockSchema.parse({ type: 'LINK', content: {
+    title: 'Campaign', url: 'https://example.com', smartRouting: { rules: [
+      { condition: 'device', value: 'mobile', destinationUrl: 'https://m.example.com' },
+      { condition: 'country', value: 'IN', destinationUrl: 'https://in.example.com' },
+      { condition: 'referrer', value: 'instagram.com', destinationUrl: 'https://social.example.com' },
+    ] }, automation: { activeFrom: '2026-10-26T12:00:00.000Z', activeUntil: '2026-10-27T12:00:00.000Z', redirectPage: true },
+  } });
+  assert.equal(valid.content.smartRouting.rules[0].destinationUrl, 'https://m.example.com/');
+  for (const rule of [
+    { condition: 'device', value: 'watch', destinationUrl: 'https://example.com' },
+    { condition: 'country', value: 'India', destinationUrl: 'https://example.com' },
+    { condition: 'referrer', value: 'https://instagram.com/path', destinationUrl: 'https://example.com' },
+  ]) assert.equal(createLinkBlockSchema.safeParse({ type: 'LINK', content: { title: 'x', url: 'https://example.com', smartRouting: { rules: [rule] } } }).success, false);
+  assert.equal(createLinkBlockSchema.safeParse({ type: 'LINK', content: { title: 'x', url: 'https://example.com',
+    automation: { activeFrom: '2026-10-27T12:00:00.000Z', activeUntil: '2026-10-26T12:00:00.000Z' } } }).success, false);
+  const tooMany = Array.from({ length: 11 }, () => ({ condition: 'device', value: 'mobile', destinationUrl: 'https://example.com' }));
+  assert.equal(createLinkBlockSchema.safeParse({ type: 'LINK', content: { title: 'x', url: 'https://example.com', smartRouting: { rules: tooMany } } }).success, false);
+});
+
 test('page and block requests protect server-owned fields and require complete LINK content', () => {
   assert.deepEqual(createPageSchema.parse({}), {});
   assert.deepEqual(createPageSchema.parse({ slug: ' My-Work ' }), { slug: 'my-work' });

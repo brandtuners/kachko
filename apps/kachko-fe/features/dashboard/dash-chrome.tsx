@@ -25,7 +25,7 @@ import {
   IconSettings,
 } from "../../components/icons";
 
-export type DashTab = "home" | "blocks" | "qr" | "appearance" | "analytics" | "forms" | "audience" | "links";
+export type DashTab = "home" | "blocks" | "qr" | "appearance" | "analytics" | "forms" | "audience" | "links" | "social" | "automations" | "shortener";
 
 function KachkoMark() {
   return (
@@ -195,6 +195,14 @@ function AccountMenu({ handle, go, active }: { handle: string; go: (t: DashTab) 
             <IconQr className="h-4 w-4 text-[#8b908c]" />
             My QR
           </button>
+          <Link
+            href="/dashboard/billing"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-semibold text-[var(--k-ink)] transition hover:bg-[#f6f7f2]"
+          >
+            <span aria-hidden className="grid h-4 w-4 place-items-center text-xs font-extrabold text-[#718c1b]">₹</span>
+            Plans &amp; billing
+          </Link>
           <div aria-hidden className="my-1.5 h-px bg-[#eceee9]" />
           <button
             type="button"
@@ -240,6 +248,9 @@ export function Sidebar({ tab, go }: { tab: DashTab; go: (t: DashTab) => void })
     { key: "appearance", label: "Design", icon: IconPalette },
     { key: "forms", label: "Forms", icon: IconLink },
     { key: "audience", label: "Audience", icon: IconEye },
+    { key: "social", label: "Social", icon: IconChart },
+    { key: "automations", label: "Auto-replies", icon: IconSettings },
+    { key: "shortener", label: "Short links", icon: IconLink },
     { key: "analytics", label: "Analytics", icon: IconChart },
     { key: "links", label: "Settings", icon: IconSettings },
   ];

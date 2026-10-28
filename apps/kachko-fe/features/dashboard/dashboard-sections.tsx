@@ -17,6 +17,7 @@ import { IconArrowUpRight, IconCheck, IconChart, IconEye, IconLink, IconPlus, Ic
 import { PageQr } from "../share/page-qr";
 import { publicPageUrl } from "../../lib/public-url";
 import { createTemplateForm } from "../conversion/api";
+import { KACHKO_FEATURES, useBilling } from "../billing/use-billing";
 
 function Panel({ title, sub, action, children }: { title: string; sub?: string; action?: JSX.Element; children: React.ReactNode }) {
   return (
@@ -313,6 +314,7 @@ export function AnalyticsPanel() {
   const editor = useEditor();
   const page = editor.page!;
   const [range, setRange] = useState<AnalyticsRange>("7d");
+  const billing = useBilling();
   const stats = useStats(page.id, range);
   const funnel = useQuery({ queryKey: ["conversion-funnel", page.id], queryFn: () => apiFetch<ConversionFunnel>(`/analytics/pages/${page.id}/conversion-funnel`) });
   const { summary, series, top, topSocials, referrers, geo, devices } = stats;
@@ -325,7 +327,9 @@ export function AnalyticsPanel() {
   const failed = queries.some((query) => query.isError);
   const refreshing = queries.some((query) => query.isFetching);
   const maxActivity = Math.max(1, ...points.map((point) => point.views + point.linkClicks + point.socialClicks));
-  const rangeLabel = range === "today" ? "today" : range === "7d" ? "last 7 days" : "last 30 days";
+  const rangeLabel = range === "today" ? "today" : range === "all" ? "all retained history" : `last ${range.slice(0, -1)} days`;
+  const ranges: AnalyticsRange[] = billing.has(KACHKO_FEATURES.ADVANCED_ANALYTICS)
+    ? ["today", "7d", "30d", "90d", "365d", "all"] : ["today", "7d", "30d"];
 
   return (
     <Panel
@@ -334,13 +338,15 @@ export function AnalyticsPanel() {
       action={
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-full border border-[#e2e5de] bg-white p-1" aria-label="Analytics date range">
-            {(["today", "7d", "30d"] as const).map((value) => (
+            {ranges.map((value) => (
               <button key={value} type="button" aria-pressed={range === value} onClick={() => setRange(value)}
                 className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${range === value ? "bg-[var(--k-ink)] text-white" : "text-[var(--k-muted)] hover:bg-[#f3f4ef]"}`}>
-                {value === "today" ? "Today" : value === "7d" ? "7 days" : "30 days"}
+                {value === "today" ? "Today" : value === "all" ? "All retained" : `${value.slice(0, -1)} days`}
               </button>
             ))}
           </div>
+          {!billing.has(KACHKO_FEATURES.ADVANCED_ANALYTICS) ? <Link href="/dashboard/billing" className="k-btn-line !h-9 !rounded-full !px-4 text-xs">Unlock 1-year history</Link> : null}
+          {billing.has(KACHKO_FEATURES.ADVANCED_ANALYTICS) ? <a href={`/api/v1/pages/${page.id}/analytics/export.csv?range=${range}`} title="Export up to the latest 50,000 events in this range" className="k-btn-line !h-9 !rounded-full !px-4 text-xs">Export CSV</a> : null}
           <button type="button" className="k-btn-line !h-9 !rounded-full !px-4 text-xs" disabled={refreshing}
             onClick={() => queries.forEach((query) => void query.refetch())}>
             {refreshing ? "Refreshing…" : "Refresh"}

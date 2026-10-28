@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
-import sharp from 'sharp';
+import sharp, { type Metadata } from 'sharp';
 import type { CompleteMediaUploadInput, RequestMediaUploadInput } from '@kachko/validation';
 import { MEDIA_MAX_BYTES, MEDIA_MAX_DIMENSION } from '@kachko/validation';
 import type { MediaAsset, MediaUploadTarget } from '@kachko/types';
@@ -67,7 +67,7 @@ export class MediaService {
     try { bytes = await this.storage.read(input.storageKey); }
     catch { identityError(400, 'UPLOAD_INCOMPLETE', 'Upload the file before completing it'); }
     if (bytes.length !== intent.size || bytes.length > MEDIA_MAX_BYTES) return this.reject(input.storageKey, 'Uploaded size does not match authorization');
-    let metadata: Awaited<ReturnType<sharp.Sharp['metadata']>>;
+    let metadata: Metadata;
     try { metadata = await sharp(bytes, { animated: true, limitInputPixels: MEDIA_MAX_DIMENSION ** 2 }).metadata(); }
     catch { return this.reject(input.storageKey, 'Uploaded bytes are not a supported image'); }
     const mimeType = metadata.format ? formats[metadata.format as keyof typeof formats] : undefined;

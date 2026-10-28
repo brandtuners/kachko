@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReportPage } from "../moderation/report-page";
 import { absoluteAssetUrl, publicPageUrl } from "../../lib/public-url";
@@ -8,6 +9,7 @@ import { PublicPageRenderer } from "./public-page-renderer";
 import { themeBackground, themeVars, type ThemeJson } from "./theme";
 import { PageQr } from "../share/page-qr";
 import { PublicShareButton } from "./public-share-button";
+import { ScheduledRedirect } from "./scheduled-redirect";
 
 export async function publicPageMetadata(
   username: string,
@@ -83,6 +85,9 @@ export async function PublicPageRoute({
     >
       <div aria-hidden className="absolute inset-0 hidden bg-black/25 backdrop-blur-[2px] md:block" />
       <section data-public-profile-shell className="relative z-10 mx-auto min-h-dvh w-full overflow-hidden md:min-h-[calc(100dvh-3.5rem)] md:max-w-[680px] md:rounded-[32px] md:border md:border-white/20 md:shadow-[0_28px_90px_rgba(0,0,0,.28)] lg:max-w-[820px]" style={{ background }}>
+        <Link href="/" aria-label="Kachko home" className="absolute left-5 top-5 z-20 grid h-11 w-11 place-items-center rounded-full bg-white/70 text-[#111312] shadow-sm backdrop-blur-md transition hover:scale-105 hover:bg-white active:scale-95">
+          <svg viewBox="0 0 48 48" className="h-6 w-6" aria-hidden><path d="M8 40V18c0-8.3 6.7-15 15-15s15 6.7 15 15v22h-7V18c0-4.4-3.6-8-8-8s-8 3.6-8 8v22H8Z" fill="currentColor" /><path d="M29 40V18c0-4.4 3.6-8 8-8v30h-8Z" fill="#9fca24" /></svg>
+        </Link>
         <div className="absolute right-5 top-5 z-20"><PublicShareButton url={url} title={`${name} on Kachko`} /></div>
         <div className="container-app flex min-h-dvh flex-col items-center pb-16 pt-10 sm:pt-16 md:min-h-[calc(100dvh-3.5rem)] md:pt-24">
           <PublicPageRenderer page={page} reportAction={<ReportPage pageId={page.id} />} />
@@ -93,6 +98,7 @@ export async function PublicPageRoute({
         <PageQr url={url} username={page.user.username} size={132} showDownload={false} />
       </aside>
       <AnalyticsBeacon pageId={page.id} />
+      {page.redirect ? <ScheduledRedirect blockId={page.redirect.blockId} /> : null}
     </main>
   );
 }

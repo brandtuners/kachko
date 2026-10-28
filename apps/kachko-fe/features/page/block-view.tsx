@@ -3,6 +3,7 @@ import type { PublicBlock, PublicSocial } from "./public-page";
 import { SOCIAL_ICONS } from "../../components/icons";
 import type { CreatorForm } from "@kachko/types";
 import { PublicForm } from "../conversion/public-form";
+import { BlockShareButton } from "./block-share-button";
 
 // Profile URL per platform for SOCIAL blocks (username → full link).
 const SOCIAL_BASE_URLS: Record<string, string> = {
@@ -43,21 +44,23 @@ export function BlockView({ block, pageId, pageName = "this page", preview = fal
   switch (block.type) {
     case "LINK": {
       const url = String(c.url ?? "#");
+      const routedUrl = !preview && c.smartRouting ? `/api/v1/public/routes/${encodeURIComponent(block.id)}` : url;
       return (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          data-event="LINK_CLICK"
-          data-block-id={block.id}
-          style={themeButtonStyle()}
-          className={`${blockBase} ${blockNeutral} ${blockAccentBorder}`}
-        >
-          <span className="font-semibold">
-            {String(c.title ?? url)}
-          </span>
-          <span className={`${blockAccentText} transition group-hover:translate-x-0.5`}>↗</span>
-        </a>
+        <div className="relative w-full">
+          <a
+            href={routedUrl}
+            target={c.openInNewTab === false ? undefined : "_blank"}
+            rel="noopener noreferrer"
+            data-event="LINK_CLICK"
+            data-block-id={block.id}
+            style={themeButtonStyle()}
+            className={`${blockBase} ${blockNeutral} ${blockAccentBorder} pr-14`}
+          >
+            <span className="font-semibold">{String(c.title ?? url)}</span>
+            <span className={`${blockAccentText} transition group-hover:translate-x-0.5`}>↗</span>
+          </a>
+          {!preview ? <BlockShareButton url={url} title={String(c.title ?? url)} /> : null}
+        </div>
       );
     }
     case "TEXT":
@@ -177,10 +180,13 @@ export function SocialBar({ socials }: { socials: PublicSocial[] }) {
           data-event="SOCIAL_CLICK"
           data-social-profile-id={s.id}
           data-platform={s.platform}
-          style={themeButtonStyle()}
-          className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/85 transition hover:border-magenta/60 hover:text-magenta"
+          aria-label={s.username ? `${s.platform} @${s.username.replace(/^@/, "")}` : s.platform}
+          className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-white/10 text-[color:var(--page-text,white)] transition hover:-translate-y-0.5 hover:bg-white/20"
         >
-          {s.platform}
+          {(() => {
+            const Icon = SOCIAL_ICONS[s.platform];
+            return Icon ? <Icon className="h-[18px] w-[18px]" /> : <span className="text-xs font-bold">{s.platform.slice(0, 1)}</span>;
+          })()}
         </a>
       ))}
     </div>

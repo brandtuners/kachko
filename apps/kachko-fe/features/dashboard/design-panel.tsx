@@ -9,6 +9,7 @@ import { IconArrowLeft, IconCheck, IconTrash } from "../../components/icons";
 import { useEditor } from "../editor/use-editor";
 import { useMediaUpload } from "../editor/use-media-upload";
 import { PAGE_FONT_STACKS, themeBackground, themeButtonStyle, themeVars } from "../page/theme";
+import { KACHKO_FEATURES, useBilling } from "../billing/use-billing";
 
 type View = "home" | "theme" | "customize" | "background" | "buttons" | "text" | "footer";
 
@@ -63,6 +64,7 @@ function ColorControl({ label, value, onChange }: { label: string; value: string
 export function DesignPanel() {
   const editor = useEditor();
   const upload = useMediaUpload();
+  const billing = useBilling();
   const serverConfig = editor.page?.theme?.config;
   const [view, setView] = useState<View>("home");
   const [draft, setDraft] = useState<ThemeConfig | null>(serverConfig ?? null);
@@ -251,14 +253,14 @@ export function DesignPanel() {
   return <div><BackHeader view="footer" back={() => setView("customize")} />
     <label className="flex items-center justify-between gap-4 rounded-2xl border border-[#e5e7e1] bg-white p-4 text-sm font-bold">
       <span><span className="flex items-center gap-2"><span>Show “Made with KACHKO”</span><span title="Premium feature" aria-label="Premium feature" className="grid h-5 w-5 place-items-center rounded-full bg-[#111312] text-[#c8f24a]"><svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden><path d="M13.2 2 5 13h6l-.2 9L19 10h-6l.2-8Z" /></svg></span></span><span className="mt-1 block text-xs font-normal text-[#818780]">Removing the Kachko watermark requires a premium subscription.</span></span>
-      <button type="button" role="switch" aria-label="Show Made with KACHKO footer" aria-checked={draft.footer.visible} onClick={() => draft.footer.visible ? setShowUpgrade(true) : commit({ ...draft, footer: { visible: true } })} className={`relative h-7 w-12 shrink-0 rounded-full transition ${draft.footer.visible ? "bg-[#9fce23]" : "bg-[#a9aea7]"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${draft.footer.visible ? "left-6" : "left-1"}`} /></button>
+      <button type="button" role="switch" aria-label="Show Made with KACHKO footer" aria-checked={draft.footer.visible} disabled={billing.isLoading} onClick={() => draft.footer.visible ? (billing.has(KACHKO_FEATURES.REMOVE_BRANDING) ? commit({ ...draft, footer: { visible: false } }) : setShowUpgrade(true)) : commit({ ...draft, footer: { visible: true } })} className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-50 ${draft.footer.visible ? "bg-[#9fce23]" : "bg-[#a9aea7]"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${draft.footer.visible ? "left-6" : "left-1"}`} /></button>
     </label>
     {showUpgrade ? createPortal(<div className="fixed inset-0 z-[120] grid min-h-dvh place-items-center bg-[#111312]/45 px-4 py-8 backdrop-blur-[6px]" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowUpgrade(false); }}>
       <div role="dialog" aria-modal="true" aria-labelledby="subscribe-title" aria-describedby="subscribe-description" className="w-full max-w-md rounded-3xl border border-[#dfe3d9] bg-[#fbfaf6] p-6 shadow-[0_24px_80px_rgba(17,19,18,.3)]">
         <span className="grid h-11 w-11 place-items-center rounded-full bg-[#eaf7bd] text-[#35430d]"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden><path d="M13.2 2 5 13h6l-.2 9L19 10h-6l.2-8Z" /></svg></span>
         <h4 id="subscribe-title" className="mt-4 text-xl font-extrabold tracking-[-.4px] text-[#111312]">Subscribe to disable the watermark</h4>
         <p id="subscribe-description" className="mt-2 text-sm leading-relaxed text-[#697069]">Removing “Made with KACHKO” is a premium feature. Subscribe to keep your public page completely brand-free.</p>
-        <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={() => setShowUpgrade(false)} className="k-btn-line !rounded-full">Not now</button><Link href="/#pricing" className="k-btn-ink !rounded-full" onClick={() => setShowUpgrade(false)}>View plans</Link></div>
+        <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={() => setShowUpgrade(false)} className="k-btn-line !rounded-full">Not now</button><Link href="/dashboard/billing" className="k-btn-ink !rounded-full" onClick={() => setShowUpgrade(false)}>View plans</Link></div>
       </div>
     </div>, document.body) : null}
   </div>;

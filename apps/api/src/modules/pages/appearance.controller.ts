@@ -3,7 +3,8 @@ import { ApiBody, ApiCookieAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags }
 import { pageIdSchema, updateAppearanceSchema, applyTemplateSchema, createSocialSchema, updateSocialSchema, reorderBlocksSchema,
   type UpdateAppearanceInput, type ApplyTemplateInput, type CreateSocialInput, type UpdateSocialInput, type ReorderBlocksInput } from '@kachko/validation';
 import { IdentityValidationPipe } from '../identity/identity.controller';
-import { IdentityRateGuard, SessionGuard, RatePolicy, type IdentityRequest } from '../identity/identity.guards';
+import { hasFeature, IdentityRateGuard, KACHKO_FEATURES, SessionGuard, RatePolicy, type IdentityRequest } from '../identity/identity.guards';
+import { identityError } from '../identity/identity.service';
 import { PagesService } from './pages.service';
 import * as schema from './pages.swagger';
 const idPipe = new IdentityValidationPipe(pageIdSchema);
@@ -55,7 +56,12 @@ export class PageAppearanceController {
   @ApiBody({ schema: schema.appearanceBody, examples: { dark: { value: { themeKey: 'dark' } }, custom: { value: { overrides: { buttons: { radius: 20 }, typography: { titleSize: 36 } } } } } })
   @ApiResponse({ status: 200, schema: schema.pageResponse })
   updateAppearance(@Req() req: IdentityRequest, @Param('pageId', idPipe) id: string,
-    @Body(new IdentityValidationPipe(updateAppearanceSchema)) input: UpdateAppearanceInput) { return this.pages.appearance(req.identity.id, id, input); }
+    @Body(new IdentityValidationPipe(updateAppearanceSchema)) input: UpdateAppearanceInput) {
+    if (input.overrides?.footer?.visible === false && !hasFeature(req.entitlements, KACHKO_FEATURES.REMOVE_BRANDING)) {
+      identityError(403, 'FEATURE_REQUIRED', 'Removing Kachko branding requires a paid plan');
+    }
+    return this.pages.appearance(req.identity.id, id, input);
+  }
   @Post('template')
   @HttpCode(200)
   @ApiOperation({ summary: 'Apply a template; confirm replacement if the page has blocks' })

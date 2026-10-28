@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const { registerSchema, profileSchema, usernameSchema, passwordResetRequestSchema, passwordResetConfirmSchema,
   createReportSchema, deleteAccountSchema } = require('@kachko/validation');
 const { validateEnvironment } = require('../dist/config/environment');
-const { CsrfGuard, sessionCookie } = require('../dist/modules/identity/identity.guards');
+const { CsrfGuard, FeatureGuard, sessionCookie } = require('../dist/modules/identity/identity.guards');
+const { clerkEntitlements } = require('../dist/modules/identity/clerk-identity.service');
 const { ConfigService } = require('@nestjs/config');
 
 test('shared identity contracts normalize names, protect fields and bound inputs', () => {
@@ -53,4 +54,25 @@ test('session configuration is bounded and typed', () => {
   assert.equal(validateEnvironment({ ...env, SESSION_TTL_SECONDS: '60' }).SESSION_TTL_SECONDS, 60);
   for (const value of ['0', 'NaN', '2592001']) assert.throws(() => validateEnvironment({ ...env, SESSION_TTL_SECONDS: value }));
   assert.throws(() => validateEnvironment({ ...env, SESSION_COOKIE_NAME: 'bad;name' }));
+});
+
+test('Clerk compact billing claims become allow-listed Kachko entitlements', () => {
+  assert.deepEqual(clerkEntitlements({
+    pla: 'u:creator,o:agency',
+    fea: 'u:remove_kachko_branding,u:data_export,u:unknown_feature,o:automations',
+  }), {
+    plan: 'creator',
+    features: ['remove_kachko_branding', 'data_export'],
+    source: 'clerk',
+  });
+  assert.deepEqual(clerkEntitlements({}), { plan: 'free', features: [], source: 'clerk' });
+});
+
+test('premium feature guard fails closed and allows the matching entitlement', () => {
+  const reflector = { getAllAndOverride: () => 'data_export' };
+  const guard = new FeatureGuard(reflector);
+  const context = (features) => ({ getHandler: () => null, getClass: () => null,
+    switchToHttp: () => ({ getRequest: () => ({ entitlements: { plan: 'creator', source: 'clerk', features } }) }) });
+  assert.throws(() => guard.canActivate(context([])), /data_export/);
+  assert.equal(guard.canActivate(context(['data_export'])), true);
 });

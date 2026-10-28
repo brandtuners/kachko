@@ -84,6 +84,11 @@ export class AuthController {
   @ApiResponse({ status: 200, schema: userSchema })
   me(@Req() request: IdentityRequest) { return { data: request.identity }; }
 
+  @Get('billing')
+  @UseGuards(SessionGuard)
+  @ApiCookieAuth()
+  billing(@Req() request: IdentityRequest) { return { data: request.entitlements }; }
+
   @Post('logout')
   @HttpCode(200)
   @ApiCookieAuth()

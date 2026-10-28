@@ -134,7 +134,10 @@ test('identity journey, persistence, ownership, CSRF, revocation and distributed
   const wrong = await req('/auth/login', { method: 'POST', body: { email: registration.email, password: 'incorrect' } });
   const unknown = await req('/auth/login', { method: 'POST', body: { email: 'unknown@example.com', password: 'incorrect' } });
   assert.equal(wrong.status, 401);
-  assert.deepEqual(wrong.body, unknown.body);
+  assert.equal(wrong.body.error.code, unknown.body.error.code);
+  assert.equal(wrong.body.error.message, unknown.body.error.message);
+  assert.ok(wrong.body.error.requestId);
+  assert.notEqual(wrong.body.error.requestId, unknown.body.error.requestId);
   const loggedIn = await req('/auth/login', { method: 'POST', cookie, body: { email: registration.email, password: registration.password } });
   assert.equal(loggedIn.status, 200);
   const newCookie = loggedIn.headers.get('set-cookie').split(';')[0];
@@ -250,6 +253,112 @@ test('identity journey, persistence, ownership, CSRF, revocation and distributed
   await db.user.update({ where: { id: googleAccount.userId }, data: { isActive: false } });
   flow = await beginGoogle();
   assert.equal((await callback(flow)).status, 401, 'disabled Google users cannot login');
+
+  await t.test('Clerk migration revokes legacy credentials and rejects residual login paths', async () => {
+    await flushLimits();
+    const email = 'girish@example.com';
+    const legacy = await db.user.findUniqueOrThrow({ where: { email } });
+    const password = 'new-password-456';
+    const before = await req('/auth/login', { method: 'POST', body: { email, password } });
+    assert.equal(before.status, 200);
+    const legacyCookie = before.headers.get('set-cookie').split(';')[0];
+    const resetToken = 'z'.repeat(43);
+    await db.passwordResetToken.create({ data: { userId: legacy.id, tokenHash: createHash('sha256').update(resetToken).digest('hex'),
+      expiresAt: new Date(Date.now() + 60_000) } });
+    await db.googleAccount.create({ data: { userId: legacy.id, subject: 'legacy-migration-subject' } });
+    const { IdentityRepository } = require('../../dist/modules/identity/identity.repository');
+    const repository = app.get(IdentityRepository);
+    const migrated = await repository.linkClerkUser('user_security_fixture', email, {});
+    assert.equal(migrated.id, legacy.id);
+    assert.equal(migrated.passwordHash, null);
+    assert.equal(await db.session.count({ where: { userId: legacy.id, revokedAt: null } }), 0);
+    assert.equal(await db.passwordResetToken.count({ where: { userId: legacy.id, usedAt: null } }), 0);
+    assert.equal(await db.googleAccount.count({ where: { userId: legacy.id } }), 0);
+    assert.equal((await req('/auth/me', { cookie: legacyCookie })).status, 401);
+    assert.equal((await req('/auth/login', { method: 'POST', body: { email, password } })).status, 401);
+    assert.equal((await req('/auth/password-reset/confirm', { method: 'POST', body: { token: resetToken, password: 'new-password-789' } })).status, 400);
+    assert.equal(await repository.createPasswordReset(email, 'blocked-reset', new Date(Date.now() + 60_000)), null);
+    assert.equal(await repository.linkGoogle(legacy.id, 'blocked-google', email), null);
+    // Defense in depth for accounts migrated before this patch, or a session
+    // issued concurrently with migration: persisted legacy credentials deny access.
+    await db.session.updateMany({ where: { userId: legacy.id }, data: { revokedAt: null } });
+    await db.user.update({ where: { id: legacy.id }, data: { passwordHash: legacy.passwordHash } });
+    await db.googleAccount.create({ data: { userId: legacy.id, subject: 'residual-google' } });
+    assert.equal((await req('/auth/me', { cookie: legacyCookie })).status, 401);
+    assert.equal((await req('/auth/login', { method: 'POST', body: { email, password } })).status, 401);
+    const { IdentityService } = require('../../dist/modules/identity/identity.service');
+    await assert.rejects(app.get(IdentityService).googleLogin('residual-google'), error => error.getStatus() === 401);
+    assert.equal((await req('/auth/me', { cookie: '__session=%E0%A4%A' })).status, 401);
+  });
+
+  await t.test('protected API families and admin routes reject anonymous or ordinary users', async () => {
+    await flushLimits();
+    for (const path of ['/pages', '/media', '/audience/contacts', '/social/accounts', '/social/automations',
+      '/short-links', '/admin/users', '/admin/pages', '/admin/reports', '/admin/audit-logs']) {
+      assert.equal((await req(path)).status, 401, path);
+    }
+    const login = await req('/auth/login', { method: 'POST', body: { email: 'rohan@example.com', password: registration.password } });
+    const ordinary = login.headers.get('set-cookie').split(';')[0];
+    for (const path of ['/admin/users', '/admin/pages', '/admin/reports', '/admin/audit-logs']) {
+      assert.equal((await req(path, { cookie: ordinary })).status, 403, path);
+    }
+    assert.equal((await req('/social/webhooks/instagram', { method: 'POST', body: { object: 'instagram', entry: [] }, csrf: false })).status, 403);
+    assert.equal((await req('/social/data-deletion/instagram', { method: 'POST', body: { signed_request: 'forged.payload' }, csrf: false })).status, 403);
+    assert.equal((await req('/webhooks/clerk', { method: 'POST', body: { type: 'subscription.updated', data: {} }, csrf: false })).status, 400);
+  });
+
+  await t.test('HTTP ownership isolation covers forms, audience, social accounts, uploads, short links and exports', async () => {
+    await flushLimits();
+    const ownerLogin = await req('/auth/login', { method: 'POST', body: { email: 'rohan@example.com', password: registration.password } });
+    const ownerCookie = ownerLogin.headers.get('set-cookie').split(';')[0];
+    const stranger = await register({ email: 'security-stranger@example.test', username: 'security_stranger', password: registration.password });
+    assert.equal(stranger.status, 201);
+    const strangerCookie = stranger.headers.get('set-cookie').split(';')[0];
+    const ownerId = ownerLogin.body.data.id;
+    const page = await req('/pages', { method: 'POST', cookie: ownerCookie, body: {} });
+    assert.equal(page.status, 201);
+    const pageId = page.body.data.id;
+    const form = await req(`/pages/${pageId}/forms`, { method: 'POST', cookie: ownerCookie, body: { name: 'Security contact form' } });
+    assert.equal(form.status, 201);
+    const formId = form.body.data.id;
+    assert.equal((await req(`/forms/${formId}/fields`, { method: 'POST', cookie: ownerCookie,
+      body: { type: 'EMAIL', name: 'email', label: 'Email', required: true } })).status, 201);
+    const block = await req(`/pages/${pageId}/blocks`, { method: 'POST', cookie: ownerCookie, body: { type: 'FORM', content: { formId } } });
+    assert.equal(block.status, 201);
+    assert.equal((await req(`/forms/${formId}`, { cookie: strangerCookie })).status, 404);
+    assert.equal((await req(`/forms/${formId}`, { method: 'PATCH', cookie: strangerCookie, body: { name: 'Stolen' } })).status, 404);
+    assert.equal((await req(`/forms/${formId}/fields`, { method: 'POST', cookie: strangerCookie,
+      body: { type: 'TEXT', name: 'injected', label: 'Stolen' } })).status, 404);
+    const submit = values => req(`/public/forms/${formId}/submissions`, { method: 'POST', csrf: false, body: { values } });
+    assert.equal((await submit({ email: 'not-an-email' })).status, 400);
+    assert.equal((await submit({ email: 'lead@example.test', role: 'ADMIN' })).status, 400);
+    const submission = await submit({ email: 'lead@example.test' });
+    assert.equal(submission.status, 201);
+    const contactId = submission.body.data.contactId;
+    assert.equal((await req(`/audience/contacts/${contactId}`, { cookie: strangerCookie })).status, 404);
+    assert.equal((await req(`/audience/contacts/${contactId}`, { method: 'PATCH', cookie: strangerCookie, body: { status: 'WON' } })).status, 404);
+    assert.equal((await req(`/audience/contacts/${contactId}/notes`, { method: 'POST', cookie: strangerCookie, body: { note: 'Injected' } })).status, 404);
+    assert.equal((await db.contact.findUniqueOrThrow({ where: { id: contactId } })).status, 'NEW');
+    assert.equal((await req('/audience/export', { cookie: ownerCookie })).status, 403);
+    assert.equal((await req(`/pages/${pageId}/analytics/summary?range=365d`, { cookie: ownerCookie })).status, 403);
+    assert.equal((await req(`/pages/${pageId}/blocks`, { method: 'POST', cookie: ownerCookie, body: { type: 'LINK', content: {
+      title: 'Premium bypass', url: 'https://example.com', smartRouting: { rules: [{ condition: 'device', value: 'mobile', destinationUrl: 'https://example.com/mobile' }] },
+    } } })).status, 403);
+    const short = await req('/short-links', { method: 'POST', cookie: ownerCookie, body: { destinationUrl: 'https://example.com', code: 'security-alias' } });
+    assert.equal(short.status, 201);
+    assert.equal((await req(`/short-links/${short.body.data.id}`, { method: 'PATCH', cookie: strangerCookie, body: { destinationUrl: 'https://other.example' } })).status, 404);
+    assert.equal((await req(`/short-links/${short.body.data.id}/stats`, { cookie: strangerCookie })).status, 404);
+    assert.equal((await req('/short-links', { cookie: strangerCookie })).body.data.items.length, 0);
+    const account = await db.socialAccount.create({ data: { userId: ownerId, platform: 'INSTAGRAM', externalId: '987654321', username: 'security_account', accessToken: 'fixture-unused' } });
+    assert.equal((await req(`/social/accounts/${account.id}/media`, { cookie: strangerCookie })).status, 404);
+    assert.equal((await req(`/social/accounts/${account.id}`, { method: 'DELETE', cookie: strangerCookie })).status, 404);
+    const upload = await req('/media/upload-url', { method: 'POST', cookie: ownerCookie, body: { mimeType: 'image/png', size: 100 } });
+    assert.equal(upload.status, 201);
+    assert.equal((await req('/media/complete', { method: 'POST', cookie: strangerCookie, body: { storageKey: upload.body.data.storageKey } })).status, 404);
+    assert.equal((await req(`/forms/${formId}`, { method: 'PATCH', cookie: ownerCookie, body: { isActive: false } })).status, 200);
+    assert.equal((await submit({ email: 'lead@example.test' })).status, 404);
+    assert.equal((await db.formSubmission.count({ where: { formId } })), 1);
+  });
   await docker('stop', redis);
   const unavailable = await req('/auth/login', { method: 'POST', body: { email: registration.email, password: registration.password } });
   assert.equal(unavailable.status, 503);

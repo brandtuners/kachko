@@ -7,6 +7,8 @@ export interface LinkBlockContent {
   title: string;
   url: string;
   openInNewTab: boolean;
+  smartRouting?: { rules: Array<{ condition: 'device' | 'country' | 'referrer'; value: string; destinationUrl: string }> };
+  automation?: { activeFrom?: string; activeUntil?: string; redirectPage: boolean };
 }
 export interface LinkBlock {
   id: string;
@@ -63,7 +65,8 @@ export interface PublicPage {
   page: { id: string; slug: string; isPrimary: boolean; title: string | null; description: string | null; themeKey: PageThemeKey; appearance: ThemeConfig };
   blocks: PublicBlock[];
   socials: PublicSocial[];
+  redirect?: { blockId: string };
 }
 export type PublicPageResponse = ApiData<PublicPage>;
 export type PageErrorCode = 'PAGE_SLUG_UNAVAILABLE' | 'PAGE_NOT_FOUND' | 'BLOCK_NOT_FOUND'
-  | 'THEME_NOT_FOUND' | 'TEMPLATE_NOT_FOUND' | 'SOCIAL_NOT_FOUND' | 'TEMPLATE_REPLACE_REQUIRED' | 'SOCIAL_ORDER_CONFLICT' | 'BLOCK_ORDER_CONFLICT' | 'VALIDATION_ERROR' | 'UNAUTHENTICATED' | 'CSRF_REJECTED' | 'RATE_LIMITED';
+  | 'THEME_NOT_FOUND' | 'TEMPLATE_NOT_FOUND' | 'SOCIAL_NOT_FOUND' | 'TEMPLATE_REPLACE_REQUIRED' | 'SOCIAL_ORDER_CONFLICT' | 'BLOCK_ORDER_CONFLICT' | 'REDIRECT_CONFLICT' | 'VALIDATION_ERROR' | 'UNAUTHENTICATED' | 'CSRF_REJECTED' | 'RATE_LIMITED';

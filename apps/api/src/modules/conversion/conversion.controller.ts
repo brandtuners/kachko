@@ -4,7 +4,7 @@ import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import { z, audienceQuerySchema, contactIdSchema, contactNoteSchema, contactTagSchema, createFormFieldSchema, createFormSchema, fieldIdSchema, formIdSchema, pageIdSchema, publicSubmissionSchema, reorderFormFieldsSchema, tagIdSchema, updateContactSchema, updateFormFieldSchema, updateFormSchema,
   type AudienceQueryInput, type CreateFormFieldInput, type CreateFormInput, type PublicSubmissionInput, type ReorderFormFieldsInput, type UpdateContactInput, type UpdateFormFieldInput, type UpdateFormInput } from '@kachko/validation';
 import { IdentityValidationPipe } from '../identity/identity.controller';
-import { IdentityRateGuard, RatePolicy, SessionGuard, SkipCsrf, type IdentityRequest } from '../identity/identity.guards';
+import { FeatureGuard, IdentityRateGuard, KACHKO_FEATURES, RatePolicy, RequireFeature, SessionGuard, SkipCsrf, type IdentityRequest } from '../identity/identity.guards';
 import { ConversionService } from './conversion.service';
 
 const uuid = (schema: z.ZodType<string>) => new IdentityValidationPipe(schema);
@@ -39,5 +39,5 @@ export class AudienceController {
   @Post('contacts/:contactId/notes') note(@Req() req: IdentityRequest, @Param('contactId', uuid(contactIdSchema)) id: string, @Body(new IdentityValidationPipe(contactNoteSchema)) input: { note: string }) { return this.conversion.addNote(req.identity.id, id, input.note); }
   @Post('contacts/:contactId/tags') tag(@Req() req: IdentityRequest, @Param('contactId', uuid(contactIdSchema)) id: string, @Body(new IdentityValidationPipe(contactTagSchema)) input: { name: string }) { return this.conversion.addTag(req.identity.id, id, input.name); }
   @Delete('contacts/:contactId/tags/:tagId') removeTag(@Req() req: IdentityRequest, @Param('contactId', uuid(contactIdSchema)) id: string, @Param('tagId', uuid(tagIdSchema)) tagId: string) { return this.conversion.removeTag(req.identity.id, id, tagId); }
-  @Get('export') @Header('Content-Type', 'text/csv; charset=utf-8') async export(@Req() req: IdentityRequest, @Res({ passthrough: true }) response: Response) { response.setHeader('Content-Disposition', 'attachment; filename="kachko-audience.csv"'); return this.conversion.csv(req.identity.id); }
+  @Get('export') @UseGuards(FeatureGuard) @RequireFeature(KACHKO_FEATURES.DATA_EXPORT) @Header('Content-Type', 'text/csv; charset=utf-8') async export(@Req() req: IdentityRequest, @Res({ passthrough: true }) response: Response) { response.setHeader('Content-Disposition', 'attachment; filename="kachko-audience.csv"'); return this.conversion.csv(req.identity.id); }
 }

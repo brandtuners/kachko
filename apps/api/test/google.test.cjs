@@ -39,6 +39,8 @@ test('Google configuration is optional, complete, HTTPS in production and has fi
   assert.throws(() => validateEnvironment({ ...enabled, GOOGLE_REDIRECT_URI: 'https://api.example.com/wrong' }));
   const production = { ...enabled, NODE_ENV: 'production', PUBLIC_APP_URL: 'https://app.example.com',
     RESEND_API_KEY: 're_test', EMAIL_FROM: 'KACHKO <no-reply@example.com>',
+    CLERK_SECRET_KEY: 'sk_test_production-fixture',
+    CLERK_WEBHOOK_SIGNING_SECRET: 'whsec_production-fixture',
     GOOGLE_REDIRECT_URI: 'https://api.example.com/api/v1/auth/google/callback', GOOGLE_LOGIN_REDIRECT_URL: 'https://app.example.com/auth/google/callback' };
   assert.equal(validateEnvironment(production).GOOGLE_LOGIN_REDIRECT_URL, 'https://app.example.com/auth/google/callback');
 });

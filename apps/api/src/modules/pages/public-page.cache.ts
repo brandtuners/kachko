@@ -10,7 +10,9 @@ export class PublicPageCache {
   private client() {
     return this.redis.client.withCommandOptions({ abortSignal: AbortSignal.timeout(this.config.getOrThrow<number>('DEPENDENCY_TIMEOUT_MS')) });
   }
-  key(username: string, page: { id: string; revision: number }) { return `page:${username}:${page.id}:${page.revision}`; }
+  key(username: string, page: { id: string; revision: number; billingUpdatedAt?: Date | null }) {
+    return `page:${username}:${page.id}:${page.revision}:${page.billingUpdatedAt?.getTime() ?? 0}`;
+  }
   async get(key: string): Promise<PublicPage | null> {
     try {
       if (!this.redis.client.isReady) return null;

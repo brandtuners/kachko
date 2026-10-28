@@ -21,7 +21,7 @@ export const analyticsEventSchema = z.strictObject({
   }
 });
 export const analyticsRangeSchema = z.strictObject({
-  range: z.enum(['today', '7d', '30d']).default('7d'),
+  range: z.enum(['today', '7d', '30d', '90d', '365d', 'all']).default('7d'),
 });
 export type AnalyticsEventInput = z.infer<typeof analyticsEventSchema>;
 export type AnalyticsRangeInput = z.infer<typeof analyticsRangeSchema>;

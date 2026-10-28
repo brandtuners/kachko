@@ -22,6 +22,9 @@ model User {
   isVerified    Boolean   @default(false)
   isActive      Boolean   @default(true)
   deletedAt     DateTime?
+  billingPlan     String    @default("free")
+  billingFeatures String[]  @default([])
+  billingUpdatedAt DateTime?
 
   sessions            Session[]
   passwordResetTokens PasswordResetToken[]
@@ -35,12 +38,178 @@ model User {
   contacts            Contact[]            @relation("ContactOwner")
   contactNotes        ContactNote[]        @relation("ContactNoteAuthor")
   contactTags         Tag[]                @relation("TagOwner")
+  shortLinks          ShortLink[]
+  socialAccounts      SocialAccount[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Unique email/username constraints already create their lookup indexes.
   @@index([createdAt])
+}
+
+model ShortLink {
+  id             String @id @default(uuid())
+  userId         String
+  code           String @unique
+  title          String?
+  destinationUrl String
+  utm            Json @default("{}")
+  channel        String?
+  tags           String[] @default([])
+  isActive       Boolean @default(true)
+  clickCount     Int @default(0)
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clicks         ShortLinkClick[]
+  aliases        ShortLinkAlias[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([userId, createdAt])
+}
+
+model ShortLinkAlias {
+  code        String @id
+  shortLinkId String
+  shortLink   ShortLink @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+  @@index([shortLinkId])
+}
+
+model ShortLinkClick {
+  id          String @id @default(uuid())
+  shortLinkId String
+  device      String?
+  referrer    String?
+  country     String?
+  createdAt   DateTime @default(now())
+  shortLink   ShortLink @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+  @@index([shortLinkId, createdAt])
+}
+
+model SocialAccount {
+  id               String @id @default(uuid())
+  userId           String
+  platform         String
+  externalId       String
+  username         String
+  avatarUrl        String?
+  accessToken      String
+  refreshToken     String?
+  tokenExpiresAt   DateTime?
+  scopes           String[] @default([])
+  status           String @default("CONNECTED")
+  lastSyncedAt     DateTime?
+  lastSyncError    String?
+  report           Json @default("{}")
+  syncLeaseUntil   DateTime?
+  nextSyncAt       DateTime @default(now())
+  user             User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshots        SocialSnapshot[]
+  media            SocialMedia[]
+  automations      DmAutomation[]
+  deliveries       DmDelivery[]
+  commentEvents    SocialCommentEvent[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  @@unique([platform, externalId])
+  @@index([userId, platform])
+  @@index([status, nextSyncAt])
+}
+
+model SocialSnapshot {
+  id         String @id @default(uuid())
+  accountId  String
+  date       DateTime @db.Date
+  followers  Int?
+  posts      Int?
+  views      BigInt?
+  reach      Int?
+  account    SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@unique([accountId, date])
+}
+
+model SocialMedia {
+  id          String @id @default(uuid())
+  accountId   String
+  externalId  String
+  caption     String?
+  permalink   String?
+  mediaType   String
+  publishedAt DateTime
+  likes       Int?
+  comments    Int?
+  views       BigInt?
+  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@unique([accountId, externalId])
+  @@index([accountId, publishedAt])
+}
+
+model DmAutomation {
+  id             String @id @default(uuid())
+  accountId      String
+  name           String
+  triggerType    String
+  mediaId        String?
+  matchType      String
+  keywords       String[] @default([])
+  message        String
+  buttonLabel    String
+  destinationUrl String
+  publicReply    String?
+  isActive       Boolean @default(true)
+  deletedAt      DateTime?
+  triggerStartedAt DateTime @default(now())
+  account        SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  deliveries     DmDelivery[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([accountId, isActive])
+}
+
+model DmDelivery {
+  id               String @id @default(uuid())
+  accountId        String
+  automationId     String
+  commentId        String
+  mediaId          String
+  commentCreatedAt DateTime
+  status           String @default("PENDING")
+  message          String
+  buttonLabel      String
+  destinationUrl   String
+  publicReply      String?
+  clickToken       String @unique
+  clickCount       Int @default(0)
+  providerMessageId String?
+  errorCode        String?
+  sentAt           DateTime?
+  claimedAt        DateTime?
+  nextAttemptAt    DateTime @default(now())
+  createdAt        DateTime @default(now())
+  account          SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  automation       DmAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  @@unique([accountId, commentId])
+  @@index([status, createdAt])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([accountId, createdAt])
+}
+
+model SocialCommentEvent {
+  id          String @id @default(uuid())
+  accountId   String
+  commentId   String
+  mediaId     String
+  text        String
+  occurredAt  DateTime
+  status      String @default("PENDING")
+  attempts    Int @default(0)
+  claimedAt   DateTime?
+  nextAttemptAt DateTime @default(now())
+  errorCode   String?
+  createdAt   DateTime @default(now())
+  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@unique([accountId, commentId])
+  @@index([status, createdAt])
+  @@index([status, nextAttemptAt, createdAt])
 }
 
 model PasswordResetToken {

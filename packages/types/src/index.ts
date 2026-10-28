@@ -18,7 +18,7 @@ export type UsernameResponse = ApiData<{
 }>;
 export type IdentityErrorCode = 'VALIDATION_ERROR' | 'ACCOUNT_UNAVAILABLE' | 'USERNAME_UNAVAILABLE'
   | 'INVALID_CREDENTIALS' | 'UNAUTHENTICATED' | 'CSRF_REJECTED' | 'RATE_LIMITED' | 'DEPENDENCIES_UNAVAILABLE'
-  | 'RESET_TOKEN_INVALID' | 'FORBIDDEN';
+  | 'RESET_TOKEN_INVALID' | 'FORBIDDEN' | 'FEATURE_REQUIRED';
 export interface ApiError { error: { code: string; message: string | string[] } }
 
 export type GoogleCallbackResponse = ApiData<
@@ -36,3 +36,5 @@ export * from './media';
 export * from './analytics';
 export * from './moderation';
 export * from './conversion';
+export * from './billing';
+export * from './short-links';

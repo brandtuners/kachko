@@ -7,8 +7,9 @@ export class PageResourceError extends Error {
   constructor(readonly code: 'PAGE_NOT_FOUND' | 'BLOCK_NOT_FOUND' | 'THEME_NOT_FOUND' | 'TEMPLATE_NOT_FOUND' | 'SOCIAL_NOT_FOUND' | 'MEDIA_NOT_FOUND' | 'FORM_NOT_FOUND') { super(code); }
 }
 export class PageInputError extends Error {
-  constructor(readonly code: 'VALIDATION_ERROR' | 'PAGE_SLUG_UNAVAILABLE' | 'BLOCK_ORDER_CONFLICT' | 'SOCIAL_ORDER_CONFLICT' | 'TEMPLATE_REPLACE_REQUIRED', message: string) { super(message); }
+  constructor(readonly code: 'VALIDATION_ERROR' | 'PAGE_SLUG_UNAVAILABLE' | 'BLOCK_ORDER_CONFLICT' | 'SOCIAL_ORDER_CONFLICT' | 'TEMPLATE_REPLACE_REQUIRED' | 'REDIRECT_CONFLICT', message: string) { super(message); }
 }
+const redirectsPage = (content: unknown) => Boolean((content as { automation?: { redirectPage?: boolean } } | null)?.automation?.redirectPage);
 const orderedBlocks = { orderBy: [{ position: 'asc' as const }, { id: 'asc' as const }], include: { media: true } };
 const orderedSocials = { orderBy: [{ position: 'asc' as const }, { id: 'asc' as const }] };
 const fullPage = { blocks: orderedBlocks, forms: { include: { fields: { orderBy: [{ position: 'asc' as const }, { id: 'asc' as const }] } } }, theme: true, socials: orderedSocials, user: { select: { username: true } } };
@@ -74,6 +75,10 @@ export class PagesRepository {
   }
   addBlock(userId: string, id: string, data: CreateBlockInput) {
     return this.mutate(userId, id, async (tx, page) => {
+      if (data.type === 'LINK' && redirectsPage(data.content)
+        && page.blocks.some(block => block.type === 'LINK' && redirectsPage(block.content))) {
+        throw new PageInputError('REDIRECT_CONFLICT', 'Only one link can redirect the page at a time');
+      }
       const position = page.blocks.length ? Math.max(...page.blocks.map(block => block.position)) + 1 : 0;
       const mediaId = data.type === 'IMAGE' ? data.content.mediaId : undefined;
       if (mediaId && !await tx.media.findFirst({ where: { id: mediaId, userId } })) throw new PageResourceError('MEDIA_NOT_FOUND');
@@ -93,6 +98,10 @@ export class PagesRepository {
         const parsed = blockContentSchemas[stored.type].safeParse(data.content);
         if (!parsed.success) throw new PageInputError('VALIDATION_ERROR', `Content must match the stored ${stored.type} block type`);
         data = { ...data, content: parsed.data };
+      }
+      if (stored.type === 'LINK' && data.content && redirectsPage(data.content)
+        && page.blocks.some(block => block.id !== blockId && block.type === 'LINK' && redirectsPage(block.content))) {
+        throw new PageInputError('REDIRECT_CONFLICT', 'Only one link can redirect the page at a time');
       }
       const mediaId = stored.type === 'IMAGE' && data.content ? (data.content as { mediaId: string }).mediaId : undefined;
       if (mediaId && !await tx.media.findFirst({ where: { id: mediaId, userId } })) throw new PageResourceError('MEDIA_NOT_FOUND');
@@ -212,14 +221,22 @@ export class PagesRepository {
       user: { username, isActive: true, deletedAt: null } };
   }
   publicGate(username: string, pageSlug?: string) {
-    return this.db.page.findFirst({ where: this.publicWhere(username, pageSlug), select: { id: true, revision: true } });
+    return this.db.page.findFirst({ where: this.publicWhere(username, pageSlug), select: {
+      id: true, revision: true, user: { select: { billingUpdatedAt: true, billingFeatures: true } },
+    } }).then(page => page ? { id: page.id, revision: page.revision, billingUpdatedAt: page.user.billingUpdatedAt,
+      billingFeatures: page.user.billingFeatures } : null);
   }
   publicSnapshot(username: string, pageSlug?: string) {
     return this.db.$transaction(tx => tx.page.findFirst({ where: this.publicWhere(username, pageSlug), include: {
-      user: { select: { username: true, displayName: true, bio: true, avatarUrl: true } },
+      user: { select: { username: true, displayName: true, bio: true, avatarUrl: true, billingFeatures: true, billingUpdatedAt: true } },
       blocks: { ...orderedBlocks, where: { isVisible: true } },
       forms: { where: { isActive: true }, include: { fields: { orderBy: [{ position: 'asc' }, { id: 'asc' }] } } },
       theme: true, socials: { ...orderedSocials, where: { isVisible: true } },
     } }), { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+  }
+  publicLink(blockId: string) {
+    return this.db.pageBlock.findFirst({ where: { id: blockId, type: 'LINK', isVisible: true,
+      page: { isPublished: true, user: { isActive: true, deletedAt: null } } },
+      select: { id: true, content: true, page: { select: { user: { select: { billingFeatures: true } } } } } });
   }
 }
