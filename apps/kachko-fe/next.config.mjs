@@ -1,3 +1,5 @@
+import { assertClerkBuildEnvironment } from "./lib/clerk-build-env.mjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -38,4 +40,7 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default function configureNext(phase) {
+  if (phase === "phase-production-build") assertClerkBuildEnvironment(process.env);
+  return nextConfig;
+}

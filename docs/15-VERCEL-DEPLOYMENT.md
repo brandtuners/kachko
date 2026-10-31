@@ -288,6 +288,12 @@ frontend project serving the affected domain. It must have
 used by that deployment. `CLERK_PUBLISHABLE_KEY` does not replace the Next.js
 variable. The keys must belong to the same Clerk instance.
 
+Production builds validate these variables in `next.config.mjs` before
+compilation. Missing names, whitespace, invalid prefixes, and mixed test/live
+key pairs fail the build with a specific message that never includes key
+values. Local production builds and CI builds also need a configured key pair;
+development and test commands do not run this production-build check.
+
 When building through `pnpm build` or `turbo run build`, Turborepo uses strict
 environment filtering. Both Clerk variables are declared in `tasks.build.env`
 in `turbo.json` so they reach Next.js and key changes invalidate the build
