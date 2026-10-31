@@ -280,6 +280,29 @@ vercel deploy --prod
 
 Environment changes affect new deployments, so redeploy after changing variables. See the [Vercel CLI deployment guide](https://vercel.com/docs/projects/deploy-from-cli).
 
+### Troubleshooting: Clerk keys missing after redeploy
+
+If Vercel logs say `Clerk keys are missing from your environment`, check the
+frontend project serving the affected domain. It must have
+`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` in the environment
+used by that deployment. `CLERK_PUBLISHABLE_KEY` does not replace the Next.js
+variable. The keys must belong to the same Clerk instance.
+
+When building through `pnpm build` or `turbo run build`, Turborepo uses strict
+environment filtering. Both Clerk variables are declared in `tasks.build.env`
+in `turbo.json` so they reach Next.js and key changes invalidate the build
+cache. Next.js framework inference permits `NEXT_PUBLIC_*`, but does not
+automatically permit `CLERK_SECRET_KEY`. Do not put the secret in
+`next.config.mjs`'s `env` option or give it a `NEXT_PUBLIC_` prefix.
+
+Deploy the commit containing this configuration change. Rebuilding an old
+deployment without this commit keeps the old allowlist. Rebuild without the
+existing build cache once, and verify that the resulting production deployment
+is assigned to the affected domain. If the error remains, inspect the newest
+deployment's first runtime error rather than older log entries.
+
+Reference: [Turborepo environment modes](https://turborepo.dev/docs/crafting-your-repository/using-environment-variables#environment-modes).
+
 ## Final release gate
 
 - [ ] Two Vercel projects use the correct monorepo root directories.
